@@ -1,4 +1,6 @@
 {
   "name": "Semaphore UI",
-  "render_readme": true
+  "render_readme": true,
+  "zip_release": true,
+  "filename": "semaphore_ui.zip"
 }

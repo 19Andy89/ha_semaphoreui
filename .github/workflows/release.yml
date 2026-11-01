@@ -1,0 +1,36 @@
+name: Release
+
+# Ein Tag „vX.Y.Z“ erzeugt ein GitHub-Release mit semaphore_ui.zip.
+# Das ZIP enthält nur den Inhalt von custom_components/semaphore_ui (so erwartet es HACS mit "zip_release").
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version des Tags mit manifest.json vergleichen
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(python3 -c "import json;print(json.load(open('custom_components/semaphore_ui/manifest.json'))['version'])")"
+          echo "Tag: $tag, manifest.json: $version"
+          [ "$tag" = "$version" ] || { echo "::error::Tag und manifest.json-Version passen nicht zusammen"; exit 1; }
+
+      - name: ZIP bauen (nur custom_components/semaphore_ui)
+        run: |
+          cd custom_components/semaphore_ui
+          zip -r -q ../../semaphore_ui.zip . -x "__pycache__/*" "*.pyc"
+          unzip -l ../../semaphore_ui.zip | tail -n 3
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" semaphore_ui.zip \
+            --title "$GITHUB_REF_NAME" --generate-notes --prerelease

@@ -42,6 +42,8 @@ die Pfade in dieser Datei durch absolute `https://raw.githubusercontent.com/<Ben
 3. In Semaphore ein API-Token anlegen: Benutzername (oben rechts) → **API-Tokens** → **Neues Token**.
 4. *Einstellungen → Geräte & Dienste → Integration hinzufügen → „Semaphore UI“*:
    URL (z. B. `https://semaphore.example.de`) + Token → danach das **Projekt** aus der Liste wählen.
+   Das Token darf ein Ablaufdatum haben: Die Integration zeigt es an und erneuert das Token rechtzeitig
+   (siehe [Token-Pflege](#token-pflege-ablauf-erneuern)).
 
 Mehrere Projekte: Integration einfach mehrfach hinzufügen.
 Die URL bitte so eintragen, wie sie ohne Weiterleitung erreichbar ist (`https://…`), sonst gehen POST-Aufrufe verloren.
@@ -502,6 +504,10 @@ sequence:
   ein fehlendes Gerät und können gelöscht werden. Die Zähler der Projekt-Karte (Templates, Handlungsbedarf, …) und „Nächster
   geplanter Lauf“ gelten nur für die angehakten Templates; der Zähler „Anzahl Templates“ nennt die weggelassenen im Attribut
   `excluded`. Ist Semaphore beim Öffnen der Optionen nicht erreichbar, fehlt die Liste; die gespeicherte Auswahl bleibt dann erhalten.
+* **API-Token vor dem Ablauf selbst erneuern** (Standard: an), **Tage vor dem Ablauf** (Standard 7), optional **Benutzer und Passwort
+  für den Notfall** – siehe [Token-Pflege](#token-pflege-ablauf-erneuern).
+
+![Optionen mit Token-Pflege](docs/screenshots/token-options.png)
 
 ## Fehler bei der Einrichtung
 
@@ -517,7 +523,9 @@ höchstens einen Hinweis pro Art, und er verschwindet von selbst, sobald das Pro
 
 | Hinweis | Wann | Was tun |
 |---|---|---|
-| **Semaphore: API-Token abgelehnt** | sofort, wenn Semaphore das Token ablehnt (HTTP 401) | **Beheben**: neues Token eintragen. Es wird geprüft, bevor es gespeichert wird; danach lädt die Integration neu und die offene Meldung „Erneut authentifizieren“ ist erledigt. |
+| **Semaphore: API-Token abgelehnt** | sofort, wenn Semaphore das Token ablehnt (HTTP 401) und kein gespeicherter Login hilft | **Beheben**: neues Token **oder Benutzer und Passwort** eintragen. Es wird geprüft, bevor es gespeichert wird; danach lädt die Integration neu und die offene Meldung „Erneut authentifizieren“ ist erledigt. |
+| **Semaphore: API-Token läuft bald ab** | wenn das Token in weniger als den eingestellten Tagen abläuft **und** die automatische Erneuerung aus ist | **Beheben**: legt mit dem aktuellen Token ein neues an, prüft und übernimmt es. |
+| **Semaphore: API-Token konnte nicht erneuert werden** | wenn die automatische Erneuerung fehlgeschlagen ist (der Grund steht im Hinweis) | **Beheben** versucht es erneut; sonst in Semaphore ein Token anlegen und unter „Erneut authentifizieren“ eintragen. |
 | **Semaphore ist nicht erreichbar** | wenn Semaphore **10 Minuten ohne Unterbrechung** nicht antwortet (Verbindung, Zeitüberschreitung, HTTP 5xx, falsche Antwort) | Semaphore, Adresse, Netzwerk und Firewall prüfen. Der Hinweis nennt den Grund und seit wann es besteht. Ein Neustart von Semaphore (ein paar Sekunden) löst nichts aus. |
 | **Semaphore-Projekt nicht gefunden** | wenn das Projekt **10 Minuten** lang HTTP 404/403 liefert | Projekt in Semaphore und Rechte des Tokens prüfen; wurde das Projekt gelöscht, den Eintrag entfernen. |
 
@@ -532,14 +540,34 @@ für diese Integration und freigegeben unter **CC0 1.0 (Public Domain)** – sie
 Logo und keine Grafik des Semaphore-UI-Projekts. Quelle: `brand/icon.svg`; Home Assistant 2026.10 lädt `brand/icon.png`
 und `brand/icon@2x.png` direkt aus der Integration.
 
-## Token, Zugangsdaten ändern
+## Token-Pflege (Ablauf, erneuern)
 
-Semaphore-API-Tokens laufen nicht von selbst ab (die API kennt nur das Flag `expired`, wenn man ein Token löscht).
-Wird ein Token abgelehnt, fragt Home Assistant über den Dialog **„Erneut authentifizieren“** nach einem neuen – und unter
-*Reparaturen* steht ein Hinweis, in dem sich das neue Token direkt eintragen lässt (siehe oben).
+Ab Semaphore 2.18.2 können API-Tokens ein **Ablaufdatum** haben. Die Integration liest es einmal pro Stunde
+(`GET /api/user/tokens`, das eigene Token erkennt sie an den ersten 8 Zeichen) und zeigt es an:
+
+* **Sensor „API-Token gültig bis“** (Diagnose, am Projekt-Gerät, Zeitstempel). Attribute: `token_found`, `token_name`, `created`,
+  `never_expires`, `auto_renew`, `renew_days_before`, `stored_login`, `last_renewed`, `renew_error`. Hat das Token kein Ablaufdatum
+  (oder zeigt Semaphore die Tokens nicht), bleibt der Sensor leer und es passiert nichts.
+* **Automatisch erneuern** (Option, Standard an): Bleiben weniger als **7 Tage** (einstellbar, höchstens die halbe Gültigkeitsdauer),
+  legt die Integration **mit dem Token selbst** ein neues an (`POST /api/user/tokens`, gleiche Gültigkeitsdauer, Name
+  „Home Assistant (semaphore_ui)“), prüft es mit einer Abfrage und stellt dann um. **Kein Passwort nötig.**
+  Das **alte Token wird nicht gelöscht**: Du nutzt es vielleicht noch anderswo (`rest_command`, Skripte), und es läuft von selbst ab.
+  Neue Tokens sammeln sich daher in Semaphore (unter „API-Tokens“); alte kannst du dort jederzeit selbst löschen.
+* **Erneuerung aus:** Dann erscheint unter *Reparaturen* der Hinweis „API-Token läuft bald ab“ mit **Beheben** (ein Klick erneuert).
+  Schlägt die automatische Erneuerung fehl, steht der Grund im Hinweis „konnte nicht erneuert werden“.
+
+![Reparatur „Token erneuern“](docs/screenshots/token-repair.png)
+
+**Notfall-Login (optional):** Ein Token, das Semaphore **schon ablehnt** (abgelaufen oder gelöscht), lässt sich nicht mehr mit sich
+selbst ersetzen. Trägst du in den Optionen Benutzer und Passwort ein (oder beim Erneut-Authentifizieren mit dem Haken
+„Benutzer und Passwort speichern“), meldet sich die Integration in diesem Fall an, legt ein neues Token an und **meldet sich wieder ab**.
+Der Versuch wird höchstens alle 10 Minuten wiederholt, damit ein falsches Passwort kein Konto sperrt. Das Passwort liegt – wie das Token –
+**unverschlüsselt** in der Konfiguration von Home Assistant (und ist in der Diagnose geschwärzt). Ein Benutzer mit **zweitem Faktor
+(MFA)** geht hier nicht. Ohne gespeicherten Login bleibt alles wie bisher: Das abgelehnte Token startet „Erneut authentifizieren“,
+und der Hinweis „API-Token abgelehnt“ erlaubt ein neues Token oder Benutzer und Passwort einzutragen.
+
 URL, Token oder die SSL-Prüfung später ändern: *Einstellungen → Geräte & Dienste → Semaphore UI → ⋮ → Neu konfigurieren*
 (alle Geräte, Entitäten und Verläufe bleiben erhalten).
-Geplant für 0.3: Token automatisch erneuern.
 
 ## Logbuch, Diagnose, Aufräumen
 
@@ -557,7 +585,10 @@ Geplant für 0.3: Token automatisch erneuern.
 * Doppelstart-Schutz: Dass „Parallele Tasks“ am Template im Feld `allow_parallel_tasks` der Semaphore-API steht, ist eine
   Annahme aus der API-Beschreibung und noch nicht gegen eine echte Instanz geprüft. Greift das Template-Flag nicht, hilft die
   Option „Mehrfachstart erlauben“ der Integration. Ein in Semaphore gestarteter Lauf sperrt erst nach dem nächsten Abruf.
-* Geplantes und Ideen stehen in [BACKLOG.md](BACKLOG.md).
+* Geplantes und Ideen stehen als [Issues](../../issues) im Repository.
+* Token-Erneuerung: gegen den Nachbau der API und ein frisches Home Assistant getestet, **noch nicht an einer echten Instanz mit
+  ablaufendem Token** (die Felder `expires_at`/`name` gibt es ab Semaphore 2.18.2; `POST /api/user/tokens` mit dem Token selbst
+  ist aus dem Quellcode abgeleitet). Bitte beim ersten Mal mit einem Token mit kurzer Laufzeit prüfen.
 * Hinweise (`notes`) und Paketlisten werden gekürzt (10 Hinweise zu je 200 Zeichen, 50 Pakete je Lauf); der Rest bleibt im Log von Semaphore.
 * Zeitpläne: Die Integration schaltet sie nur ein/aus und zeigt sie an (anlegen und ändern geht in Semaphore). Der Endpunkt
   `…/schedules/<id>/active` ist im Quellcode von Semaphore 2.19 geprüft, gegen den Nachbau getestet und an einer echten Instanz
@@ -598,6 +629,9 @@ pytest
 * `tests/test_repairs.py` – Reparaturen: abgelehntes Token (sofort, Beheben-Dialog mit Prüfung, Token ohne Zugriff, entfernter Eintrag),
   Ausfall erst nach 10 Minuten (auch über Setup-Wiederholungen), kurzer Ausfall ohne Hinweis, Projekt weg (403/404), Hinweise
   verschwinden bei Erholung und beim Entfernen, Texte (Platzhalter in de/en).
+* `tests/test_tokens.py` – Token-Pflege: Ablauf lesen (Sensor, kein Ablauf, Liste nicht lesbar), Erneuern vor dem Ablauf (Fenster,
+  halbe Laufzeit, neues Token wird geprüft, altes bleibt), Fehlschlag mit Hinweis, Erneuerung aus, Notfall-Login (abgelehntes Token,
+  falsches Passwort wird nicht ständig wiederholt, MFA), Formulare (Neu authentifizieren, Reparatur, Optionen), Diagnose ohne Passwort.
 * `tests/test_running_overview.py` – Projekt-Sensoren „Laufende Tasks“ / „Template läuft“ nennen die laufenden Templates (auch aus Semaphore gestartete).
 * `tests/test_parallel_guard.py` – Doppelstart-Schutz (gesperrter zweiter Start, gleichzeitige Starts, Testlauf, Option
   „Mehrfachstart erlauben“, Template-Flag „Parallele Tasks“, in Semaphore gestartete Läufe, Attribute des Läuft-Sensors).
@@ -616,6 +650,7 @@ Karten-Auswahl („Nach Karte“), Dashboard-Ressource, die Fehlertexte im Einri
 (inkl. Ansicht „nur Benötigtes“), außerdem Zahlen je Host und Hinweise, anklickbare Zeilen, die **Kachel-Filter** und die
 **Versionsanzeigen** der Projekt-Karte, die **Zeitpläne** (Schalter wirkt auf Semaphore, „Nächster Lauf“, „Zuletzt erfolgreich“), den **Kringel** nach dem Klick
 (Schalter, Starten) und
+die **Token-Pflege** (Sensor, Optionen, Reparatur „Beheben“ legt ein neues Token an) und
 die **Bilder für diese Doku**. Dauert gut zwei Minuten.
 
 ```bash
@@ -643,7 +678,8 @@ custom_components/semaphore_ui/
   coordinator.py   Abfrage, Start/Ende-Erkennung, Ereignisse, Start/Stopp/Warten; Versions-Coordinator
   config_flow.py   Einrichtung, Re-Auth, Neu konfigurieren, Optionen (inkl. Template-Auswahl)
   issues.py        Reparatur-Hinweise (Token, nicht erreichbar, Projekt weg) erzeugen und aufräumen
-  repairs.py       „Beheben“-Dialog des Token-Hinweises (neues Token eintragen und prüfen)
+  tokens.py        Token-Pflege: Ablauf lesen, rechtzeitig erneuern, Notfall-Login (Sensor, Reparatur „läuft bald ab“)
+  repairs.py       Beheben-Dialoge: Token abgelehnt (Token oder Login eintragen), Token jetzt erneuern
   survey.py        Survey-Variablen: Defaults, Pflichtfelder, Typen (ohne Home-Assistant-Abhängigkeit)
   survey_entity.py · text.py · number.py · select.py   Eingabe-Entitäten der Survey-Variablen
   sensor.py · binary_sensor.py · button.py · event.py · update.py · switch.py (Zeitpläne)

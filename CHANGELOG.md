@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 (alpha) – Token-Pflege
+- **Ablauf des API-Tokens wird angezeigt:** neuer Sensor „API-Token gültig bis“ (Diagnose, Projekt-Gerät) mit Attributen
+  (`token_found`, `token_name`, `created`, `never_expires`, `auto_renew`, `renew_days_before`, `stored_login`, `last_renewed`, `renew_error`).
+  Gelesen wird einmal pro Stunde über `GET /api/user/tokens` (Semaphore ab 2.18.2); ohne Ablaufdatum oder ohne Listenzugriff bleibt alles wie bisher.
+- **Automatisch erneuern (Option, Standard an):** Bleiben weniger als 7 Tage (einstellbar, höchstens die halbe Laufzeit), legt die
+  Integration **mit dem Token selbst** ein neues an (gleiche Laufzeit, Name „Home Assistant (semaphore_ui)“), prüft es und stellt um.
+  Kein Passwort nötig. Das **alte Token bleibt bestehen** und läuft von selbst ab.
+- **Reparaturen:** „API-Token läuft bald ab“ (nur bei ausgeschalteter Erneuerung; **Beheben** erneuert sofort) und „API-Token konnte nicht
+  erneuert werden“ (mit Grund).
+- **Notfall-Login (optional):** Mit gespeichertem Benutzer/Passwort (Optionen, Erneut authentifizieren oder Reparatur) ersetzt die
+  Integration ein Token, das Semaphore schon ablehnt: anmelden, Token anlegen, abmelden. Höchstens alle 10 Minuten ein Versuch;
+  Passwort liegt unverschlüsselt in der Konfiguration (in der Diagnose geschwärzt); kein zweiter Faktor (MFA).
+- **Erneut authentifizieren** und die Reparatur „Token abgelehnt“ akzeptieren jetzt ein Token **oder** Benutzer und Passwort.
+- Diagnose: Abschnitt `token` (ohne Token und Passwort). Neue Übersetzungen (de/en).
+- Release: Ein Tag `vX.Y.Z` baut per GitHub Actions `semaphore_ui.zip` (nur `custom_components/semaphore_ui`) und legt ein Release an;
+  `hacs.json` nutzt `zip_release`. Der Backlog liegt jetzt in den GitHub-Issues.
+- Tests: 257 pytest-Tests (neu: `test_tokens.py`), Browser-Test mit 170 Prüfungen (neu: Sensor, Optionen, Reparatur „Beheben“ legt ein neues Token an).
+  **Nicht an einer echten Instanz mit ablaufendem Token geprüft.**
+
 ## 0.2.3 (alpha) – Playbook konsolidiert
 - **Beispiel-Playbook** liegt jetzt einheitlich unter `playbooks/update-linux.yml` (die bisherige Kopie `examples/update-linux.yml` wurde entfernt). Inhalt unverändert zur 0.2.2-Version (adaptive Speicherplatz-Prüfung, `disk_*`-Metriken im `HA_RESULT`).
 - Doku und Tests auf den neuen Pfad umgestellt.
