@@ -534,6 +534,19 @@ def test_disk_figures(page: Page) -> None:
     check("Platte: Template ohne Werte zeigt keinen Block", quiet == 0, quiet)
 
 
+def test_dry_run_marker(page: Page) -> None:
+    """Testlauf-Kennzeichen: Template-Karte (Zeile „Letzter Lauf“) und Projekt-Karte (Untertitel) – nur wenn der letzte Lauf ein Testlauf war."""
+    docker = tcard(page, "docker-system")
+    check("Testlauf: Template-Karte mit Testlauf zeigt das Kennzeichen", docker.locator(".row .tag[data-dry]").count() == 1 and docker.locator(".row .tag[data-dry]").inner_text() == "Testlauf", docker.locator(".row .tag").count())
+    check("Testlauf: Kennzeichen erklärt sich im Tooltip", "nichts verändert" in (docker.locator(".tag[data-dry]").get_attribute("title") or ""))
+    check("Testlauf: Template-Karte eines echten Laufs hat keins", tcard(page, "Host-Update").locator(".tag[data-dry]").count() == 0)
+    project = page.locator("semaphore-ui-project-card").first
+    subs = {i.locator(".name").inner_text().strip(): i.locator(".sub").inner_text() for i in project.locator(".item").all()}
+    dock = next((v for k, v in subs.items() if k.startswith("docker-system")), "")
+    check("Testlauf: Projekt-Karte nennt „Testlauf“ beim Template mit Testlauf", "Testlauf" in dock, subs)
+    check("Testlauf: Projekt-Karte nennt es sonst nirgends", sum("Testlauf" in v for v in subs.values()) == 1, subs)
+
+
 def test_busy_schedule(page: Page) -> None:
     """0.2.1: Nach dem Klick auf den Zeitplan-Schalter dreht sich ein Kringel, bis Semaphore geantwortet hat."""
     host = tcard(page, "Host-Update")
@@ -1083,6 +1096,7 @@ def main() -> int:
             test_template_card_details(page)
             test_packages_one_line(page)
             test_disk_figures(page)
+            test_dry_run_marker(page)
             test_project_filters(page)
             test_schedules_ui(page)
             test_busy_schedule(page)

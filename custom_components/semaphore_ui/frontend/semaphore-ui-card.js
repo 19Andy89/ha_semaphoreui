@@ -17,6 +17,7 @@ const TEXTS = {
   de: {
     start: "Starten",
     dry_run: "Testlauf",
+    dry_run_hint: "Der letzte Lauf war ein Testlauf (es wurde nichts verändert)",
     stop: "Stoppen",
     last_run: "Letzter Lauf",
     duration: "Dauer",
@@ -110,6 +111,7 @@ const TEXTS = {
   en: {
     start: "Start",
     dry_run: "Dry run",
+    dry_run_hint: "The last run was a dry run (nothing was changed)",
     stop: "Stop",
     last_run: "Last run",
     duration: "Duration",
@@ -336,6 +338,7 @@ const STYLE = `
   .notes { margin-top: 6px; display: grid; gap: 4px; }
   .note { display: flex; gap: 6px; align-items: flex-start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   .note ha-icon { --mdc-icon-size: 16px; flex: none; margin-top: 1px; }
+  .tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 10px; font-size: 0.8em; line-height: 1.6; font-weight: 500; vertical-align: baseline; background: var(--secondary-background-color, #eee); color: var(--secondary-text-color); border: 1px solid var(--divider-color, #ccc); white-space: nowrap; }
   .disks { margin-top: 6px; display: grid; gap: 4px; }
   .disk { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 6px; row-gap: 3px; align-items: start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   .needbox .disk ha-icon { --mdc-icon-size: 16px; margin-top: 1px; color: var(--secondary-text-color); }
@@ -701,7 +704,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     } else {
       if (startedIso && startedIso !== "unknown" && startedIso !== "unavailable") {
         rows.push(
-          row(running ? T.running_since : T.last_run, `<span class="v" title="${esc(fmtDate(startedIso, hass))}">${esc(fmtDate(startedIso, hass))} · ${esc(fmtRelative(startedIso, hass))}</span>`, byKey["sensor:last_started"])
+          row(running ? T.running_since : T.last_run, `<span class="v" title="${esc(fmtDate(startedIso, hass))}">${esc(fmtDate(startedIso, hass))} · ${esc(fmtRelative(startedIso, hass))}${rep.dry_run ? `<span class="tag" data-dry="1" title="${esc(T.dry_run_hint)}">${esc(T.dry_run)}</span>` : ""}</span>`, byKey["sensor:last_started"])
         );
       }
       if (running && startedIso) {
@@ -1209,6 +1212,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     if (t.status === "never_run") bits.push(T.never);
     else {
       bits.push(T.status[known] || known);
+      if (t.rep && t.rep.dry_run) bits.push(T.dry_run);
       if (t.started && t.started !== "unknown") bits.push(fmtRelative(t.started, hass));
       if (!active && t.duration && !isNaN(Number(t.duration))) bits.push(fmtDuration(Number(t.duration), hass));
     }

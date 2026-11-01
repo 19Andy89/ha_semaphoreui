@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- **Testlauf sichtbar:** War der letzte Lauf ein Testlauf (Dry Run), zeigt die Template-Karte neben „Letzter Lauf“ das Kennzeichen „Testlauf“
+  (mit Tooltip), die Projekt-Karte nennt es im Untertitel des Templates („Erfolgreich · Testlauf · vor 3 Stunden“). Läufe ohne Testlauf bleiben unverändert.
+  Dazu gibt es keinen neuen Sensor: Das Attribut `dry_run` der Zusammenfassung war schon da.
+- Browser-Test: 182 Prüfungen (neu: Kennzeichen in beiden Karten).
+
 ## 0.4.0 (alpha) – Platte je Host in der Template-Karte
 - **Template-Karte:** Meldet ein Host im `HA_RESULT` die Platte (`disk_free_mib`, `disk_required_mib`, `disk_used_percent`, wie vom
   mitgelieferten `playbooks/update-linux.yml`), zeigt die Box „Offene Updates“ bzw. „Nichts zu tun“ je Host eine Zeile
