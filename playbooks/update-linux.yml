@@ -249,6 +249,6 @@
             'packages': (upgrade_final.stdout_lines | select('match', '^Inst ') | map('regex_replace', '^Inst (\S+).*$', '\1') | list),
             'disk_free_mib': ((root_available_kib.stdout_lines[-1] | int) / 1024) | round(1),
             'disk_required_mib': ((required_space_kib.stdout | default('0') | trim | int) / 1024) | round(1),
-            'disk_used_percent': (((1 - ((root_available_kib.stdout_lines[-1] | int) / (root_total_kib.stdout_lines[-1] | int))) * 100) | round(1),
+            'disk_used_percent': ((1 - ((root_available_kib.stdout_lines[-1] | int) / (root_total_kib.stdout_lines[-1] | int))) * 100) | round(1),
             'notes': ([debian_hinweis] if debian_hinweis is defined else [])
           } | to_json }}
