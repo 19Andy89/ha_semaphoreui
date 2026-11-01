@@ -1,0 +1,43 @@
+run_template:
+  target:
+    device:
+      integration: semaphore_ui
+      model: Template
+  fields:
+    dry_run:
+      required: false
+      default: false
+      selector:
+        boolean:
+    wait:
+      required: false
+      default: false
+      selector:
+        boolean:
+    timeout:
+      required: false
+      default: 600
+      selector:
+        number:
+          min: 5
+          max: 7200
+          step: 5
+          unit_of_measurement: s
+          mode: box
+    message:
+      required: false
+      selector:
+        text:
+    limit:
+      required: false
+      selector:
+        text:
+    survey:
+      required: false
+      selector:
+        object:
+    raise_on_failure:
+      required: false
+      default: false
+      selector:
+        boolean:

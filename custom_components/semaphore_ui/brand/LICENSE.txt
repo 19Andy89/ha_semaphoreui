@@ -1,0 +1,6 @@
+Das Symbol in diesem Ordner (icon.svg, icon.png, icon@2x.png) ist eine eigene Zeichnung für diese Integration
+und steht unter CC0 1.0 (Public Domain): https://creativecommons.org/publicdomain/zero/1.0/
+Es verwendet kein Logo, keine Schrift und keine Grafik des Semaphore-UI-Projekts.
+
+The icon in this folder (icon.svg, icon.png, icon@2x.png) is original artwork made for this integration and is
+released under CC0 1.0 (public domain). It does not use any logo, font or artwork of the Semaphore UI project.

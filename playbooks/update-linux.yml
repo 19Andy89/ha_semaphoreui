@@ -1,0 +1,254 @@
+# examples/update-linux.yml – Linux-Gäste aktualisieren und das Ergebnis an Home Assistant melden (HA_RESULT)
+---
+- name: Linux-Gäste aktualisieren
+  hosts: linux_guests
+  become: true
+  serial: 1
+
+  # Anpassbare Schwellenwerte (über extra-vars oder host_vars überschreibbar):
+  #   min_free_space_kib     – absolute Mindestreserve auf / in KiB (Default: 512 MiB)
+  #   update_space_buffer_kib – Puffer über dem errechneten Update-Bedarf in KiB (Default: 256 MiB)
+  # Bei Root-Partitionen >= 15 GiB wird automatisch eine Mindestreserve von 2 GiB verwendet.
+  vars:
+    min_free_space_kib: 524288
+    update_space_buffer_kib: 262144
+
+  tasks:
+    - name: Erreichbarkeit prüfen
+      ansible.builtin.ping:
+
+    - name: Freien Speicherplatz prüfen
+      ansible.builtin.command: df -P /
+      changed_when: false
+      check_mode: false
+      register: disk_space
+
+    - name: Speicherplatz anzeigen
+      ansible.builtin.debug:
+        var: disk_space.stdout_lines
+
+    - name: Verfügbaren Speicherplatz für Update prüfen
+      ansible.builtin.command:
+        argv:
+          - df
+          - --output=avail
+          - -k
+          - /
+      changed_when: false
+      check_mode: false
+      register: root_available_kib
+
+    - name: Gesamtgröße der Root-Partition ermitteln
+      ansible.builtin.command:
+        argv:
+          - df
+          - --output=size
+          - -k
+          - /
+      changed_when: false
+      check_mode: false
+      register: root_total_kib
+
+    - name: Adaptive Mindestreserve berechnen
+      ansible.builtin.set_fact:
+        effective_min_free_kib: >-
+          {{
+            2097152
+            if (root_total_kib.stdout_lines[-1] | int) >= 15728640
+            else (min_free_space_kib | int)
+          }}
+
+    - name: Paketlisten aktualisieren
+      ansible.builtin.apt:
+        auto_install_module_deps: true
+        update_cache: true
+        cache_valid_time: 3600
+        update_cache_retries: 3
+        update_cache_retry_max_delay: 12
+        lock_timeout: 300
+      check_mode: false
+
+    - name: Verfügbare Paketupdates ermitteln
+      ansible.builtin.command:
+        cmd: timeout 120s apt-get -s upgrade
+      environment:
+        LC_ALL: C
+      changed_when: false
+      check_mode: false
+      register: upgrade_simulation
+
+    - name: Anzahl verfügbarer Paketupdates anzeigen
+      ansible.builtin.debug:
+        msg: >-
+          Paketupdates verfügbar:
+          {{ upgrade_simulation.stdout_lines
+             | select('match', '^Inst ')
+             | list
+             | length }}
+
+    - name: Benötigten Speicherplatz der Updates aus der Simulation berechnen
+      ansible.builtin.shell: |
+        python3 -c '
+        import sys, re
+        text = sys.stdin.read()
+        units = {"B": 1.0 / 1024.0, "kB": 1.0, "MB": 1024.0, "GB": 1048576.0}
+        def conv(num, unit):
+            return float(num.replace(",", "")) * units.get(unit, 1.0)
+        download = 0.0
+        additional = 0.0
+        for line in text.splitlines():
+            m = re.search(r"Need to get ([\d.,]+)\s*(B|kB|MB|GB)\s+of archives", line)
+            if m:
+                download = conv(m.group(1), m.group(2))
+            m = re.search(r"After this operation, ([\d.,]+)\s*(B|kB|MB|GB) of additional disk space will be (used|freed)\.", line)
+            if m:
+                v = conv(m.group(1), m.group(2))
+                additional = v if m.group(3) == "used" else -v
+        peak = download + (additional if additional > 0 else 0.0)
+        print(int(peak))
+        '
+      args:
+        stdin: "{{ upgrade_simulation.stdout }}"
+      changed_when: false
+      register: required_space_kib
+
+    - name: Benötigten Speicherplatz anzeigen
+      ansible.builtin.debug:
+        msg: >-
+          Updates benötigen ca.
+          {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB
+          (Download + zusätzlicher Platz, ohne {{ (update_space_buffer_kib | int / 1024) | round(0) }} MiB Puffer).
+
+    - name: Update bei zu wenig freiem Speicher verhindern
+      ansible.builtin.assert:
+        that:
+          - (root_available_kib.stdout_lines[-1] | int) >= (required_space_kib.stdout | default('0') | trim | int) + (update_space_buffer_kib | int)
+          - (root_available_kib.stdout_lines[-1] | int) >= (effective_min_free_kib | int)
+        fail_msg: >-
+          Update abgebrochen: Auf / sind nur
+          {{ ((root_available_kib.stdout_lines[-1] | int) / 1048576) | round(2) }} GiB frei.
+          Benötigt werden ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB für die Updates
+          plus {{ (update_space_buffer_kib | int / 1024) | round(0) }} MiB Puffer
+          (Mindestreserve {{ (effective_min_free_kib | int / 1024) | round(0) }} MiB).
+        success_msg: >-
+          Ausreichend Speicherplatz vorhanden:
+          {{ ((root_available_kib.stdout_lines[-1] | int) / 1048576) | round(2) }} GiB frei;
+          Updates benötigen ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB.
+
+    - name: Installierte Pakete aktualisieren
+      ansible.builtin.apt:
+        auto_install_module_deps: true
+        upgrade: safe
+        lock_timeout: 300
+        update_cache_retries: 3
+        update_cache_retry_max_delay: 12
+
+    - name: Neustartbedarf prüfen
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Neustartbedarf anzeigen
+      ansible.builtin.debug:
+        msg: >-
+          Neustart erforderlich: {{ reboot_required.stat.exists }}
+
+    - name: Offene Paketupdates nach dem Lauf ermitteln
+      ansible.builtin.command:
+        cmd: timeout 120s apt-get -s upgrade
+      environment:
+        LC_ALL: C
+      changed_when: false
+      check_mode: false
+      register: upgrade_final
+
+    - name: Aktuelle Debian-Stable-Version abfragen
+      ansible.builtin.uri:
+        url: https://deb.debian.org/debian/dists/stable/Release
+        return_content: true
+        status_code: 200
+        timeout: 10
+      register: debian_stable_release
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when: ansible_facts.distribution == "Debian"
+
+    - name: Debian-Metadaten extrahieren
+      ansible.builtin.set_fact:
+        debian_stable_version_line: >-
+          {{
+            debian_stable_release.content.splitlines()
+            | select('match', '^Version:')
+            | list
+            | first
+            | default('')
+          }}
+        debian_stable_codename_line: >-
+          {{
+            debian_stable_release.content.splitlines()
+            | select('match', '^Codename:')
+            | list
+            | first
+            | default('')
+          }}
+      when:
+        - ansible_facts.distribution == "Debian"
+        - debian_stable_release is not failed
+        - debian_stable_release.content is defined
+
+    - name: Debian-Version und Codename extrahieren
+      ansible.builtin.set_fact:
+        debian_stable_major: "{{ (debian_stable_version_line.split(':', 1)[1] | trim).split('.')[0] | int }}"
+        debian_stable_codename: "{{ debian_stable_codename_line.split(':', 1)[1] | trim }}"
+      when:
+        - debian_stable_version_line is defined
+        - debian_stable_version_line is match('^Version:\\s*[0-9]+')
+        - debian_stable_codename_line is defined
+        - debian_stable_codename_line is match('^Codename:\\s*\\S+')
+
+    - name: Debian-Versionen vergleichen
+      ansible.builtin.debug:
+        msg: >-
+          Installiert: Debian {{ ansible_facts.distribution_major_version }}
+          ({{ ansible_facts.distribution_release }}).
+          Aktuell stabil: Debian {{ debian_stable_major }}
+          ({{ debian_stable_codename }}).
+          {{
+            'HINWEIS: Distributionsupgrade prüfen!'
+            if (ansible_facts.distribution_major_version | int) < (debian_stable_major | int)
+            else
+            'Hauptversion entspricht der aktuellen Stable-Version.'
+            if (ansible_facts.distribution_major_version | int) == (debian_stable_major | int)
+            else
+            'Installierte Hauptversion ist neuer als Stable; Release-Kanal prüfen.'
+          }}
+      when:
+        - ansible_facts.distribution == "Debian"
+        - debian_stable_major is defined
+        - debian_stable_codename is defined
+
+    - name: Hinweis für Home Assistant vorbereiten
+      ansible.builtin.set_fact:
+        debian_hinweis: >-
+          Debian {{ ansible_facts.distribution_major_version }}
+          ({{ ansible_facts.distribution_release }}) installiert,
+          aktuell stabil ist Debian {{ debian_stable_major }}
+          ({{ debian_stable_codename }})
+      when:
+        - ansible_facts.distribution == "Debian"
+        - debian_stable_major is defined
+        - (ansible_facts.distribution_major_version | int) < (debian_stable_major | int)
+
+    - name: Ergebnis für Home Assistant melden
+      ansible.builtin.debug:
+        msg: >-
+          HA_RESULT {{ {
+            'updates': (upgrade_final.stdout_lines | select('match', '^Inst ') | list | length),
+            'reboot_required': reboot_required.stat.exists,
+            'packages': (upgrade_final.stdout_lines | select('match', '^Inst ') | map('regex_replace', '^Inst (\S+).*$', '\1') | list),
+            'disk_free_mib': ((root_available_kib.stdout_lines[-1] | int) / 1024) | round(1),
+            'disk_required_mib': ((required_space_kib.stdout | default('0') | trim | int) / 1024) | round(1),
+            'disk_used_percent': (((1 - ((root_available_kib.stdout_lines[-1] | int) / (root_total_kib.stdout_lines[-1] | int))) * 100) | round(1),
+            'notes': ([debian_hinweis] if debian_hinweis is defined else [])
+          } | to_json }}

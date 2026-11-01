@@ -1,0 +1,11 @@
+
+PLAY [hosts] *******************************************************************
+
+TASK [Ergebnis fuer Home Assistant melden] *************************************
+ok: [adguard] => {
+    "msg": "HA_RESULT {\n    \"packages\": [\n        \"it's-a-pkg\",\n        \"libssl3\"\n    ],\n    \"reboot_required\": false,\n    \"updates\": 2\n}\n"
+}
+
+PLAY RECAP *********************************************************************
+adguard                    : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+

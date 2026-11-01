@@ -1,0 +1,15 @@
+
+PLAY [Hinweise an Home Assistant melden] ***************************************
+
+TASK [Ergebnis fuer Home Assistant melden] *************************************
+ok: [adguard] => {
+    "msg": "HA_RESULT {\"updates\": 0, \"reboot_required\": false, \"notes\": [\"Installiert: Debian 12 (bookworm). Aktuell stabil: Debian 13 (trixie). HINWEIS: Distributionsupgrade pr\\u00fcfen!\"]}"
+}
+ok: [dockerhost] => {
+    "msg": "HA_RESULT {\"updates\": 0, \"reboot_required\": false, \"notes\": \"it's old: Kernel > 2 Jahre\"}"
+}
+
+PLAY RECAP *********************************************************************
+adguard                    : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+dockerhost                 : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+

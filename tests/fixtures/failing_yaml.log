@@ -1,0 +1,34 @@
+
+PLAY [hosts] *******************************************************************
+
+TASK [Ergebnis fuer Home Assistant melden] *************************************
+ok: [adguard] =>
+    msg: 'HA_RESULT {"updates": 4, "reboot_required": true}'
+
+TASK [Danach geht etwas schief] ************************************************
+Origin: /tmp/claude-0/-home-claude/b35a6908-f5ba-5c07-a167-6b94d7a04cc4/scratchpad/ansible_try/failing.yml:8:7
+
+6         msg: >-
+7           HA_RESULT {{ {'updates': 4, 'reboot_required': true} | to_json }}
+8     - name: Danach geht etwas schief
+        ^ column 7
+
+fatal: [adguard]: FAILED! =>
+    ansible_facts:
+        discovered_interpreter_python: /root/.local/bin/python3.14
+    changed: true
+    cmd:
+    - /bin/false
+    delta: '0:00:00.008134'
+    end: '2026-10-28 06:02:59.501029'
+    msg: The command exited with a non-zero return code.
+    rc: 1
+    start: '2026-10-28 06:02:59.492895'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+
+PLAY RECAP *********************************************************************
+adguard                    : ok=1    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0
+

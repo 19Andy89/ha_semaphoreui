@@ -1,0 +1,321 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Semaphore UI verbinden",
+        "description": "Adresse deiner Semaphore-Instanz und ein API-Token. Das Token legst du in Semaphore unter Benutzername (oben rechts) → „API-Tokens“ → „Neues Token“ an.",
+        "data": {
+          "url": "URL (z. B. https://semaphore.example.de)",
+          "api_token": "API-Token",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        }
+      },
+      "project": {
+        "title": "Projekt auswählen",
+        "description": "Pro Projekt wird ein Eintrag angelegt. Jedes Template des Projekts wird ein eigenes Gerät.",
+        "data": {
+          "project_id": "Projekt"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Neues API-Token",
+        "description": "Das Token für {url} wurde abgelehnt. Bitte ein neues API-Token eingeben.",
+        "data": {
+          "api_token": "API-Token"
+        }
+      },
+      "reconfigure": {
+        "title": "Zugangsdaten ändern",
+        "description": "Neue Adresse, neues API-Token oder SSL-Einstellung für dieses Projekt. Geräte und Einträge bleiben erhalten.",
+        "data": {
+          "url": "URL (z. B. https://semaphore.example.de)",
+          "api_token": "API-Token",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zu {url} fehlgeschlagen: {detail}",
+      "cannot_resolve": "Der Name „{host}“ konnte nicht aufgelöst werden (DNS: {detail}). Home Assistant kennt diesen Namen nicht. Prüfe die Schreibweise und den DNS-Server von Home Assistant (Einstellungen → System → Netzwerk) oder verwende stattdessen die IP-Adresse, z. B. http://192.168.1.10:3000.",
+      "connection_refused": "{detail} lehnt die Verbindung ab: Auf diesem Port läuft kein Dienst. Prüfe den Port (Semaphore: standardmäßig 3000) und ob http oder https stimmt.",
+      "timeout": "{host} antwortet nicht innerhalb von {seconds} Sekunden. Prüfe Adresse, Port und Firewall.",
+      "ssl_error": "SSL-/Zertifikatsfehler bei {host}: {detail}. Bei selbstsignierten oder internen Zertifikaten „SSL-Zertifikat prüfen“ ausschalten oder http verwenden.",
+      "host_unreachable": "{host} ist von Home Assistant aus nicht erreichbar ({detail}). Prüfe Adresse, Netzwerk/VLAN und Firewall.",
+      "connection_lost": "Die Verbindung zu {host} wurde unterbrochen ({detail}). Prüfe, ob http/https stimmt, und versuche es erneut.",
+      "invalid_url": "Die Adresse ist ungültig ({detail}). Beispiel: https://semaphore.example.de oder http://192.168.1.10:3000",
+      "not_semaphore": "Unter {url} antwortet kein Semaphore UI (HTTP {status}: {detail}). Prüfe Adresse, Port und ggf. den Unterpfad, ohne „/api“ am Ende.",
+      "http_error": "Semaphore antwortet mit HTTP {status}: {detail}",
+      "project_not_found": "Das Projekt gibt es unter {url} nicht (mehr), oder dieses Token darf es nicht sehen (HTTP 404).",
+      "invalid_auth": "Das API-Token wurde abgelehnt (HTTP 401). Lege in Semaphore unter Benutzername → „API-Tokens“ ein neues an und prüfe, dass es vollständig kopiert wurde.",
+      "no_projects": "Mit diesem Token ist kein Projekt sichtbar.",
+      "unknown": "Unerwarteter Fehler: {detail}"
+    },
+    "abort": {
+      "already_configured": "Dieses Projekt ist bereits eingerichtet.",
+      "reauth_successful": "Das neue Token wurde übernommen."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Semaphore UI",
+        "description": "Während ein Task läuft, wird automatisch alle 5 Sekunden abgefragt.",
+        "data": {
+          "scan_interval": "Abfrage-Intervall (Sekunden)",
+          "check_for_updates": "Auf neue Semaphore-Version prüfen (fragt alle 6 Std. GitHub ab)",
+          "allow_parallel_runs": "Mehrfachstart erlauben (Template starten, obwohl schon ein Lauf wartet oder läuft)",
+          "templates": "Templates in Home Assistant anzeigen"
+        },
+        "data_description": {
+          "allow_parallel_runs": "Aus (Standard): Solange für ein Template ein Lauf wartet oder läuft, sind Starten und Testlauf gesperrt – Karte, Taste und Aktion. An: Home Assistant startet trotzdem; Semaphore reiht den Lauf ein oder startet ihn parallel (je nach „Parallele Tasks erlauben“ am Template). Erlaubt das Template in Semaphore parallele Tasks, gilt das immer.",
+          "templates": "Nur angehakte Templates bekommen Geräte, Entitäten und Zeitplan-Schalter. Abgewählte werden beim Speichern entfernt (ihre Dashboard-Karten zeigen dann ein fehlendes Gerät); Läufe und Zeitpläne in Semaphore bleiben unberührt, die Zähler der Projekt-Karte zählen nur die angehakten. Neue Templates aus Semaphore erscheinen automatisch. Mindestens eines muss angehakt bleiben."
+        }
+      }
+    },
+    "error": {
+      "no_templates": "Mindestens ein Template muss angehakt bleiben."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "never_run": "Noch nie ausgeführt",
+          "waiting": "Wartet",
+          "starting": "Startet",
+          "waiting_confirmation": "Wartet auf Bestätigung",
+          "confirmed": "Bestätigt",
+          "running": "Läuft",
+          "stopping": "Wird gestoppt",
+          "success": "Erfolgreich",
+          "error": "Fehler",
+          "stopped": "Abgebrochen",
+          "rejected": "Abgelehnt"
+        }
+      },
+      "last_started": {
+        "name": "Zuletzt gestartet"
+      },
+      "last_ended": {
+        "name": "Zuletzt beendet"
+      },
+      "last_duration": {
+        "name": "Letzte Dauer"
+      },
+      "summary": {
+        "name": "Zusammenfassung"
+      },
+      "running_tasks": {
+        "name": "Laufende Tasks"
+      },
+      "template_count": {
+        "name": "Anzahl Templates"
+      },
+      "failed_templates": {
+        "name": "Templates mit Fehler"
+      },
+      "last_task_template": {
+        "name": "Zuletzt gelaufenes Template"
+      },
+      "last_task_status": {
+        "name": "Status des letzten Laufs",
+        "state": {
+          "never_run": "Noch nie ausgeführt",
+          "waiting": "Wartet",
+          "starting": "Startet",
+          "waiting_confirmation": "Wartet auf Bestätigung",
+          "confirmed": "Bestätigt",
+          "running": "Läuft",
+          "stopping": "Wird gestoppt",
+          "success": "Erfolgreich",
+          "error": "Fehler",
+          "stopped": "Abgebrochen",
+          "rejected": "Abgelehnt"
+        }
+      },
+      "last_task_started": {
+        "name": "Letzter Lauf gestartet"
+      },
+      "pending_updates": {
+        "name": "Offene Updates"
+      },
+      "action_templates": {
+        "name": "Templates mit Handlungsbedarf"
+      },
+      "next_run": {
+        "name": "Nächster Lauf"
+      },
+      "project_next_run": {
+        "name": "Nächster geplanter Lauf"
+      },
+      "last_success": {
+        "name": "Zuletzt erfolgreich"
+      }
+    },
+    "binary_sensor": {
+      "running": {
+        "name": "Läuft"
+      },
+      "problem": {
+        "name": "Letzter Lauf fehlgeschlagen"
+      },
+      "connectivity": {
+        "name": "Verfügbar"
+      },
+      "project_problem": {
+        "name": "Template mit Fehler"
+      },
+      "needs_action": {
+        "name": "Handlungsbedarf"
+      },
+      "project_running": {
+        "name": "Template läuft"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Starten"
+      },
+      "dry_run": {
+        "name": "Testlauf"
+      },
+      "stop": {
+        "name": "Stoppen"
+      }
+    },
+    "event": {
+      "tasks": {
+        "name": "Tasks",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Gestartet",
+              "success": "Erfolgreich",
+              "failed": "Fehlgeschlagen",
+              "stopped": "Abgebrochen"
+            }
+          }
+        }
+      }
+    },
+    "update": {
+      "semaphore_update": {
+        "name": "Semaphore-Update"
+      }
+    },
+    "switch": {
+      "schedule": {
+        "name": "Zeitplan {name}"
+      }
+    }
+  },
+  "exceptions": {
+    "template_not_found": {
+      "message": "Das Template {template_id} gibt es in Semaphore nicht mehr."
+    },
+    "auth_failed": {
+      "message": "Semaphore hat das API-Token abgelehnt. Bitte unter „Einstellungen → Geräte & Dienste“ ein neues Token eingeben."
+    },
+    "start_failed": {
+      "message": "Template „{template}“ konnte nicht gestartet werden: {error}"
+    },
+    "stop_failed": {
+      "message": "Der Task konnte nicht gestoppt werden: {error}"
+    },
+    "task_failed": {
+      "message": "Template „{template}“ ist fehlgeschlagen: {reason}"
+    },
+    "not_a_template": {
+      "message": "Bitte ein Template-Gerät von Semaphore UI auswählen (nicht das Projekt-Gerät)."
+    },
+    "exactly_one_template": {
+      "message": "Bitte genau ein Template auswählen."
+    },
+    "entry_not_loaded": {
+      "message": "Die Semaphore-Integration ist gerade nicht geladen."
+    },
+    "survey_invalid": {
+      "message": "Template „{template}“: Die Survey-Variablen passen nicht – {details}"
+    },
+    "already_running": {
+      "message": "Template „{template}“ läuft bereits oder wartet (Task {task_id}). Ein zweiter Start ist gesperrt – bitte abwarten oder den Lauf stoppen. In den Integrations-Optionen lässt sich „Mehrfachstart erlauben“ einschalten."
+    },
+    "schedule_not_found": {
+      "message": "Den Zeitplan {schedule_id} gibt es in Semaphore nicht mehr."
+    },
+    "schedule_failed": {
+      "message": "Zeitplan „{schedule}“ konnte nicht umgeschaltet werden: {error}"
+    }
+  },
+  "services": {
+    "run_template": {
+      "name": "Template starten",
+      "description": "Startet ein Template in Semaphore. Mit „Warten“ kommt der fertige Bericht (Start, Dauer, Ergebnis, Fehlergrund) als Antwort zurück.",
+      "fields": {
+        "dry_run": {
+          "name": "Testlauf",
+          "description": "Nur prüfen, nichts ändern (ansible-playbook --check)."
+        },
+        "wait": {
+          "name": "Warten",
+          "description": "Auf das Ende des Tasks warten und den vollständigen Bericht zurückgeben."
+        },
+        "timeout": {
+          "name": "Zeitlimit",
+          "description": "Wie lange maximal gewartet wird (Sekunden). Danach kommt der Zwischenstand mit timed_out: true."
+        },
+        "message": {
+          "name": "Notiz",
+          "description": "Notiz, die in Semaphore am Task angezeigt wird."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Nur diese Hosts (Ansible --limit), mehrere mit Komma trennen."
+        },
+        "raise_on_failure": {
+          "name": "Bei Fehler abbrechen",
+          "description": "Wenn der Task fehlschlägt, einen Fehler auslösen (bricht ein Script ab)."
+        },
+        "survey": {
+          "name": "Survey-Variablen",
+          "description": "Werte der Survey-Variablen als Name: Wert, z. B. target: dockerhost. Fehlende Werte werden mit dem Standardwert des Templates gefüllt, Pflichtfelder ohne Wert führen zu einem Fehler. Enum: Wert oder Beschriftung, Select: Liste, Secret: nur hier möglich."
+        }
+      }
+    }
+  },
+  "issues": {
+    "token_rejected": {
+      "title": "Semaphore: API-Token abgelehnt",
+      "description": "Semaphore ({url}) hat das API-Token für das Projekt „{project}“ abgelehnt (HTTP 401). Solange sind die Geräte dieses Projekts „nicht verfügbar“. Hier lässt sich ein neues Token eintragen.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Neues API-Token",
+            "description": "Lege in Semaphore unter Benutzername (oben rechts) → „API-Tokens“ ein neues Token an und trage es hier ein. Es wird geprüft, bevor es gespeichert wird. Adresse: {url}, Projekt: „{project}“.",
+            "data": {
+              "api_token": "API-Token"
+            }
+          }
+        },
+        "error": {
+          "invalid_auth": "Auch dieses Token wurde abgelehnt (HTTP 401). Prüfe, dass es vollständig kopiert wurde.",
+          "project_not_found": "Mit diesem Token ist das Projekt nicht sichtbar (HTTP 403/404).",
+          "cannot_connect": "Keine Verbindung zu {url}: {detail}",
+          "unknown": "Unerwarteter Fehler: {detail}"
+        },
+        "abort": {
+          "entry_missing": "Dieses Projekt ist nicht mehr eingerichtet."
+        }
+      }
+    },
+    "unreachable": {
+      "title": "Semaphore ist nicht erreichbar",
+      "description": "Seit {since} Uhr bekommt Home Assistant keine Antwort von Semaphore ({url}, Projekt „{project}“): {detail}\n\nDie Geräte und Entitäten dieses Projekts sind solange „nicht verfügbar“. Zeitpläne und Läufe in Semaphore sind davon nicht betroffen. Prüfe, ob Semaphore läuft (z. B. der Docker-Container), ob die Adresse stimmt und ob Netzwerk und Firewall den Zugriff erlauben. Sobald Semaphore wieder antwortet, verschwindet dieser Hinweis von selbst."
+    },
+    "project_missing": {
+      "title": "Semaphore-Projekt nicht gefunden",
+      "description": "Seit {since} Uhr antwortet Semaphore ({url}) für das Projekt „{project}“ mit {detail}: Das Projekt wurde gelöscht, oder das API-Token darf es nicht (mehr) sehen. Prüfe das Projekt und die Rechte des Tokens in Semaphore. Wurde das Projekt gelöscht, entferne diesen Eintrag unter „Einstellungen → Geräte & Dienste“. Der Hinweis verschwindet von selbst, sobald das Projekt wieder erreichbar ist."
+    }
+  }
+}

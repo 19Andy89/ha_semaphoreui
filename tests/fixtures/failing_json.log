@@ -1,0 +1,22 @@
+
+PLAY [hosts] *******************************************************************
+
+TASK [Ergebnis fuer Home Assistant melden] *************************************
+ok: [adguard] => {
+    "msg": "HA_RESULT {\"updates\": 4, \"reboot_required\": true}"
+}
+
+TASK [Danach geht etwas schief] ************************************************
+[ERROR]: Task failed: Module failed: The command exited with a non-zero return code.
+Origin: /tmp/claude-0/-home-claude/b35a6908-f5ba-5c07-a167-6b94d7a04cc4/scratchpad/ansible_try/failing.yml:8:7
+
+6         msg: >-
+7           HA_RESULT {{ {'updates': 4, 'reboot_required': true} | to_json }}
+8     - name: Danach geht etwas schief
+        ^ column 7
+
+fatal: [adguard]: FAILED! => {"ansible_facts": {"discovered_interpreter_python": "/root/.local/bin/python3.14"}, "changed": true, "cmd": ["/bin/false"], "delta": "0:00:00.004280", "end": "2026-10-28 06:04:45.173992", "msg": "The command exited with a non-zero return code.", "rc": 1, "start": "2026-10-28 06:04:45.169712", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+
+PLAY RECAP *********************************************************************
+adguard                    : ok=1    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0
+

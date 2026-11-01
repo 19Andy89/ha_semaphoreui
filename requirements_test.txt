@@ -1,0 +1,2 @@
+# Testet gegen die jeweils aktuelle Home-Assistant-Version, die dieses Paket mitbringt.
+pytest-homeassistant-custom-component

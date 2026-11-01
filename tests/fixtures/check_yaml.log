@@ -1,0 +1,17 @@
+
+PLAY [hosts] *******************************************************************
+
+TASK [Reboot-Marker pruefen] ***************************************************
+ok: [dockerhost]
+ok: [adguard]
+
+TASK [Ergebnis fuer Home Assistant melden] *************************************
+ok: [adguard] =>
+    msg: 'HA_RESULT {"updates": 2, "reboot_required": false, "packages": ["libssl3", "openssl"]}'
+ok: [dockerhost] =>
+    msg: 'HA_RESULT {"updates": 2, "reboot_required": false, "packages": ["libssl3", "openssl"]}'
+
+PLAY RECAP *********************************************************************
+adguard                    : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+dockerhost                 : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+

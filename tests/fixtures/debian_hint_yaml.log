@@ -1,0 +1,152 @@
+
+PLAY [Linux-Gäste aktualisieren] ***********************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [adguard]
+
+TASK [(Test) Debian-Fakten vortäuschen] ****************************************
+ok: [adguard]
+
+TASK [Erreichbarkeit prüfen] ***************************************************
+ok: [adguard]
+
+TASK [Freien Speicherplatz prüfen] *********************************************
+ok: [adguard]
+
+TASK [Speicherplatz anzeigen] **************************************************
+ok: [adguard] => 
+    disk_space.stdout_lines:
+    - Filesystem     1024-blocks     Used Available Capacity Mounted on
+    - /dev/vda         264212084 13775904  30065204      32% /
+
+TASK [Verfügbaren Speicherplatz für Update prüfen] *****************************
+ok: [adguard]
+
+TASK [Update bei zu wenig freiem Speicher verhindern] **************************
+ok: [adguard] => 
+    changed: false
+    msg: 'Ausreichend Speicherplatz vorhanden: 28.67 GiB frei.'
+
+TASK [Paketlisten aktualisieren] ***********************************************
+skipping: [adguard]
+
+TASK [Verfügbare Paketupdates ermitteln] ***************************************
+ok: [adguard]
+
+TASK [Anzahl verfügbarer Paketupdates anzeigen] ********************************
+ok: [adguard] => 
+    msg: 'Paketupdates verfügbar: 2'
+
+TASK [Installierte Pakete aktualisieren] ***************************************
+skipping: [adguard]
+
+TASK [Neustartbedarf prüfen] ***************************************************
+ok: [adguard]
+
+TASK [Neustartbedarf anzeigen] *************************************************
+ok: [adguard] => 
+    msg: 'Neustart erforderlich: False'
+
+TASK [Offene Paketupdates nach dem Lauf ermitteln] *****************************
+ok: [adguard]
+
+TASK [Aktuelle Debian-Stable-Version abfragen] *********************************
+ok: [adguard]
+
+TASK [Debian-Metadaten extrahieren] ********************************************
+ok: [adguard]
+
+TASK [Debian-Version und Codename extrahieren] *********************************
+ok: [adguard]
+
+TASK [Debian-Versionen vergleichen] ********************************************
+ok: [adguard] => 
+    msg: 'Installiert: Debian 12 (bookworm). Aktuell stabil: Debian 13 (trixie). HINWEIS:
+        Distributionsupgrade prüfen!'
+
+TASK [Hinweis für Home Assistant vorbereiten] **********************************
+ok: [adguard]
+
+TASK [Ergebnis für Home Assistant melden] **************************************
+ok: [adguard] => 
+    msg: 'HA_RESULT {"updates": 2, "reboot_required": false, "packages": ["libbrotli-dev",
+        "libbrotli1"], "notes": ["Debian 12 (bookworm) installiert, aktuell stabil ist
+        Debian 13 (trixie)"]}'
+
+PLAY [Linux-Gäste aktualisieren] ***********************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [dockerhost]
+
+TASK [(Test) Debian-Fakten vortäuschen] ****************************************
+ok: [dockerhost]
+
+TASK [Erreichbarkeit prüfen] ***************************************************
+ok: [dockerhost]
+
+TASK [Freien Speicherplatz prüfen] *********************************************
+ok: [dockerhost]
+
+TASK [Speicherplatz anzeigen] **************************************************
+ok: [dockerhost] => 
+    disk_space.stdout_lines:
+    - Filesystem     1024-blocks     Used Available Capacity Mounted on
+    - /dev/vda         264212084 13776244  30064864      32% /
+
+TASK [Verfügbaren Speicherplatz für Update prüfen] *****************************
+ok: [dockerhost]
+
+TASK [Update bei zu wenig freiem Speicher verhindern] **************************
+ok: [dockerhost] => 
+    changed: false
+    msg: 'Ausreichend Speicherplatz vorhanden: 28.67 GiB frei.'
+
+TASK [Paketlisten aktualisieren] ***********************************************
+skipping: [dockerhost]
+
+TASK [Verfügbare Paketupdates ermitteln] ***************************************
+ok: [dockerhost]
+
+TASK [Anzahl verfügbarer Paketupdates anzeigen] ********************************
+ok: [dockerhost] => 
+    msg: 'Paketupdates verfügbar: 2'
+
+TASK [Installierte Pakete aktualisieren] ***************************************
+skipping: [dockerhost]
+
+TASK [Neustartbedarf prüfen] ***************************************************
+ok: [dockerhost]
+
+TASK [Neustartbedarf anzeigen] *************************************************
+ok: [dockerhost] => 
+    msg: 'Neustart erforderlich: False'
+
+TASK [Offene Paketupdates nach dem Lauf ermitteln] *****************************
+ok: [dockerhost]
+
+TASK [Aktuelle Debian-Stable-Version abfragen] *********************************
+ok: [dockerhost]
+
+TASK [Debian-Metadaten extrahieren] ********************************************
+ok: [dockerhost]
+
+TASK [Debian-Version und Codename extrahieren] *********************************
+ok: [dockerhost]
+
+TASK [Debian-Versionen vergleichen] ********************************************
+ok: [dockerhost] => 
+    msg: 'Installiert: Debian 13 (trixie). Aktuell stabil: Debian 13 (trixie). Hauptversion
+        entspricht der aktuellen Stable-Version.'
+
+TASK [Hinweis für Home Assistant vorbereiten] **********************************
+skipping: [dockerhost]
+
+TASK [Ergebnis für Home Assistant melden] **************************************
+ok: [dockerhost] => 
+    msg: 'HA_RESULT {"updates": 2, "reboot_required": false, "packages": ["libbrotli-dev",
+        "libbrotli1"], "notes": []}'
+
+PLAY RECAP *********************************************************************
+adguard                    : ok=18   changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+dockerhost                 : ok=17   changed=0    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+

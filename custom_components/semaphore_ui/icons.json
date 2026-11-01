@@ -1,0 +1,121 @@
+{
+  "entity": {
+    "sensor": {
+      "status": {
+        "default": "mdi:progress-question",
+        "state": {
+          "never_run": "mdi:minus-circle-outline",
+          "waiting": "mdi:timer-sand",
+          "starting": "mdi:rocket-launch-outline",
+          "waiting_confirmation": "mdi:account-clock-outline",
+          "confirmed": "mdi:check",
+          "running": "mdi:play-circle-outline",
+          "stopping": "mdi:stop-circle-outline",
+          "success": "mdi:check-circle-outline",
+          "error": "mdi:alert-circle-outline",
+          "stopped": "mdi:stop-circle-outline",
+          "rejected": "mdi:close-circle-outline"
+        }
+      },
+      "last_started": {
+        "default": "mdi:clock-start"
+      },
+      "last_ended": {
+        "default": "mdi:clock-end"
+      },
+      "last_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "summary": {
+        "default": "mdi:text-box-check-outline"
+      },
+      "running_tasks": {
+        "default": "mdi:play-box-multiple-outline"
+      },
+      "template_count": {
+        "default": "mdi:format-list-numbered"
+      },
+      "failed_templates": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "last_task_template": {
+        "default": "mdi:history"
+      },
+      "last_task_status": {
+        "default": "mdi:progress-question",
+        "state": {
+          "never_run": "mdi:minus-circle-outline",
+          "waiting": "mdi:timer-sand",
+          "starting": "mdi:rocket-launch-outline",
+          "waiting_confirmation": "mdi:account-clock-outline",
+          "confirmed": "mdi:check",
+          "running": "mdi:play-circle-outline",
+          "stopping": "mdi:stop-circle-outline",
+          "success": "mdi:check-circle-outline",
+          "error": "mdi:alert-circle-outline",
+          "stopped": "mdi:stop-circle-outline",
+          "rejected": "mdi:close-circle-outline"
+        }
+      },
+      "last_task_started": {
+        "default": "mdi:clock-start"
+      },
+      "pending_updates": {
+        "default": "mdi:package-up"
+      },
+      "action_templates": {
+        "default": "mdi:clipboard-alert-outline"
+      },
+      "next_run": {
+        "default": "mdi:calendar-clock"
+      },
+      "project_next_run": {
+        "default": "mdi:calendar-clock"
+      },
+      "last_success": {
+        "default": "mdi:check-decagram-outline"
+      }
+    },
+    "button": {
+      "start": {
+        "default": "mdi:play"
+      },
+      "dry_run": {
+        "default": "mdi:flask-outline"
+      },
+      "stop": {
+        "default": "mdi:stop"
+      }
+    },
+    "event": {
+      "tasks": {
+        "default": "mdi:bell-ring-outline"
+      }
+    },
+    "binary_sensor": {
+      "needs_action": {
+        "default": "mdi:clipboard-check-outline",
+        "state": {
+          "on": "mdi:clipboard-alert-outline",
+          "off": "mdi:clipboard-check-outline"
+        }
+      },
+      "project_running": {
+        "default": "mdi:play-circle-outline"
+      }
+    },
+    "switch": {
+      "schedule": {
+        "default": "mdi:calendar-sync",
+        "state": {
+          "off": "mdi:calendar-remove"
+        }
+      }
+    }
+  },
+  "services": {
+    "run_template": {
+      "service": "mdi:play-circle-outline"
+    }
+  }
+}
