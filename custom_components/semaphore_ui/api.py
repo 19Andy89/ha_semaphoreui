@@ -9,6 +9,9 @@ Endpoints used (see https://semaphoreui.com/api-docs/):
 * GET  /api/project/{id}/tasks/{task_id}/output
 * POST /api/project/{id}/tasks          (start a task)
 * POST /api/project/{id}/tasks/{task_id}/stop
+* GET  /api/user/tokens                 (expiry of the own token)
+* POST /api/user/tokens                 (create a new token)
+* POST /api/auth/login, /api/auth/logout (only to get a new token with user name and password)
 
 Authentication: ``Authorization: Bearer <API token>``.
 """
@@ -16,6 +19,7 @@ Authentication: ``Authorization: Bearer <API token>``.
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 import json
 import logging
 import socket
@@ -57,7 +61,24 @@ class SemaphoreConnectionError(SemaphoreError):
 
 
 class SemaphoreAuthError(SemaphoreError):
-    """Token rejected (HTTP 401)."""
+    """Token rejected (HTTP 401). ``body`` is what the server said (e.g. ``TOTP_REQUIRED``)."""
+
+    def __init__(self, message: str = "", body: str = "") -> None:
+        super().__init__(message)
+        self.body = body
+
+
+class SemaphoreLoginError(SemaphoreError):
+    """Signing in with user name and password did not work.
+
+    ``reason``: ``invalid_auth`` (wrong login, or password login is switched off),
+    ``mfa_required`` (a second factor is needed - not possible here) or ``unsupported``
+    (the server answered in a way we do not understand).
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 class SemaphoreApiError(SemaphoreError):
@@ -146,20 +167,28 @@ class SemaphoreClient:
         *,
         params: dict[str, Any] | None = None,
         json_body: dict[str, Any] | None = None,
+        session_cookie: str | None = None,
+        cookie_sink: dict[str, str] | None = None,
     ) -> Any:
+        """Send a request. With ``session_cookie`` the login session is used instead of the token."""
         url = f"{self.base_url}/api{path}"
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Accept": "application/json",
-        }
+        headers = {"Accept": "application/json"}
+        if session_cookie is None:
+            headers["Authorization"] = f"Bearer {self._token}"
+        elif session_cookie:  # "" = neither token nor session (the login itself)
+            headers["Cookie"] = f"semaphore={session_cookie}"
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT):
                 async with self._session.request(
                     method, url, headers=headers, params=params, json=json_body
                 ) as resp:
-                    if resp.status == 401:
-                        raise SemaphoreAuthError("Token rejected (HTTP 401)")
+                    if cookie_sink is not None:
+                        cookie_sink.update({k: m.value for k, m in resp.cookies.items()})
                     text = await resp.text()
+                    if resp.status == 401:
+                        raise SemaphoreAuthError(
+                            "Token rejected (HTTP 401)", text.strip()[:100]
+                        )
                     if resp.status >= 400:
                         raise SemaphoreApiError(resp.status, text.strip()[:300])
         except TimeoutError as err:
@@ -185,6 +214,71 @@ class SemaphoreClient:
                 f"Answer is not JSON: {text.strip()[:120]}",
                 kind="not_json",
             ) from err
+
+    @property
+    def token(self) -> str:
+        """The token that is used right now."""
+        return self._token
+
+    def set_token(self, token: str) -> None:
+        """Use a new token from now on (all coordinators share this client)."""
+        self._token = token
+
+    async def get_tokens(
+        self, *, session_cookie: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Return the API tokens of the user (``id`` is shortened to the first 8 characters)."""
+        return (
+            await self._request("GET", "/user/tokens", session_cookie=session_cookie)
+            or []
+        )
+
+    async def create_token(
+        self,
+        name: str,
+        expires_at: datetime | None = None,
+        *,
+        session_cookie: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a new API token; the answer carries the token itself as ``id``."""
+        body: dict[str, Any] = {"name": name}
+        if expires_at is not None:
+            body["expires_at"] = expires_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            created = await self._request(
+                "POST", "/user/tokens", json_body=body, session_cookie=session_cookie
+            )
+        except SemaphoreAuthError as err:
+            if session_cookie is not None and err.body.upper().endswith("_REQUIRED"):
+                raise SemaphoreLoginError("mfa_required") from err
+            raise
+        if not isinstance(created, dict) or not created.get("id"):
+            raise SemaphoreApiError(0, "No token in the answer", kind="not_json")
+        return created
+
+    async def login(self, username: str, password: str) -> str:
+        """Sign in with user name and password and return the session cookie."""
+        sink: dict[str, str] = {}
+        try:
+            await self._request(
+                "POST",
+                "/auth/login",
+                json_body={"auth": username, "password": password, "method": "password"},
+                session_cookie="",
+                cookie_sink=sink,
+            )
+        except SemaphoreAuthError as err:
+            raise SemaphoreLoginError("invalid_auth") from err
+        if not sink.get("semaphore"):
+            raise SemaphoreLoginError("unsupported")
+        return sink["semaphore"]
+
+    async def logout(self, session_cookie: str) -> None:
+        """End the login session (best effort)."""
+        try:
+            await self._request("POST", "/auth/logout", session_cookie=session_cookie)
+        except SemaphoreError as err:
+            _LOGGER.debug("Logout failed (ignored): %s", err)
 
     async def get_info(self) -> dict[str, Any]:
         """Return the system info (contains the Semaphore ``version``)."""

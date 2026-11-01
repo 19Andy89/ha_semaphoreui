@@ -10,6 +10,7 @@ Umgebungsvariablen: ``E2E_DIR``, ``HA_URL``, ``FAKE_URL``, ``DOCS_SHOTS`` (Ordne
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
 import os
 from pathlib import Path
@@ -875,6 +876,173 @@ def test_setup_errors(playwright) -> None:
         browser.close()
 
 
+def ha_api(path: str, data: dict | None = None) -> object:
+    """REST-Aufruf an Home Assistant als Benutzer „tester“ (GET, mit ``data`` POST)."""
+    access = json.loads((E2E_DIR / "token.json").read_text())["access_token"]
+    request = urllib.request.Request(  # noqa: S310
+        HA_URL + path,
+        json.dumps(data).encode() if data is not None else None,
+        {"Authorization": f"Bearer {access}", "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+        text = response.read().decode()
+    return json.loads(text) if text else None
+
+
+def token_sensor(project: str = "Homelab") -> dict | None:
+    """Zustand des Sensors „API-Token gültig bis“ eines Projekts (erkennbar am Attribut ``token_found``)."""
+    for state in ha_api("/api/states"):
+        if "token_found" in state["attributes"] and project in state["attributes"].get("friendly_name", ""):
+            return state
+    return None
+
+
+DEEP_TEXT = """el => {
+    const out = [];
+    const walk = (node) => {
+        if (node.nodeType === 3) { out.push(node.textContent); return; }
+        if (node.nodeType === 1 && ['STYLE', 'SCRIPT'].includes(node.tagName)) return;
+        if (node.shadowRoot) walk(node.shadowRoot);
+        node.childNodes.forEach(walk);
+    };
+    walk(el);
+    return out.join(' ').replace(/\\s+/g, ' ').trim();
+}"""
+
+
+def deep_text(locator) -> str:
+    """Text eines Elements samt Shadow-DOM (``inner_text`` sieht Home-Assistant-Dialoge nicht)."""
+    return locator.first.evaluate(DEEP_TEXT)
+
+
+def days_until(iso_text: str) -> float:
+    return (datetime.fromisoformat(iso_text) - datetime.now(UTC)).total_seconds() / 86400
+
+
+def dialog_shot(page: Page, name: str) -> None:
+    """Bild des geöffneten Dialogs (zugeschnitten) für die Doku."""
+    box = page.evaluate(
+        """() => {
+            const find = (root) => {
+                for (const el of root.querySelectorAll('*')) {
+                    if (el.getAttribute && el.getAttribute('role') === 'dialog') return el;
+                    if (el.shadowRoot) { const hit = find(el.shadowRoot); if (hit) return hit; }
+                }
+                return null;
+            };
+            const el = find(document.querySelector('home-assistant').shadowRoot);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return {x: r.x, y: r.y, width: r.width, height: r.height};
+        }"""
+    )
+    folder = DOCS or (SHOTS / "docs")
+    folder.mkdir(parents=True, exist_ok=True)
+    if box and box["width"] > 200 and box["height"] > 100:
+        pad = 12
+        page.screenshot(
+            path=str(folder / f"{name}.png"),
+            clip={"x": max(0, box["x"] - pad), "y": max(0, box["y"] - pad), "width": box["width"] + 2 * pad, "height": box["height"] + 2 * pad},
+        )
+    else:
+        page.screenshot(path=str(folder / f"{name}.png"))
+
+
+def test_token_care(playwright) -> None:
+    """0.3.0: Sensor „API-Token gültig bis“, Optionen, Reparatur „läuft bald ab“ → „Beheben“ legt ein neues Token an.
+
+    Läuft zuletzt: Es schaltet die automatische Erneuerung von „Homelab“ aus und lädt den Eintrag neu.
+    """
+    state = token_sensor()
+    check("Token: Sensor „gültig bis“ ist da und zeigt ein Datum in rund 60 Tagen", state is not None and 55 < days_until(state["state"]) < 65, state and state["state"])
+    attrs = state["attributes"] if state else {}
+    check(
+        "Token: Attribute (gefunden, Name, erneuert automatisch, 7 Tage, kein Login)",
+        attrs.get("token_found") is True and attrs.get("token_name") == "Home Assistant" and attrs.get("auto_renew") is True
+        and attrs.get("renew_days_before") == 7 and attrs.get("stored_login") is False and attrs.get("never_expires") is False,
+        attrs,
+    )
+
+    # --- Optionen im Dialog -------------------------------------------------------------------
+    entries = [e for e in ha_api("/api/config/config_entries/entry") if e["domain"] == "semaphore_ui"]
+    homelab = next(e for e in entries if e["title"].endswith("Homelab"))
+    browser = playwright.chromium.launch()
+    tokens = json.loads((E2E_DIR / "token.json").read_text())
+    context = browser.new_context(viewport={"width": 1400, "height": 1100}, locale="de-DE")
+    context.add_init_script(
+        f"localStorage.setItem('hassTokens', JSON.stringify({json.dumps(tokens)}));localStorage.setItem('selectedLanguage', '\"de\"');"
+    )
+    page = context.new_page()
+    try:
+        page.goto(HA_URL + "/config/integrations/integration/semaphore_ui", wait_until="domcontentloaded")
+        page.get_by_role("button", name="Konfigurieren").first.wait_for(timeout=60000)
+        page.locator("dialog-http-pending-config").evaluate_all("els => els.forEach((e) => e.remove())")
+        page.get_by_role("button", name="Konfigurieren").first.click()
+        dialog = page.locator("dialog-data-entry-flow")
+        dialog.locator("ha-form").wait_for(timeout=20000)
+        time.sleep(1.5)
+        text = deep_text(dialog)
+        check(
+            "Token-Optionen: Erneuern, Tage, Benutzer und Passwort für den Notfall mit Erklärung",
+            all(t in text for t in ("API-Token vor dem Ablauf selbst erneuern", "weniger als … Tage übrig", "Benutzer für den Notfall (optional)", "Passwort für den Notfall (optional)", "unverschlüsselt")),
+            text[-600:],
+        )
+        names = dialog.locator("ha-form").first.evaluate("form => form.schema.map((field) => field.name)")
+        check("Token-Optionen: Felder renew_token, token_days, renew_username, renew_password (+ clear_login erst mit Login)", {"renew_token", "token_days", "renew_username", "renew_password"} <= set(names) and "clear_login" not in names, names)
+        dialog_shot(page, "token-options")
+        page.keyboard.press("Escape")
+        time.sleep(0.8)
+
+        # --- Erneuerung ausschalten, Token läuft in 3 Tagen ab -> Reparatur ------------------------
+        flow = ha_api("/api/config/config_entries/options/flow", {"handler": homelab["entry_id"]})
+        done = ha_api(
+            "/api/config/config_entries/options/flow/" + flow["flow_id"],
+            {"scan_interval": 10, "check_for_updates": False, "renew_token": False},
+        )
+        check("Token-Optionen: Speichern ohne Login klappt", done["type"] == "create_entry", done)
+        ctl("token_soon")
+        ha_api(f"/api/config/config_entries/entry/{homelab['entry_id']}/reload", {})
+        page.goto(HA_URL + "/config/repairs", wait_until="domcontentloaded")
+        row = page.get_by_text("Semaphore: API-Token läuft bald ab")
+        row.first.wait_for(timeout=60000)
+        page.locator("dialog-http-pending-config").evaluate_all("els => els.forEach((e) => e.remove())")
+        check("Reparatur: „API-Token läuft bald ab“ wird gemeldet (Erneuerung aus)", row.count() == 1, row.count())
+        state = token_sensor()
+        check("Token: Sensor zeigt jetzt rund 3 Tage", state is not None and 2 < days_until(state["state"]) < 4, state and state["state"])
+
+        row.first.click()
+        dialog = page.locator("dialog-data-entry-flow")
+        dialog.get_by_text("API-Token jetzt erneuern").wait_for(timeout=20000)
+        time.sleep(1)
+        text = deep_text(dialog)
+        check("Reparatur: „Beheben“ öffnet die Bestätigung mit Projekt und Adresse", "Homelab" in text and FAKE_URL in text and "bleibt in Semaphore bestehen" in text, text[-500:])
+        dialog_shot(page, "token-repair")
+        before = [t["id"] for t in ctl("tokens")]
+        dialog.get_by_role("button", name="OK").click()
+        time.sleep(4)
+        shot(page, "40_token_repair_done")
+
+        # --- danach: neues Token (90 Tage), Hinweis weg, Projekt weiter verfügbar --------------------
+        tokens_now = ctl("tokens")
+        new = [t for t in tokens_now if t["id"] not in before]
+        check("Reparatur: Semaphore hat ein neues Token „Home Assistant (semaphore_ui)“ mit 90 Tagen bekommen", len(new) == 1 and new[0]["name"] == "Home Assistant (semaphore_ui)" and 89 < new[0]["days_left"] < 91, tokens_now)
+        check("Reparatur: das alte Token bleibt bestehen (läuft von selbst ab)", any(t["id"] == "good-tok" and t["days_left"] < 4 for t in tokens_now), tokens_now)
+        for _ in range(20):
+            state = token_sensor()
+            if state and days_until(state["state"]) > 80:
+                break
+            time.sleep(1)
+        check("Token: Sensor zeigt nach dem Erneuern rund 90 Tage, „zuletzt erneuert“ ist gesetzt", state is not None and 85 < days_until(state["state"]) < 91 and state["attributes"].get("last_renewed"), state)
+        page.goto(HA_URL + "/config/repairs", wait_until="domcontentloaded")
+        time.sleep(4)
+        check("Reparatur: der Hinweis ist nach dem Erneuern verschwunden", page.get_by_text("Semaphore: API-Token läuft bald ab").count() == 0)
+        mine = [s for s in ha_api("/api/states") if s["attributes"].get("friendly_name", "").startswith("Semaphore – Homelab")]
+        gone = [s["entity_id"] for s in mine if s["state"] == "unavailable"]
+        check("Projekt „Homelab“ ist mit dem neuen Token weiter verfügbar (keine Entität „nicht verfügbar“)", len(mine) >= 8 and not gone, (len(mine), gone))
+    finally:
+        browser.close()
+
+
 def main() -> int:
     with sync_playwright() as playwright:
         test_needs_action_view(playwright)
@@ -905,6 +1073,7 @@ def main() -> int:
         test_setup_errors(playwright)
         test_mobile_dark(playwright)
         test_english(playwright)
+        test_token_care(playwright)  # zuletzt: schaltet die Token-Erneuerung von „Homelab“ aus und lädt den Eintrag neu
     mine = [e for e in errors if "semaphore" in e.lower()]
     check("Keine JavaScript-Fehler aus den Semaphore-Karten", not mine, mine)
     print(f"\n{sum(results)}/{len(results)} Prüfungen bestanden")

@@ -26,9 +26,11 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CONF_PROJECT_NAME,
     DOMAIN,
+    ISSUE_ALL,
     ISSUE_KINDS,
     ISSUE_PROJECT,
     ISSUE_TOKEN,
+    ISSUE_TOKEN_EXPIRING,
     ISSUE_UNREACHABLE,
     REPAIR_AFTER,
 )
@@ -83,7 +85,8 @@ def _create(
 def report_token_rejected(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """The token was rejected: reported at once (the server is reachable)."""
     _series(hass).pop(entry.entry_id, None)
-    for kind in (ISSUE_UNREACHABLE, ISSUE_PROJECT):
+    # "unreachable" / "project missing" / "expires soon" are outdated: the token is the problem
+    for kind in (ISSUE_UNREACHABLE, ISSUE_PROJECT, ISSUE_TOKEN_EXPIRING):
         ir.async_delete_issue(hass, DOMAIN, issue_id(kind, entry.entry_id))
     _create(
         hass, entry, ISSUE_TOKEN, fixable=True, severity=ir.IssueSeverity.ERROR
@@ -134,5 +137,5 @@ def report_ok(hass: HomeAssistant, entry: ConfigEntry) -> None:
 def clear(hass: HomeAssistant, entry_id: str) -> None:
     """The entry was removed: remove its issues too."""
     _series(hass).pop(entry_id, None)
-    for kind in ISSUE_KINDS:
+    for kind in ISSUE_ALL:
         ir.async_delete_issue(hass, DOMAIN, issue_id(kind, entry_id))

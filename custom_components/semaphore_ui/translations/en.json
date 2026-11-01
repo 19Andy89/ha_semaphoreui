@@ -19,9 +19,15 @@
       },
       "reauth_confirm": {
         "title": "New API token",
-        "description": "The token for {url} was rejected. Please enter a new API token.",
+        "description": "The token for {url} was rejected. Enter a new API token - or a user name and password, then the integration creates the token itself.",
         "data": {
-          "api_token": "API token"
+          "api_token": "API token",
+          "username": "User name (instead of a token)",
+          "password": "Password (instead of a token)",
+          "store_login": "Keep the user name and password to replace a rejected token by itself in future"
+        },
+        "data_description": {
+          "store_login": "Optional. The password is then kept - like the token - unencrypted in the configuration of Home Assistant. Without the tick only the new token is stored."
         }
       },
       "reconfigure": {
@@ -48,7 +54,10 @@
       "project_not_found": "The project does not exist at {url} (any more), or this token may not see it (HTTP 404).",
       "invalid_auth": "The API token was rejected (HTTP 401). Create a new one in Semaphore under your user name → \"API tokens\" and check that it was copied completely.",
       "no_projects": "No project is visible with this token.",
-      "unknown": "Unexpected error: {detail}"
+      "unknown": "Unexpected error: {detail}",
+      "login_failed": "Sign-in not possible: user name or password are wrong, or signing in with a password is switched off in Semaphore.",
+      "mfa_required": "This user needs a second factor. That is not possible here - create the token in Semaphore and enter it.",
+      "need_token_or_login": "Enter an API token - or a user name and password."
     },
     "abort": {
       "already_configured": "This project is already set up.",
@@ -64,16 +73,30 @@
           "scan_interval": "Polling interval (seconds)",
           "check_for_updates": "Check for new Semaphore version (asks GitHub every 6 h)",
           "allow_parallel_runs": "Allow starting again (start a template although a run of it is queued or running)",
-          "templates": "Show templates in Home Assistant"
+          "templates": "Show templates in Home Assistant",
+          "renew_token": "Replace the API token by itself before it expires",
+          "token_days": "Replace / warn when fewer than ... days are left",
+          "renew_username": "User name for emergencies (optional)",
+          "renew_password": "Password for emergencies (optional)",
+          "clear_login": "Remove the stored user name and password"
         },
         "data_description": {
           "allow_parallel_runs": "Off (default): while a run of a template is queued or running, start and dry run are blocked - card, button and action. On: Home Assistant starts anyway; Semaphore queues the run or starts it in parallel (depending on \"Allow parallel tasks\" of the template). If the template allows parallel tasks in Semaphore, this always applies.",
-          "templates": "Only ticked templates get devices, entities and schedule switches. Unticked ones are removed when you save (their dashboard cards then show a missing device); runs and schedules in Semaphore are not touched, and the counters of the project card count only the ticked ones. New templates from Semaphore show up automatically. At least one must stay ticked."
+          "templates": "Only ticked templates get devices, entities and schedule switches. Unticked ones are removed when you save (their dashboard cards then show a missing device); runs and schedules in Semaphore are not touched, and the counters of the project card count only the ticked ones. New templates from Semaphore show up automatically. At least one must stay ticked.",
+          "renew_token": "On (default): when the token expires soon, the integration creates a new one with the token itself (same lifetime), checks it and switches over. The old token stays in Semaphore and expires by itself - you may still use it elsewhere. A token without an expiry date is left alone. Off: a notice with “Fix” appears under “Repairs” instead.",
+          "token_days": "At most half of the lifetime of the token.",
+          "renew_username": "Only needed when Semaphore already rejects a token (expired or deleted): the integration then signs in, creates a new token and signs out again. The sign-in is checked when you save. A second factor is not possible.",
+          "renew_password": "It is not shown again; leaving it empty keeps the stored password. It is kept - like the token - unencrypted in the configuration of Home Assistant.",
+          "clear_login": "Tick and save: the user name and password are deleted."
         }
       }
     },
     "error": {
-      "no_templates": "At least one template must stay ticked."
+      "no_templates": "At least one template must stay ticked.",
+      "login_incomplete": "For the emergency sign-in you need a user name and a password.",
+      "login_failed": "Sign-in not possible: user name or password are wrong, or signing in with a password is switched off in Semaphore.",
+      "mfa_required": "This user needs a second factor. That is not possible here - create the token in Semaphore and enter it.",
+      "login_unreachable": "The sign-in could not be checked because Semaphore does not answer. Please save again later."
     }
   },
   "entity": {
@@ -151,6 +174,9 @@
       },
       "last_success": {
         "name": "Last success"
+      },
+      "token_expires": {
+        "name": "API token valid until"
       }
     },
     "binary_sensor": {
@@ -292,9 +318,15 @@
         "step": {
           "init": {
             "title": "New API token",
-            "description": "In Semaphore create a new token under your user name (top right) → “API tokens” and enter it here. It is checked before it is saved. Address: {url}, project: “{project}”.",
+            "description": "In Semaphore create a new token under your user name (top right) → “API tokens” and enter it here - or enter a user name and password and the integration creates the token itself. It is checked before it is saved. Address: {url}, project: “{project}”.",
             "data": {
-              "api_token": "API token"
+              "api_token": "API token",
+              "username": "User name (instead of a token)",
+              "password": "Password (instead of a token)",
+              "store_login": "Keep the user name and password to replace a rejected token by itself in future"
+            },
+            "data_description": {
+              "store_login": "Optional. The password is then kept - like the token - unencrypted in the configuration of Home Assistant. Without the tick only the new token is stored."
             }
           }
         },
@@ -302,7 +334,10 @@
           "invalid_auth": "This token was rejected, too (HTTP 401). Check that it was copied completely.",
           "project_not_found": "The project is not visible with this token (HTTP 403/404).",
           "cannot_connect": "No connection to {url}: {detail}",
-          "unknown": "Unexpected error: {detail}"
+          "unknown": "Unexpected error: {detail}",
+          "login_failed": "Sign-in not possible: user name or password are wrong, or signing in with a password is switched off in Semaphore.",
+          "mfa_required": "This user needs a second factor. That is not possible here - create the token in Semaphore and enter it.",
+          "need_token_or_login": "Enter an API token - or a user name and password."
         },
         "abort": {
           "entry_missing": "This project is no longer set up."
@@ -316,6 +351,42 @@
     "project_missing": {
       "title": "Semaphore project not found",
       "description": "Since {since} Semaphore ({url}) answers for the project “{project}” with {detail}: the project was deleted or the API token may not (or no longer) see it. Check the project and the rights of the token in Semaphore. If the project was deleted, remove this entry under “Settings → Devices & services”. This notice disappears by itself as soon as the project is reachable again."
+    },
+    "token_expiring": {
+      "title": "Semaphore: API token expires soon",
+      "description": "The API token of the integration for the project “{project}” ({url}) expires on {when} (days left: {days}). After that Semaphore rejects it and the devices are “unavailable”. The automatic renewal is switched off (options of the integration). “Fix” creates a new token now.",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Replace the API token now",
+            "description": "A new token is created with the current one (same lifetime), checked and adopted. The old token stays in Semaphore and expires by itself. Address: {url}, project: “{project}”."
+          }
+        },
+        "error": {
+          "renew_failed": "The token could not be replaced: {detail}"
+        },
+        "abort": {
+          "not_loaded": "This project is not loaded right now. Try again later."
+        }
+      }
+    },
+    "token_renew_failed": {
+      "title": "Semaphore: API token could not be replaced",
+      "description": "The API token of the project “{project}” ({url}) expires on {when} (days left: {days}); the automatic renewal failed: {detail}\n\n“Fix” tries again. If that does not work, create a new token in Semaphore yourself and enter it under “Re-authenticate”. When the token expires the devices are “unavailable”.",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Replace the API token now",
+            "description": "A new token is created with the current one (same lifetime), checked and adopted. The old token stays in Semaphore and expires by itself. Address: {url}, project: “{project}”."
+          }
+        },
+        "error": {
+          "renew_failed": "The token could not be replaced: {detail}"
+        },
+        "abort": {
+          "not_loaded": "This project is not loaded right now. Try again later."
+        }
+      }
     }
   }
 }

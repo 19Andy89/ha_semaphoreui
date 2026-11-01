@@ -13,11 +13,18 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlowWithReload,
 )
-from homeassistant.const import CONF_SCAN_INTERVAL, CONF_URL, CONF_VERIFY_SSL
+from homeassistant.const import (
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_URL,
+    CONF_USERNAME,
+    CONF_VERIFY_SSL,
+)
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from . import tokens
 from .api import (
     REQUEST_TIMEOUT,
     SemaphoreApiError,
@@ -25,20 +32,29 @@ from .api import (
     SemaphoreClient,
     SemaphoreConnectionError,
     SemaphoreError,
+    SemaphoreLoginError,
     normalize_base_url,
 )
 from .const import (
     CONF_ALLOW_PARALLEL,
     CONF_API_TOKEN,
     CONF_CHECK_UPDATES,
+    CONF_CLEAR_LOGIN,
     CONF_EXCLUDED_TEMPLATES,
     CONF_PROJECT_ID,
     CONF_PROJECT_NAME,
+    CONF_RENEW_PASSWORD,
+    CONF_RENEW_TOKEN,
+    CONF_RENEW_USER,
     CONF_TEMPLATES,
+    CONF_TOKEN_DAYS,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TOKEN_DAYS,
     DOMAIN,
     MAX_SCAN_INTERVAL,
+    MAX_TOKEN_DAYS,
     MIN_SCAN_INTERVAL,
+    MIN_TOKEN_DAYS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -209,28 +225,37 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask for a new API token."""
+        """Ask for a new API token - or for a login that creates one."""
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         placeholders = _placeholders(entry.data[CONF_URL])
         if user_input is not None:
-            token = user_input[CONF_API_TOKEN].strip()
             try:
-                await self._client(
-                    entry.data[CONF_URL], token, entry.data[CONF_VERIFY_SSL]
-                ).get_project(entry.data[CONF_PROJECT_ID])
+                token = await tokens.async_check_new_token(self.hass, entry, user_input)
+            except SemaphoreLoginError as err:
+                errors["base"] = tokens.login_error_key(err)
             except SemaphoreError as err:
                 errors["base"], placeholders = describe_error(
                     err, entry.data[CONF_URL], project_call=True
                 )
                 _LOGGER.warning("Semaphore re-auth failed (%s): %s", errors["base"], err)
             else:
+                options = tokens.options_with_login(entry, user_input)
                 return self.async_update_reload_and_abort(
-                    entry, data_updates={CONF_API_TOKEN: token}
+                    entry,
+                    data_updates={CONF_API_TOKEN: token},
+                    **({"options": options} if options is not None else {}),
                 )
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_API_TOKEN): TOKEN_SELECTOR}),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_API_TOKEN): TOKEN_SELECTOR,
+                    vol.Optional(CONF_USERNAME): selector.TextSelector(),
+                    vol.Optional(CONF_PASSWORD): TOKEN_SELECTOR,
+                    vol.Optional(tokens.STORE_LOGIN, default=False): selector.BooleanSelector(),
+                }
+            ),
             description_placeholders=placeholders,
             errors=errors,
         )
@@ -306,10 +331,43 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class SemaphoreOptionsFlow(OptionsFlowWithReload):
-    """Polling interval, update check, parallel runs and which templates are shown.
+    """Polling interval, update check, parallel runs, token care and which templates are shown.
 
     The entry is reloaded when the options change.
     """
+
+    async def _async_login_option(
+        self, user_input: dict[str, Any], errors: dict[str, str]
+    ) -> dict[str, Any]:
+        """The stored login after this form: ``{}`` (none) or the user name and password.
+
+        A typed login is tried first; an empty password keeps the stored one (it is never
+        shown again), ``clear_login`` removes it.
+        """
+        stored = tokens.stored_login(self.config_entry)
+        if user_input.get(CONF_CLEAR_LOGIN):
+            return {}
+        user = str(user_input.get(CONF_RENEW_USER) or "").strip()
+        password = str(user_input.get(CONF_RENEW_PASSWORD) or "")
+        if not user and not password:
+            return (
+                {CONF_RENEW_USER: stored[0], CONF_RENEW_PASSWORD: stored[1]} if stored else {}
+            )
+        if not user or (not password and not (stored and stored[0] == user)):
+            errors["base"] = "login_incomplete"
+            return {}
+        if not password and stored:
+            return {CONF_RENEW_USER: stored[0], CONF_RENEW_PASSWORD: stored[1]}
+        try:
+            await tokens.async_test_login(self.hass, self.config_entry, user, password)
+        except SemaphoreLoginError as err:
+            errors["base"] = tokens.login_error_key(err)
+            return {}
+        except SemaphoreError as err:
+            _LOGGER.warning("The login could not be tested: %s", err)
+            errors["base"] = "login_unreachable"
+            return {}
+        return {CONF_RENEW_USER: user, CONF_RENEW_PASSWORD: password}
 
     def _known_templates(self) -> dict[int, str]:
         """All templates of the project (id -> name) as of the last poll.
@@ -335,7 +393,10 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
                 CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
                 CONF_CHECK_UPDATES: user_input[CONF_CHECK_UPDATES],
                 CONF_ALLOW_PARALLEL: user_input[CONF_ALLOW_PARALLEL],
+                CONF_RENEW_TOKEN: user_input[CONF_RENEW_TOKEN],
+                CONF_TOKEN_DAYS: int(user_input[CONF_TOKEN_DAYS]),
             }
+            saved.update(await self._async_login_option(user_input, errors))
             if templates:
                 shown = {int(tid) for tid in user_input.get(CONF_TEMPLATES, [])}
                 if not shown & set(templates):
@@ -347,7 +408,9 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
                 saved[CONF_EXCLUDED_TEMPLATES] = sorted(excluded)  # not offered: keep it
             if not errors:
                 return self.async_create_entry(data=saved)
-            options = saved  # show what was typed
+            options = dict(saved)  # show what was typed
+            if user_input.get(CONF_RENEW_USER):
+                options[CONF_RENEW_USER] = user_input[CONF_RENEW_USER]
             excluded = set(templates) - {
                 int(tid) for tid in user_input.get(CONF_TEMPLATES, [])
             }
@@ -355,6 +418,7 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
         current = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         check_updates = options.get(CONF_CHECK_UPDATES, True)
         allow_parallel = options.get(CONF_ALLOW_PARALLEL, False)
+        stored = tokens.stored_login(self.config_entry)
         schema: dict[Any, Any] = {
             vol.Required(CONF_SCAN_INTERVAL, default=current): selector.NumberSelector(
                 selector.NumberSelectorConfig(
@@ -371,7 +435,28 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
             vol.Required(
                 CONF_ALLOW_PARALLEL, default=allow_parallel
             ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_RENEW_TOKEN, default=options.get(CONF_RENEW_TOKEN, True)
+            ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_TOKEN_DAYS, default=options.get(CONF_TOKEN_DAYS, DEFAULT_TOKEN_DAYS)
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=MIN_TOKEN_DAYS,
+                    max=MAX_TOKEN_DAYS,
+                    step=1,
+                    unit_of_measurement="d",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Optional(
+                CONF_RENEW_USER,
+                description={"suggested_value": options.get(CONF_RENEW_USER)},
+            ): selector.TextSelector(),
+            vol.Optional(CONF_RENEW_PASSWORD): TOKEN_SELECTOR,
         }
+        if stored:
+            schema[vol.Optional(CONF_CLEAR_LOGIN, default=False)] = selector.BooleanSelector()
         if templates:
             names = list(templates.values())
             choices = [

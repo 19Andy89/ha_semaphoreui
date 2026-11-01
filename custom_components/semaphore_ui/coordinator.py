@@ -25,7 +25,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from . import const, issues
+from . import const, issues, tokens
 from .api import (
     SemaphoreApiError,
     SemaphoreAuthError,
@@ -126,6 +126,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self.base_url: str = client.base_url
         self.project_device_id: str | None = None
         self.version_coordinator: SemaphoreVersionCoordinator | None = None
+        self.token_coordinator: tokens.SemaphoreTokenCoordinator | None = None
         # a template may be started while one of its runs is queued/running
         self.allow_parallel: bool = entry.options.get(CONF_ALLOW_PARALLEL, False)
         # templates that get no devices/entities (option "Templates")
@@ -582,9 +583,21 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
     # ------------------------------------------------------------------ #
     # Polling
     # ------------------------------------------------------------------ #
+    async def _async_get_templates(self) -> list[dict[str, Any]]:
+        """The templates; a rejected token is replaced first when a login is stored."""
+        failed = self.client.token
+        try:
+            return await self.client.get_templates(self.project_id)
+        except SemaphoreAuthError:
+            if not await tokens.async_recover(
+                self.hass, self.config_entry, self.client, failed
+            ):
+                raise
+            return await self.client.get_templates(self.project_id)
+
     async def _async_update_data(self) -> SemaphoreData:
         try:
-            raw = await self.client.get_templates(self.project_id)
+            raw = await self._async_get_templates()
         except SemaphoreAuthError as err:
             raise self._auth_failed(err) from err
         except SemaphoreApiError as err:
@@ -988,8 +1001,16 @@ class SemaphoreVersionCoordinator(DataUpdateCoordinator[SemaphoreVersionData]):
         self.check_updates: bool = entry.options.get(CONF_CHECK_UPDATES, True)
 
     async def _async_update_data(self) -> SemaphoreVersionData:
+        failed = self.client.token
         try:
-            info = await self.client.get_info()
+            try:
+                info = await self.client.get_info()
+            except SemaphoreAuthError:
+                if not await tokens.async_recover(
+                    self.hass, self.config_entry, self.client, failed
+                ):
+                    raise
+                info = await self.client.get_info()
         except SemaphoreAuthError as err:
             issues.report_token_rejected(self.hass, self.config_entry)
             raise ConfigEntryAuthFailed(str(err)) from err

@@ -75,6 +75,24 @@ ISSUE_TOKEN: Final = "token_rejected"
 ISSUE_UNREACHABLE: Final = "unreachable"
 ISSUE_PROJECT: Final = "project_missing"
 ISSUE_KINDS: Final = (ISSUE_TOKEN, ISSUE_UNREACHABLE, ISSUE_PROJECT)
+# "the token expires soon" is managed by the token check (not removed by a successful poll)
+ISSUE_TOKEN_EXPIRING: Final = "token_expiring"
+ISSUE_ALL: Final = (*ISSUE_KINDS, ISSUE_TOKEN_EXPIRING)
+
+# Token care (0.3.0): show when the API token expires, replace it before that and, with a
+# stored login, replace a token that was rejected.
+CONF_RENEW_TOKEN: Final = "renew_token"  # option: replace the token before it expires
+CONF_TOKEN_DAYS: Final = "token_days"  # option: warn / replace when fewer days are left
+CONF_RENEW_USER: Final = "renew_username"  # option: stored login (optional)
+CONF_RENEW_PASSWORD: Final = "renew_password"
+CONF_CLEAR_LOGIN: Final = "clear_login"  # field of the options dialog only
+DEFAULT_TOKEN_DAYS: Final = 7
+MIN_TOKEN_DAYS: Final = 1
+MAX_TOKEN_DAYS: Final = 60
+# lifetime of a new token when the lifetime of the old one is not known
+DEFAULT_NEW_TOKEN_DAYS: Final = 90
+TOKEN_SCAN_INTERVAL: Final = 60 * 60
+TOKEN_NAME: Final = "Home Assistant (semaphore_ui)"
 
 # Optional check for a new Semaphore release (one request to GitHub per interval)
 CONF_CHECK_UPDATES: Final = "check_for_updates"

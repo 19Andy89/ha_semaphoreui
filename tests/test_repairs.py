@@ -20,10 +20,12 @@ from custom_components.semaphore_ui.const import (
     DOMAIN,
     ISSUE_PROJECT,
     ISSUE_TOKEN,
+    ISSUE_TOKEN_EXPIRING,
     ISSUE_UNREACHABLE,
     REPAIR_AFTER,
 )
 from custom_components.semaphore_ui.issues import issue_id
+from custom_components.semaphore_ui.tokens import ISSUE_TEXT_FAILED
 
 from .test_flow_and_entities import eid, setup, tick
 from .test_schedules import switch_id
@@ -254,8 +256,9 @@ async def test_a_problem_of_one_project_does_not_touch_another(hass: HomeAssista
 def test_every_repair_has_a_title_and_texts_with_known_placeholders(language: str) -> None:
     texts = json.loads((COMPONENT_DIR / "translations" / f"{language}.json").read_text())
     issues = texts["issues"]
-    assert set(issues) == {ISSUE_TOKEN, ISSUE_UNREACHABLE, ISSUE_PROJECT}
-    values = {"project": "P", "url": "U", "detail": "D", "since": "S"}
+    # "token expires soon" has two texts (renewal switched off / renewal failed) for one issue id
+    assert set(issues) == {ISSUE_TOKEN, ISSUE_UNREACHABLE, ISSUE_PROJECT, ISSUE_TOKEN_EXPIRING, ISSUE_TEXT_FAILED}
+    values = {"project": "P", "url": "U", "detail": "D", "since": "S", "days": "3", "when": "01.01.2027 10:00"}
     for key, item in issues.items():
         assert item["title"] and item["description"], key
         item["description"].format(**values)  # KeyError = a placeholder nobody fills in

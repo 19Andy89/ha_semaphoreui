@@ -69,6 +69,8 @@ def build() -> FakeSemaphore:
     fake.add_schedule(2, "0 2 * * *", name="linux update checks")
     fake.add_schedule(2, "30 3 * * 0", name="Sonntag voller Lauf", active=False)
     fake.add_schedule(1, "0 4 * * 1", name="Dockhand wöchentlich")
+    # the token of the integration: 90 days valid, 60 left (Semaphore >= 2.18.2 lists its expiry)
+    fake.add_token("good-token", name="Home Assistant", age=timedelta(days=30), expires_in=timedelta(days=60))
     return fake
 
 
@@ -83,7 +85,22 @@ def make_app(fake: FakeSemaphore) -> web.Application:
             return web.json_response([[a, b, c] for a, b, c in fake.requests if a == "PUT"])
         if action == "schedules":  # state of the schedules in the fake Semaphore
             return web.json_response([{"id": s["id"], "name": s["name"], "active": s["active"]} for s in fake.schedules.values()])
-        if action == "clear":
+        if action == "tokens":  # the API tokens in the fake Semaphore (name, days left)
+            now = datetime.now(UTC)
+            return web.json_response(
+                [
+                    {
+                        "id": token[:8],
+                        "name": row["name"],
+                        "days_left": None if row["expires_at"] is None else round((row["expires_at"] - now).total_seconds() / 86400, 1),
+                    }
+                    for token, row in fake.api_tokens.items()
+                ]
+            )
+        if action == "token_soon":  # the own token runs out in 3 days (of 90)
+            now = datetime.now(UTC)
+            fake.api_tokens["good-token"].update(created=now - timedelta(days=87), expires_at=now + timedelta(days=3))
+        elif action == "clear":
             fake.requests.clear()
         elif action in ("slow", "fast"):  # writing calls take 2.5 s: the card must show that it is working
             fake.write_delay = 2.5 if action == "slow" else 0.0

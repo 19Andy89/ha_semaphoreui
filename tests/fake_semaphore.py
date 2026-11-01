@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+import secrets
 from typing import Any
 
 from aiohttp import web
@@ -69,8 +70,39 @@ class FakeSemaphore:
         self.schedules_error: tuple[int, str] | None = None
         # seconds the writing calls (start a task, switch a schedule) take: lets a test see the busy state
         self.write_delay = 0.0
+        # API tokens besides the primary ``self.token``: token -> row. Tokens created through the
+        # API are valid here, too; a row can expire (``expires_at``) or be revoked (``expired``).
+        self.api_tokens: dict[str, dict[str, Any]] = {}
+        # (status, text): answer the token list / "create token" calls with this (404 = old Semaphore)
+        self.tokens_error: tuple[int, str] | None = None
+        self.tokens_create_error: tuple[int, str] | None = None  # only "create token" fails
+        self.token_requests: list[tuple[str, str, Any]] = []  # token / login traffic (not in ``requests``)
+        # users who may sign in with a password (name -> password), those who need a second factor
+        self.users: dict[str, str] = {}
+        self.mfa_users: set[str] = set()
+        self.sessions: dict[str, str] = {}  # session cookie -> user
 
     # ---- helpers for the tests ----------------------------------------- #
+    def add_token(
+        self,
+        token: str,
+        *,
+        name: str = "",
+        age: timedelta = timedelta(days=1),
+        expires_in: timedelta | None = None,
+        expired: bool = False,
+    ) -> dict[str, Any]:
+        """Register an API token (valid for the calls) that expires ``expires_in`` from now."""
+        now = datetime.now(UTC)
+        row = {
+            "created": now - age,
+            "expires_at": now + expires_in if expires_in is not None else None,
+            "expired": expired,
+            "name": name,
+        }
+        self.api_tokens[token] = row
+        return row
+
     def add_finished_task(
         self,
         template_id: int,
@@ -147,12 +179,46 @@ class FakeSemaphore:
         return max(tasks, key=lambda t: t["id"]) if tasks else None
 
     # ---- HTTP ------------------------------------------------------------ #
+    def _token_valid(self, bearer: str) -> bool:
+        row = self.api_tokens.get(bearer)
+        if row is not None:
+            if row["expired"]:
+                return False
+            return row["expires_at"] is None or row["expires_at"] > datetime.now(UTC)
+        return bearer == self.token
+
     def _check(self, request: web.Request) -> web.Response | None:
         if self.raw_answer is not None:
             return web.Response(status=self.raw_answer[0], text=self.raw_answer[1])
-        if request.headers.get("Authorization") != f"Bearer {self.token}":
+        header = request.headers.get("Authorization", "")
+        if not header.startswith("Bearer ") or not self._token_valid(header[7:]):
             return web.Response(status=401, text="Unauthorized")
         return None
+
+    def _check_user(self, request: web.Request) -> web.Response | None:
+        """Token or login session (the user's own calls: list / create API tokens)."""
+        cookie = request.cookies.get("semaphore")
+        if cookie is None:
+            return self._check(request)
+        user = self.sessions.get(cookie)
+        if user is None:
+            return web.Response(status=401, text="Unauthorized")
+        if user in self.mfa_users:  # signed in, but the second factor is missing
+            return web.Response(status=401, text="TOTP_REQUIRED")
+        return None
+
+    @staticmethod
+    def _token_row(token: str, row: dict[str, Any], *, short: bool) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "id": token[:8] if short else token,
+            "created": iso(row["created"]),
+            "expired": row["expired"],
+            "user_id": 1,
+            "name": row["name"],
+        }
+        if row["expires_at"] is not None:
+            out["expires_at"] = iso(row["expires_at"])
+        return out
 
     async def _body(self, request: web.Request) -> Any:
         return await request.json() if request.can_read_body else None
@@ -170,6 +236,57 @@ class FakeSemaphore:
             if self.info_update:
                 body["update"] = self.info_update
             return web.json_response(body)
+
+        @routes.get("/api/user/tokens")
+        async def list_tokens(request: web.Request) -> web.Response:
+            if (resp := self._check_user(request)) is not None:
+                return resp
+            self.token_requests.append(("GET", request.path, None))
+            if self.tokens_error is not None:
+                return web.Response(status=self.tokens_error[0], text=self.tokens_error[1])
+            return web.json_response(
+                [self._token_row(t, r, short=True) for t, r in self.api_tokens.items()]
+            )
+
+        @routes.post("/api/user/tokens")
+        async def create_token(request: web.Request) -> web.Response:
+            if (resp := self._check_user(request)) is not None:
+                return resp
+            body = await self._body(request) or {}
+            self.token_requests.append(("POST", request.path, body))
+            for error in (self.tokens_error, self.tokens_create_error):
+                if error is not None:
+                    return web.Response(status=error[0], text=error[1])
+            expires_at = None
+            if body.get("expires_at"):
+                expires_at = datetime.fromisoformat(str(body["expires_at"]).replace("Z", "+00:00"))
+                if expires_at <= datetime.now(UTC):
+                    return web.Response(status=400, text="expires_at must be in the future")
+            token = secrets.token_urlsafe(24).lower()
+            row = self.add_token(token, name=str(body.get("name") or ""), age=timedelta(0))
+            row["expires_at"] = expires_at
+            return web.json_response(self._token_row(token, row, short=False), status=201)
+
+        @routes.post("/api/auth/login")
+        async def login(request: web.Request) -> web.Response:
+            body = await self._body(request) or {}
+            self.token_requests.append(("LOGIN", request.path, {k: v for k, v in body.items() if k != "password"}))
+            if self.raw_answer is not None:  # a proxy in front of Semaphore answers for everything
+                return web.Response(status=self.raw_answer[0], text=self.raw_answer[1])
+            user = str(body.get("auth") or "").lower()
+            if self.users.get(user) is None or self.users[user] != body.get("password") or body.get("method") != "password":
+                return web.Response(status=401, text="")
+            cookie = secrets.token_hex(16)
+            self.sessions[cookie] = user
+            resp = web.Response(status=204)
+            resp.set_cookie("semaphore", cookie)
+            return resp
+
+        @routes.post("/api/auth/logout")
+        async def logout(request: web.Request) -> web.Response:
+            self.token_requests.append(("LOGOUT", request.path, None))
+            self.sessions.pop(request.cookies.get("semaphore", ""), None)
+            return web.Response(status=204)
 
         @routes.get("/github/latest")
         async def github(request: web.Request) -> web.Response:

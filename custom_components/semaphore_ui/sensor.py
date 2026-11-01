@@ -17,6 +17,8 @@ from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import STATUS_OPTIONS
 from .coordinator import SemaphoreConfigEntry, SemaphoreCoordinator
@@ -25,8 +27,6 @@ from .entity import (
     SemaphoreTemplateEntity,
     registered_template_ids,
 )
-from homeassistant.util import dt as dt_util
-
 from .report import (
     REPORT_KEYS,
     is_dry_run,
@@ -35,6 +35,7 @@ from .report import (
     task_started,
     task_status,
 )
+from .tokens import SemaphoreTokenCoordinator
 
 PARALLEL_UPDATES = 0
 
@@ -100,6 +101,11 @@ async def async_setup_entry(
         ]
     )
 
+    if coordinator.token_coordinator is not None:
+        async_add_entities(
+            [SemaphoreTokenExpirySensor(coordinator, coordinator.token_coordinator)]
+        )
+
     known: set[int] = set()
 
     def _add_new_templates() -> None:
@@ -161,6 +167,48 @@ async def async_setup_entry(
 
     _add_next_run_sensors()
     entry.async_on_unload(coordinator.async_add_listener(_add_next_run_sensors))
+
+
+class SemaphoreTokenExpirySensor(CoordinatorEntity[SemaphoreTokenCoordinator], SensorEntity):
+    """Until when the API token of this integration is valid (unknown: it never expires)."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "token_expires"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: SemaphoreCoordinator,
+        token_coordinator: SemaphoreTokenCoordinator,
+    ) -> None:
+        super().__init__(token_coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_token_expires"
+        self._attr_device_info = coordinator.project_device_info()
+
+    @property
+    def native_value(self) -> datetime | None:
+        """End of the validity (``None``: no expiry, or this Semaphore does not tell)."""
+        data = self.coordinator.data
+        return data.expires_at if data is not None and data.found else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Name, creation, renewal settings and the last renewal of the token."""
+        data = self.coordinator.data
+        if data is None:
+            return {}
+        return {
+            "token_found": data.found,
+            "token_name": data.name,
+            "created": data.created.isoformat() if data.created else None,
+            "never_expires": data.found and data.expires_at is None,
+            "auto_renew": self.coordinator.renew,
+            "renew_days_before": self.coordinator.days,
+            "stored_login": self.coordinator.has_login,
+            "last_renewed": data.last_renewed.isoformat() if data.last_renewed else None,
+            "renew_error": data.renew_error,
+        }
 
 
 class SemaphoreRunningTasksSensor(SemaphoreProjectEntity, SensorEntity):

@@ -9,11 +9,11 @@ from homeassistant.const import CONF_URL
 from homeassistant.core import HomeAssistant
 
 from .cards import cards_status
-from .const import CONF_API_TOKEN
+from .const import CONF_API_TOKEN, CONF_RENEW_PASSWORD, CONF_RENEW_USER
 from .coordinator import SemaphoreConfigEntry
 from .report import task_status
 
-TO_REDACT = {CONF_API_TOKEN, CONF_URL, "unique_id"}
+TO_REDACT = {CONF_API_TOKEN, CONF_URL, "unique_id", CONF_RENEW_USER, CONF_RENEW_PASSWORD}
 
 
 async def async_get_config_entry_diagnostics(
@@ -55,6 +55,8 @@ async def async_get_config_entry_diagnostics(
 
     interval = coordinator.update_interval
     version_data = version.data if version is not None else None
+    token = coordinator.token_coordinator
+    token_data = token.data if token is not None else None
     return async_redact_data(
         {
             "entry": {
@@ -73,6 +75,20 @@ async def async_get_config_entry_diagnostics(
                 "excluded_templates": sorted(coordinator.excluded_templates),
                 "templates": templates,
             },
+            "token": (
+                {
+                    "listed": token_data.found,
+                    "readable": token_data.readable,
+                    "expires_at": token_data.expires_at.isoformat() if token_data.expires_at else None,
+                    "auto_renew": token.renew,
+                    "renew_days_before": token.days,
+                    "stored_login": token.has_login,
+                    "last_renewed": token_data.last_renewed.isoformat() if token_data.last_renewed else None,
+                    "renew_error": token_data.renew_error,
+                }
+                if token_data is not None
+                else None
+            ),
             "frontend": dict(cards_status(hass)),
             "version": (
                 {

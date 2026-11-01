@@ -29,7 +29,7 @@ from homeassistant.helpers import (
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
-from . import issues
+from . import issues, tokens
 from .api import SemaphoreClient
 from .cards import async_register_cards
 from .const import CONF_API_TOKEN, DEFAULT_WAIT_TIMEOUT, DOMAIN
@@ -158,6 +158,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) ->
     coordinator.version_coordinator = SemaphoreVersionCoordinator(hass, entry, client)
     await coordinator.version_coordinator.async_refresh()
 
+    # When does the token expire / replace it in time: a failure here must not block either.
+    coordinator.token_coordinator = tokens.SemaphoreTokenCoordinator(hass, entry, client)
+    await coordinator.token_coordinator.async_refresh()
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -170,6 +174,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) -
 async def async_remove_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) -> None:
     """The project was removed: its repairs are obsolete."""
     issues.clear(hass, entry.entry_id)
+    tokens.forget(hass, entry.entry_id)
 
 
 async def async_remove_config_entry_device(
