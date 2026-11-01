@@ -40,6 +40,9 @@ const TEXTS = {
     checked: "Geprüft",
     reboot_short: "Neustart",
     more_n: "+{n} weitere",
+    disk_free: "frei",
+    disk_used: "belegt",
+    disk_need: "Updates brauchen",
     less: "weniger",
     show_all: "Alle Pakete anzeigen",
     show_less: "Weniger Pakete anzeigen",
@@ -130,6 +133,9 @@ const TEXTS = {
     checked: "Checked",
     reboot_short: "reboot",
     more_n: "+{n} more",
+    disk_free: "free",
+    disk_used: "used",
+    disk_need: "updates need",
     less: "less",
     show_all: "Show all packages",
     show_less: "Show fewer packages",
@@ -330,6 +336,14 @@ const STYLE = `
   .notes { margin-top: 6px; display: grid; gap: 4px; }
   .note { display: flex; gap: 6px; align-items: flex-start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   .note ha-icon { --mdc-icon-size: 16px; flex: none; margin-top: 1px; }
+  .disks { margin-top: 6px; display: grid; gap: 4px; }
+  .disk { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 6px; row-gap: 3px; align-items: start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
+  .needbox .disk ha-icon { --mdc-icon-size: 16px; margin-top: 1px; color: var(--secondary-text-color); }
+  .disk .dtext { min-width: 0; }
+  .disk .bar { grid-column: 2; width: 100%; max-width: 160px; height: 6px; border-radius: 3px; background: var(--divider-color, #e0e0e0); overflow: hidden; }
+  .disk .bar i { display: block; height: 100%; background: var(--success-color, #43a047); }
+  .disk .bar.warn i { background: var(--warning-color, #ffa600); }
+  .disk .bar.crit i { background: var(--error-color, #db4437); }
   .errbox { margin-top: 12px; padding: 8px 12px; border-radius: 8px; font-size: 0.9em; overflow-wrap: anywhere;
             background: color-mix(in srgb, var(--error-color, #db4437) 12%, transparent); border-left: 4px solid var(--error-color, #db4437); }
   .errbox .meta { color: var(--secondary-text-color); margin-top: 4px; }
@@ -804,6 +818,26 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
           .map((n) => `<div class="note"><ha-icon icon="mdi:information-outline"></ha-icon><span>${allHosts.length > 1 && n.host ? `<b>${esc(n.host)}:</b> ` : ""}${esc(n.text)}</span></div>`)
           .join("")}${notes.length > 3 ? `<div class="note"><span>${esc(T.more_n.replace("{n}", notes.length - 3))}</span></div>` : ""}</div>`
       : "";
+    // disk figures of the hosts (root file system), if the playbook reports them
+    const lang = langOf(hass);
+    const num = (n, digits = 1) => new Intl.NumberFormat(hass.locale?.language || lang, { maximumFractionDigits: digits }).format(n);
+    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024)} GiB` : `${num(mib, 0)} MiB`);
+    const disks = allHosts.filter(([, h]) => ["disk_free_mib", "disk_used_percent", "disk_required_mib"].some((k) => typeof h[k] === "number"));
+    const diskHtml = disks.length
+      ? `<div class="disks">${disks
+          .slice(0, 5)
+          .map(([name, h]) => {
+            const parts = [];
+            if (typeof h.disk_free_mib === "number") parts.push(`${size(h.disk_free_mib)} ${T.disk_free}`);
+            if (typeof h.disk_used_percent === "number") parts.push(`${num(h.disk_used_percent)} % ${T.disk_used}`);
+            if (h.disk_required_mib > 0) parts.push(`${T.disk_need} ${size(h.disk_required_mib)}`);
+            const pct = typeof h.disk_used_percent === "number" ? Math.min(100, h.disk_used_percent) : null;
+            const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
+            const text = `${allHosts.length > 1 ? `${name}: ` : ""}${parts.join(" · ")}`;
+            return `<div class="disk"><ha-icon icon="mdi:harddisk"></ha-icon><span class="dtext">${allHosts.length > 1 ? `<b>${esc(name)}:</b> ` : ""}${esc(parts.join(" · "))}</span>${pct === null ? "" : `<span class="bar ${level}" role="img" aria-label="${esc(text)}"><i style="width:${pct}%"></i></span>`}</div>`;
+          })
+          .join("")}${disks.length > 5 ? `<div class="disk"><span>${esc(T.more_n.replace("{n}", disks.length - 5))}</span></div>` : ""}</div>`
+      : "";
     const names = on && Array.isArray(a.packages) ? a.packages : [];
     const open = !!this._pkgsOpen;
     // all chips are rendered; _fitPackages() folds them into one line and writes "+n more" into the button
@@ -816,7 +850,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       : "";
     return `<div class="needbox ${on ? "on" : "off"}" data-action="more-info" data-entity="${entityId}">
       <ha-icon icon="${on ? "mdi:package-up" : "mdi:check-circle-outline"}"></ha-icon>
-      <div class="t"><div class="what">${esc(a.explanation || T.action_n)}</div>${hostLine ? `<div class="meta hostline">${esc(hostLine)}</div>` : ""}${meta.length ? `<div class="meta">${meta.map(esc).join(" · ")}</div>` : ""}${pkgs}${notesHtml}</div>
+      <div class="t"><div class="what">${esc(a.explanation || T.action_n)}</div>${hostLine ? `<div class="meta hostline">${esc(hostLine)}</div>` : ""}${meta.length ? `<div class="meta">${meta.map(esc).join(" · ")}</div>` : ""}${diskHtml}${pkgs}${notesHtml}</div>
     </div>`;
   }
 

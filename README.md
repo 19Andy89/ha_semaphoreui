@@ -141,7 +141,7 @@ ihn gestartet hat, auch ein Zeitplan in Semaphore) und legt daraus pro Template 
 
 | Entität | Inhalt |
 |---|---|
-| **Handlungsbedarf** (`binary_sensor`) | an = Updates offen oder Neustart nötig; aus = nichts zu tun; *unbekannt* = der letzte Lauf hat nichts gemeldet (z. B. fehlgeschlagen). Attribute: `updates`, `reboot_required`, `explanation`, `hosts` (je Host: `updates`, `reboot_required`, `needed`, `notes`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
+| **Handlungsbedarf** (`binary_sensor`) | an = Updates offen oder Neustart nötig; aus = nichts zu tun; *unbekannt* = der letzte Lauf hat nichts gemeldet (z. B. fehlgeschlagen). Attribute: `updates`, `reboot_required`, `explanation`, `hosts` (je Host: `updates`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
 | **Offene Updates** (`sensor`) | Zahl der offenen Updates (alle Hosts zusammen) |
 | **Templates mit Handlungsbedarf** (Projekt-Sensor) | Anzahl; Attribut `templates` = Namen |
 
@@ -152,6 +152,10 @@ eine Zeile „Offene Updates: 3 · Neustart nötig“.
 **Schlüssel des JSON-Objekts** (alle optional): `updates` (Zahl), `reboot_required` (true/false), `packages` (Liste von Namen,
 nur Anzeige, max. 50; die Karte zeigt sie in einer Zeile mit „+n weitere“), `host` (sonst der Host aus der Ansible-Ausgabe), `needed` (true/false – überschreibt die Regel),
 `notes` (Text oder Liste von Texten, siehe unten; auch `note` wird gelesen).
+**Platte des Hosts** (optional, nur Anzeige): `disk_free_mib` (freier Platz auf `/` in MiB), `disk_required_mib` (Platzbedarf der Updates in MiB)
+und `disk_used_percent` (belegt, 0–100). Die Template-Karte zeigt sie je Host als „4,2 GiB frei · 62,4 % belegt · Updates brauchen 310 MiB“
+mit einem Balken (ab 80 % orange, ab 90 % rot); Hosts ohne diese Werte bekommen keine Zeile. Sie ändern nichts am Handlungsbedarf.
+Ungültige Werte (negativ, kein Zahlenwert, Prozent über 100) werden einzeln ignoriert. Das mitgelieferte `playbooks/update-linux.yml` meldet sie.
 Unbekannte Schlüssel werden ignoriert. Ohne `needed` gilt: **Handlungsbedarf, wenn `updates` > 0 oder `reboot_required` wahr ist.** Bei mehreren Hosts zählt die
 letzte Zeile je Host; die Zahlen werden addiert, ein Host mit Bedarf genügt.
 
@@ -626,6 +630,7 @@ pytest
 * `tests/test_filter.py` – Option „Templates in Home Assistant anzeigen“: Geräte/Entitäten/Schalter abgewählter Templates verschwinden
   und kommen zurück, neue Templates erscheinen weiter, mindestens eines bleibt, andere Optionen verlieren die Auswahl nicht,
   ohne Verbindung bleibt sie erhalten, gleiche Namen werden unterscheidbar, Diagnose.
+* `tests/test_ha_result.py` enthält auch die Platten-Werte je Host (Rundung, Dezimalkomma, Unsinn wird ignoriert, Prozent über 100).
 * `tests/test_repairs.py` – Reparaturen: abgelehntes Token (sofort, Beheben-Dialog mit Prüfung, Token ohne Zugriff, entfernter Eintrag),
   Ausfall erst nach 10 Minuten (auch über Setup-Wiederholungen), kurzer Ausfall ohne Hinweis, Projekt weg (403/404), Hinweise
   verschwinden bei Erholung und beim Entfernen, Texte (Platzhalter in de/en).

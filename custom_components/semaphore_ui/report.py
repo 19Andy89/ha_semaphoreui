@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, tzinfo
 import json
+import math
 import re
 from typing import Any
 
@@ -48,6 +49,12 @@ HA_MARKER = "HA_RESULT"
 MAX_MARKER_LINES = 300
 MAX_PACKAGES = 50
 MAX_PACKAGE_NAME = 80
+# optional disk figures a host may report in HA_RESULT (key -> highest accepted value)
+DISK_KEYS: dict[str, float | None] = {
+    "disk_free_mib": None,
+    "disk_required_mib": None,
+    "disk_used_percent": 100.0,
+}
 MAX_NOTES = 10  # notes of all hosts together
 MAX_NOTE_LEN = 200
 
@@ -388,6 +395,22 @@ def _as_count(value: Any) -> int | None:
     return None
 
 
+def _as_number(value: Any, *, maximum: float | None = None) -> float | None:
+    """Non-negative number with one decimal (``4.2``, ``"4.2"``), otherwise ``None`` (also above ``maximum``)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        try:
+            value = float(value.strip().replace(",", "."))
+        except ValueError:
+            return None
+    if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        return None
+    if maximum is not None and value > maximum:
+        return None
+    return round(float(value), 1)
+
+
 def _as_flag(value: Any) -> bool | None:
     """Boolean (also ``0/1`` and ``"true"/"no"``), otherwise ``None``."""
     if isinstance(value, bool):
@@ -481,7 +504,8 @@ def parse_ha_result(lines: list[str]) -> dict[str, Any] | None:
 
     Keys of the JSON object (all optional): ``updates`` (number of pending updates),
     ``reboot_required`` (bool), ``needed`` (bool, overrides the rule below),
-    ``packages`` (list of names), ``notes`` (a hint or a list of hints, e.g. "Debian 13
+    ``packages`` (list of names), ``disk_free_mib`` / ``disk_required_mib`` (MiB free / needed
+    by the updates) and ``disk_used_percent`` (0-100) of the host (shown only), ``notes`` (a hint or a list of hints, e.g. "Debian 13
     available"; shown only, they do not count as action), ``host`` (otherwise the host
     of the Ansible output).
     Without ``needed``, action is needed if ``updates > 0`` or ``reboot_required``.
@@ -500,6 +524,11 @@ def parse_ha_result(lines: list[str]) -> dict[str, Any] | None:
             "updates": updates,
             "reboot_required": reboot,
         }
+        # optional disk figures of the host (root file system): free, needed by the updates, used in percent
+        for key, maximum in DISK_KEYS.items():
+            number = _as_number(payload.get(key), maximum=maximum)
+            if number is not None:
+                hosts[host][key] = number
         notes = _as_notes(payload.get("notes", payload.get("note")))
         if notes:
             hosts[host]["notes"] = notes

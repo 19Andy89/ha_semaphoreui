@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -366,3 +367,39 @@ def test_notes_show_up_in_the_push_text() -> None:
     )
     assert "Hinweis (adguard): Installiert: Debian 12" in report["text"]
     assert report["ha_result"]["notes"][0]["host"] == "adguard"
+
+
+# --------------------------------------------------------------------------- #
+# 0.4.0: disk figures of the hosts
+# --------------------------------------------------------------------------- #
+def _marker(payload: dict, host: str = "dockerhost") -> list[str]:
+    return [f"ok: [{host}] =>", f"    msg: 'HA_RESULT {json.dumps(payload)}'"]
+
+
+def test_disk_figures_are_taken_per_host() -> None:
+    lines = _marker({"updates": 2, "disk_free_mib": 4300.55, "disk_required_mib": "310,2", "disk_used_percent": 62.4}) + _marker(
+        {"updates": 0}, "adguard"
+    )
+    result = parse_ha_result(lines)
+    assert result["hosts"]["dockerhost"]["disk_free_mib"] == 4300.6  # one decimal
+    assert result["hosts"]["dockerhost"]["disk_required_mib"] == 310.2  # text with a decimal comma
+    assert result["hosts"]["dockerhost"]["disk_used_percent"] == 62.4
+    assert not [k for k in result["hosts"]["adguard"] if k.startswith("disk_")]  # a host without figures has none
+
+
+@pytest.mark.parametrize("bad", [-1, True, "viel", None, float("inf"), [1], {"a": 1}])
+def test_nonsense_disk_figures_are_ignored(bad) -> None:
+    result = parse_ha_result(_marker({"updates": 1, "disk_free_mib": bad, "disk_required_mib": bad, "disk_used_percent": bad}))
+    assert result["hosts"]["dockerhost"]["updates"] == 1
+    assert not [k for k in result["hosts"]["dockerhost"] if k.startswith("disk_")]
+
+
+def test_a_percentage_above_100_is_ignored() -> None:
+    result = parse_ha_result(_marker({"updates": 1, "disk_used_percent": 140, "disk_free_mib": 10}))
+    assert "disk_used_percent" not in result["hosts"]["dockerhost"]
+    assert result["hosts"]["dockerhost"]["disk_free_mib"] == 10
+
+
+def test_disk_figures_do_not_change_whether_action_is_needed() -> None:
+    result = parse_ha_result(_marker({"updates": 0, "disk_free_mib": 5, "disk_used_percent": 99}))
+    assert result["needed"] is False

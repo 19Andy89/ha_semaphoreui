@@ -253,8 +253,13 @@ def test_packages_one_line(page: Page) -> None:
     for w in (700, width):
         page.set_viewport_size({"width": w, "height": page.viewport_size["height"]})
         time.sleep(0.8)
-        narrow.append(pkg_state(docker))
-    check("Schmales Fenster: weiterhin eine Zeile, mehr Pakete hinter „+n weitere“", narrow[0]["rows"] == 1 and narrow[0]["overflow"] <= 1 and narrow[0]["visible"] <= narrow[1]["visible"] and (narrow[0]["clipped"] == 0 or narrow[0]["visible"] == 1), narrow)
+        state = pkg_state(docker)
+        state["card_width"] = round(docker.evaluate("el => el.getBoundingClientRect().width"))
+        narrow.append(state)
+    # die Karte kann bei anderer Fensterbreite in einer anderen Rasterspalte landen: verglichen wird die Kartenbreite
+    (a, b) = narrow
+    monotone = (a["card_width"] <= b["card_width"] and a["visible"] <= b["visible"]) or (a["card_width"] >= b["card_width"] and a["visible"] >= b["visible"])
+    check("Schmales Fenster: weiterhin eine Zeile, schmalere Karte zeigt weniger Pakete (Rest hinter „+n weitere“)", a["rows"] == 1 and a["overflow"] <= 1 and monotone and (a["clipped"] == 0 or a["visible"] == 1), narrow)
     check("Fenster wieder breit: Anzeige passt sich ohne Neuladen an", narrow[1]["visible"] == folded["visible"] and narrow[1]["more"] == folded["more"], (narrow[1], folded))
     check("Karte ohne Pakete hat keinen „+n weitere“-Knopf", tcard(page, "Host-Update").locator('[data-action="pkgs"]').count() == 0)
 
@@ -506,6 +511,27 @@ def test_needs_action_view(playwright) -> None:
     check("Nur Benötigtes: die Kacheln zählen weiter das ganze Projekt", project.locator(".stat .n").all_inner_texts() == ["1", "1", "1", "5"])
     shot(page, "00_nur_benoetigt")
     browser.close()
+
+
+def test_disk_figures(page: Page) -> None:
+    """0.4.0: Platte je Host (frei, belegt in Prozent, Bedarf der Updates) – nur für Hosts, die es melden."""
+    card = tcard(page, "docker-system")
+    disks = card.locator(".disks .disk")
+    texts = [t.strip() for t in disks.all_inner_texts()]
+    check("Platte: zwei von drei Hosts melden Werte (adguard nicht)", len(texts) == 2 and not any("adguard" in t for t in texts), texts)
+    first = texts[0] if texts else ""
+    check("Platte: dockerhost – frei, belegt, Bedarf (deutsche Zahlen)", "dockerhost" in first and "4,2 GiB frei" in first and "62,4 % belegt" in first and "Updates brauchen 310 MiB" in first, first)
+    second = texts[1] if len(texts) > 1 else ""
+    check("Platte: pialert – 1,4 GiB frei, 91,3 % belegt", "pialert" in second and "1,4 GiB frei" in second and "91,3 % belegt" in second, second)
+    bars = card.locator(".disk .bar")
+    classes = [(b.get_attribute("class") or "").replace("bar", "").strip() for b in bars.all()]
+    check("Platte: Balken – dockerhost normal, pialert (über 90 %) rot", classes == ["", "crit"], classes)
+    check("Platte: Balken hat eine Beschriftung für Screenreader", "62,4" in (bars.first.get_attribute("aria-label") or ""), bars.first.get_attribute("aria-label"))
+    box = card.bounding_box()
+    inside = card.locator(".disks").evaluate("el => { const r = el.getBoundingClientRect(); const c = el.closest('ha-card').getBoundingClientRect(); return r.left >= c.left && r.right <= c.right + 1; }")
+    check("Platte: nichts ragt aus der Karte", inside and box is not None, box)
+    quiet = tcard(page, "Host-Update").locator(".disks").count()
+    check("Platte: Template ohne Werte zeigt keinen Block", quiet == 0, quiet)
 
 
 def test_busy_schedule(page: Page) -> None:
@@ -1056,6 +1082,7 @@ def main() -> int:
             test_rendering(page)
             test_template_card_details(page)
             test_packages_one_line(page)
+            test_disk_figures(page)
             test_project_filters(page)
             test_schedules_ui(page)
             test_busy_schedule(page)

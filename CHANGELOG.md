@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 (alpha) – Platte je Host in der Template-Karte
+- **Template-Karte:** Meldet ein Host im `HA_RESULT` die Platte (`disk_free_mib`, `disk_required_mib`, `disk_used_percent`, wie vom
+  mitgelieferten `playbooks/update-linux.yml`), zeigt die Box „Offene Updates“ bzw. „Nichts zu tun“ je Host eine Zeile
+  „4,2 GiB frei · 62,4 % belegt · Updates brauchen 310 MiB“ mit Balken (grün, ab 80 % orange, ab 90 % rot). Hosts ohne Werte bekommen keine Zeile;
+  bei mehreren Hosts steht der Name davor. Zahlen im Format der Sprache (de/en).
+- **Parser:** Die drei Werte stehen je Host im Attribut `hosts` des Handlungsbedarf-Sensors. Ungültige Werte (negativ, Text, Prozent über 100) werden einzeln
+  ignoriert; sie beeinflussen den Handlungsbedarf nicht.
+- Browser-Test: Beispieldaten mit Platte für zwei von drei Hosts; der Test zur Fensterbreite vergleicht jetzt die Kartenbreite (die Karte kann in eine andere Rasterspalte rutschen).
+- Tests: 267 pytest-Tests, Browser-Test mit 177 Prüfungen.
+
 ## 0.3.0 (alpha) – Token-Pflege
 - **Ablauf des API-Tokens wird angezeigt:** neuer Sensor „API-Token gültig bis“ (Diagnose, Projekt-Gerät) mit Attributen
   (`token_found`, `token_name`, `created`, `never_expires`, `auto_renew`, `renew_days_before`, `stored_login`, `last_renewed`, `renew_error`).
