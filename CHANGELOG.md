@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 (alpha) – Testlauf im Status-Kennzeichen
+- Das Testlauf-Kennzeichen der Template-Karte sitzt jetzt **im Status-Kennzeichen oben rechts**: zweiteilig „TESTLAUF / Erfolgreich“ (bzw. „Fehler“),
+  in hellerer Farbe mit gestricheltem Rand, weil es nur ein Test war. Die eigene Marke in der Zeile „Letzter Lauf“ entfällt.
+- Browser-Test: 183 Prüfungen.
+
 ## 0.5.0 (alpha) – Testlauf sichtbar
 - **Testlauf sichtbar:** War der letzte Lauf ein Testlauf (Dry Run), zeigt die Template-Karte neben „Letzter Lauf“ das Kennzeichen „Testlauf“
   (mit Tooltip), die Projekt-Karte nennt es im Untertitel des Templates („Erfolgreich · Testlauf · vor 3 Stunden“). Läufe ohne Testlauf bleiben unverändert.

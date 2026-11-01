@@ -535,11 +535,13 @@ def test_disk_figures(page: Page) -> None:
 
 
 def test_dry_run_marker(page: Page) -> None:
-    """Testlauf-Kennzeichen: Template-Karte (Zeile „Letzter Lauf“) und Projekt-Karte (Untertitel) – nur wenn der letzte Lauf ein Testlauf war."""
+    """Testlauf: zweiteiliges Status-Kennzeichen „Testlauf / Erfolgreich“ in der Template-Karte, Hinweis im Untertitel der Projekt-Karte."""
     docker = tcard(page, "docker-system")
-    check("Testlauf: Template-Karte mit Testlauf zeigt das Kennzeichen", docker.locator(".row .tag[data-dry]").count() == 1 and docker.locator(".row .tag[data-dry]").inner_text() == "Testlauf", docker.locator(".row .tag").count())
-    check("Testlauf: Kennzeichen erklärt sich im Tooltip", "nichts verändert" in (docker.locator(".tag[data-dry]").get_attribute("title") or ""))
-    check("Testlauf: Template-Karte eines echten Laufs hat keins", tcard(page, "Host-Update").locator(".tag[data-dry]").count() == 0)
+    chip = docker.locator(".head .chip.dry")
+    check("Testlauf: Status-Kennzeichen ist zweiteilig „Testlauf“ über „Erfolgreich“", chip.count() == 1 and chip.locator(".dry-l").inner_text().lower() == "testlauf" and "Erfolgreich" in chip.locator(".dry-s").inner_text(), chip.inner_text() if chip.count() else None)
+    check("Testlauf: Kennzeichen erklärt sich im Tooltip", "nichts verändert" in (chip.get_attribute("title") or ""))
+    check("Testlauf: keine eigene Marke mehr in der Zeile „Letzter Lauf“", docker.locator(".row .tag").count() == 0)
+    check("Testlauf: Karte eines echten Laufs hat das normale Kennzeichen", tcard(page, "Host-Update").locator(".head .chip.dry").count() == 0)
     project = page.locator("semaphore-ui-project-card").first
     subs = {i.locator(".name").inner_text().strip(): i.locator(".sub").inner_text() for i in project.locator(".item").all()}
     dock = next((v for k, v in subs.items() if k.startswith("docker-system")), "")

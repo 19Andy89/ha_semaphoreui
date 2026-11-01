@@ -320,7 +320,7 @@ Dauer (zählt live, solange der Task läuft), bei Fehlern der **Fehlergrund** mi
 Parameter, die **Eingabefelder der Survey-Variablen** (Pflichtfelder mit `*`) sowie die Knöpfe **Starten**, **Testlauf**
 (nur Ansible) und **Stoppen** (nur solange etwas läuft). Titel antippen = More-Info, „In Semaphore öffnen“ springt zum Task.
 Meldet Semaphore beim Start einen Fehler (z. B. Pflicht-Survey-Wert fehlt), steht er direkt in der Karte.
-War der letzte Lauf ein **Testlauf**, steht neben „Letzter Lauf“ das Kennzeichen „Testlauf“ (die Projekt-Karte nennt es im Untertitel).
+War der letzte Lauf ein **Testlauf**, zeigt das Status-Kennzeichen oben rechts zweiteilig „Testlauf / Erfolgreich“ (bzw. „Fehler“) in hellerer Farbe mit gestricheltem Rand; die Projekt-Karte nennt es im Untertitel.
 Gibt das Playbook `HA_RESULT` aus, zeigt die Karte eine Box „Offene Updates: 5 · Neustart nötig“ (mit Prüfzeit, Testlauf-Hinweis
 und den Paketnamen) bzw. „nichts zu tun“. Die **Paketnamen stehen in einer Zeile**; was nicht hineinpasst, fasst „+5 weitere“
 zusammen. Ein **Klick auf „+5 weitere“** zeigt alle Pakete (sie dürfen dann umbrechen), ein Klick auf „weniger“ klappt wieder zu –

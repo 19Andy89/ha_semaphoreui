@@ -324,6 +324,10 @@ const STYLE = `
   .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 500; white-space: nowrap;
           background: color-mix(in srgb, var(--chip-color, var(--primary-color)) 18%, transparent); color: var(--chip-color, var(--primary-color)); }
   .chip ha-icon { --mdc-icon-size: 16px; }
+  .chip.dry { flex-direction: column; align-items: flex-start; gap: 0; padding: 2px 10px 3px; border: 1px dashed color-mix(in srgb, var(--chip-color) 55%, transparent);
+              background: color-mix(in srgb, var(--chip-color) 8%, transparent); color: color-mix(in srgb, var(--chip-color) 80%, var(--secondary-text-color)); }
+  .chip.dry .dry-l { font-size: 0.75em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.85; line-height: 1.3; }
+  .chip.dry .dry-s { display: inline-flex; align-items: center; gap: 4px; }
   .pulse { animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
   @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
@@ -338,7 +342,6 @@ const STYLE = `
   .notes { margin-top: 6px; display: grid; gap: 4px; }
   .note { display: flex; gap: 6px; align-items: flex-start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   .note ha-icon { --mdc-icon-size: 16px; flex: none; margin-top: 1px; }
-  .tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 10px; font-size: 0.8em; line-height: 1.6; font-weight: 500; vertical-align: baseline; background: var(--secondary-background-color, #eee); color: var(--secondary-text-color); border: 1px solid var(--divider-color, #ccc); white-space: nowrap; }
   .disks { margin-top: 6px; display: grid; gap: 4px; }
   .disk { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 6px; row-gap: 3px; align-items: start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   .needbox .disk ha-icon { --mdc-icon-size: 16px; margin-top: 1px; color: var(--secondary-text-color); }
@@ -631,9 +634,15 @@ class SemaphoreBaseCard extends HTMLElement {
     return this._busyRun(entity, turnOn, () => this._call("switch", turnOn ? "turn_on" : "turn_off", { entity_id: entity }));
   }
 
-  _chip(status, hass) {
+  _chip(status, hass, dry = false) {
     const st = STATUS_STYLE[status] || STATUS_STYLE.never_run;
-    return `<span class="chip ${st.pulse ? "pulse" : ""}" style="--chip-color:${st.color}"><ha-icon icon="${st.icon}"></ha-icon>${esc(tx(hass).status[status] || status)}</span>`;
+    const T = tx(hass);
+    const label = esc(T.status[status] || status);
+    // a dry run: two-part badge "Dry run / Successful" in lighter colours (it was only a test)
+    if (dry) {
+      return `<span class="chip dry ${st.pulse ? "pulse" : ""}" style="--chip-color:${st.color}" title="${esc(T.dry_run_hint)}"><span class="dry-l" data-dry="1">${esc(T.dry_run)}</span><span class="dry-s"><ha-icon icon="${st.icon}"></ha-icon>${label}</span></span>`;
+    }
+    return `<span class="chip ${st.pulse ? "pulse" : ""}" style="--chip-color:${st.color}"><ha-icon icon="${st.icon}"></ha-icon>${label}</span>`;
   }
 }
 
@@ -704,7 +713,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     } else {
       if (startedIso && startedIso !== "unknown" && startedIso !== "unavailable") {
         rows.push(
-          row(running ? T.running_since : T.last_run, `<span class="v" title="${esc(fmtDate(startedIso, hass))}">${esc(fmtDate(startedIso, hass))} · ${esc(fmtRelative(startedIso, hass))}${rep.dry_run ? `<span class="tag" data-dry="1" title="${esc(T.dry_run_hint)}">${esc(T.dry_run)}</span>` : ""}</span>`, byKey["sensor:last_started"])
+          row(running ? T.running_since : T.last_run, `<span class="v" title="${esc(fmtDate(startedIso, hass))}">${esc(fmtDate(startedIso, hass))} · ${esc(fmtRelative(startedIso, hass))}</span>`, byKey["sensor:last_started"])
         );
       }
       if (running && startedIso) {
@@ -779,7 +788,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       <div class="head" data-action="more-info" data-entity="${byKey["sensor:status"]}">
         <ha-icon class="ic ${st.pulse ? "pulse" : ""}" icon="${st.icon}" style="color:${st.color}"></ha-icon>
         <div class="titles"><div class="title">${esc(title)}</div>${projectSub}</div>
-        ${this._chip(known, hass)}
+        ${this._chip(known, hass, !!rep.dry_run && known !== "never_run")}
       </div>
       <div class="rows">${rows.join("")}</div>
       ${needHtml}
