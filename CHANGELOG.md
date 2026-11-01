@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (alpha) – Testlauf sichtbar
 - **Testlauf sichtbar:** War der letzte Lauf ein Testlauf (Dry Run), zeigt die Template-Karte neben „Letzter Lauf“ das Kennzeichen „Testlauf“
   (mit Tooltip), die Projekt-Karte nennt es im Untertitel des Templates („Erfolgreich · Testlauf · vor 3 Stunden“). Läufe ohne Testlauf bleiben unverändert.
   Dazu gibt es keinen neuen Sensor: Das Attribut `dry_run` der Zusammenfassung war schon da.
