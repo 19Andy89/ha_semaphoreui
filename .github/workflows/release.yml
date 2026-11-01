@@ -1,36 +1,54 @@
 name: Release
 
-# Ein Tag „vX.Y.Z“ erzeugt ein GitHub-Release mit semaphore_ui.zip.
-# Das ZIP enthält nur den Inhalt von custom_components/semaphore_ui (so erwartet es HACS mit "zip_release").
+# Bei jedem Push auf main: Aus den Commit-Meldungen (Conventional Commits) wird die nächste Version bestimmt
+#   fix:/perf:  -> Patch (0.3.0 -> 0.3.1)      feat: -> Minor (0.3.x -> 0.4.0)      feat!: / BREAKING CHANGE -> Minor (ab 1.0 Major)
+#   docs:/chore:/test:/ci:/refactor: -> kein Release
+# Danach: manifest.json und Karten-Version setzen, Commit + Tag, semaphore_ui.zip (nur custom_components/semaphore_ui) und GitHub-Release.
+# Steht in manifest.json schon eine höhere Version als im letzten Tag, wird genau diese veröffentlicht.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Version des Tags mit manifest.json vergleichen
+      - name: Nächste Version bestimmen
+        id: version
+        run: python3 .github/scripts/release.py
+
+      - name: Tests (pytest)
+        if: steps.version.outputs.released == 'true'
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          version="$(python3 -c "import json;print(json.load(open('custom_components/semaphore_ui/manifest.json'))['version'])")"
-          echo "Tag: $tag, manifest.json: $version"
-          [ "$tag" = "$version" ] || { echo "::error::Tag und manifest.json-Version passen nicht zusammen"; exit 1; }
+          python3 -m pip install -q -r requirements_test.txt
+          python3 -m pytest -q -p no:cacheprovider
 
       - name: ZIP bauen (nur custom_components/semaphore_ui)
+        if: steps.version.outputs.released == 'true'
         run: |
           cd custom_components/semaphore_ui
           zip -r -q ../../semaphore_ui.zip . -x "__pycache__/*" "*.pyc"
           unzip -l ../../semaphore_ui.zip | tail -n 3
 
-      - name: Release anlegen
+      - name: Commit, Tag und Release
+        if: steps.version.outputs.released == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" semaphore_ui.zip \
-            --title "$GITHUB_REF_NAME" --generate-notes --prerelease
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin HEAD:main "v$VERSION"
+          gh release create "v$VERSION" semaphore_ui.zip --title "v$VERSION" \
+            --notes-file release_notes.md --prerelease
