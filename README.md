@@ -292,7 +292,10 @@ Semaphore selbst, wann etwas startet, und ein Neustart von Home Assistant änder
   listet alle Zeitpläne des Projekts (der früheste zuerst, ausgeschaltete zuletzt). Option `show_schedules: false` blendet den
   Abschnitt aus.
 * **Automationen:** Der Schalter ist ein normaler `switch` – z. B. „Zeitplan Linux-Updates nur an, wenn jemand zu Hause ist“.
-* **Anlegen, ändern, löschen (Aktionen, ohne Karte):**
+* **Anlegen, ändern, löschen:** In der **Template-Karte** gibt es dafür ein „+“ an der Überschrift „Zeitpläne“ und je Zeitplan einen Stift. Es öffnet sich ein kleines Formular (Cron-Text, Name; Löschen fragt noch einmal nach). `edit_schedules: false` blendet beides aus. Die Projekt-Karte bleibt reine Anzeige. Die Karte nutzt diese Aktionen, du kannst sie auch selbst aufrufen:
+
+  ![Template-Karte mit Zeitplan-Formular](docs/screenshots/template-card-schedule-edit.png)
+
   * `semaphore_ui.create_schedule` – Ziel: das **Template-Gerät**; Felder `cron` (Pflicht, fünf Felder wie oben), `name` (Standard: Name des Templates), `active` (Standard: an). Antwort: `schedule_id` und `name`.
   * `semaphore_ui.update_schedule` – Ziel: der **Schalter** des Zeitplans; Felder `cron`, `name`, `template_id`, `active`. Nicht genannte Felder bleiben unverändert.
   * `semaphore_ui.delete_schedule` – Ziel: der **Schalter** des Zeitplans. Der Schalter verschwindet mit dem nächsten Abruf.
@@ -300,7 +303,7 @@ Semaphore selbst, wann etwas startet, und ein Neustart von Home Assistant änder
   Der Cron-Text wird vorher mit derselben Logik wie für „Nächster Lauf“ geprüft; ein Fehler steht dann klar in der Meldung, Semaphore wird nicht gefragt.
   Beim Ändern schickt die Integration den **ganzen** Zeitplan (`PUT /api/project/<id>/schedules/<id>`), weil Semaphore das so erwartet.
   Beispiel: `action: semaphore_ui.create_schedule` mit `target: {device_id: …}` und `data: {cron: "0 3 * * 1", name: "Montags"}`.
-  Einmalige Zeitpläne (`run_at`) und eine eigene Zeitplan-Karte gibt es noch nicht.
+  Einmalige Zeitpläne (`run_at`) lassen sich so noch nicht anlegen (der Stift zeigt bei ihnen keinen Cron-Text).
 
 ## Dashboard-Karten
 
@@ -361,6 +364,7 @@ show_survey: true                              # Eingabefelder der Survey-Variab
 show_details: true                             # Fehlergrund + Parameter (Standard: true)
 confirm_start: true                            # „Wirklich starten?“ vor dem Start (Standard: false)
 show_schedules: true                           # Zeitpläne mit Schalter (Standard: true)
+edit_schedules: true                           # „+“ und Stift: Zeitpläne in der Karte anlegen, ändern, löschen (Standard: true)
 ```
 
 ### Projekt-Karte `custom:semaphore-ui-project-card`

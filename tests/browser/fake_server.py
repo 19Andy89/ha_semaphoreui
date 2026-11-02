@@ -84,7 +84,7 @@ def make_app(fake: FakeSemaphore) -> web.Application:
         if action == "puts":  # PUTs (switch a schedule on / off) received so far
             return web.json_response([[a, b, c] for a, b, c in fake.requests if a == "PUT"])
         if action == "schedules":  # state of the schedules in the fake Semaphore
-            return web.json_response([{"id": s["id"], "name": s["name"], "active": s["active"]} for s in fake.schedules.values()])
+            return web.json_response([{"id": s["id"], "name": s["name"], "active": s["active"], "cron": s["cron_format"], "template_id": s["template_id"]} for s in fake.schedules.values()])
         if action == "tokens":  # the API tokens in the fake Semaphore (name, days left)
             now = datetime.now(UTC)
             return web.json_response(

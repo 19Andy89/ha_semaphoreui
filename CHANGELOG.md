@@ -4,6 +4,7 @@
 - Neue Aktionen `semaphore_ui.create_schedule` (Ziel: Template-Gerät), `update_schedule` und `delete_schedule` (Ziel: Zeitplan-Schalter).
   Cron-Text wird vorab geprüft (klare Meldung statt „bad request“); beim Ändern wird der ganze Zeitplan an Semaphore geschickt.
   Die Schalter erscheinen/verschwinden mit dem nächsten Abruf. Tests: 274 pytest.
+- **Template-Karte:** „+“ an der Überschrift „Zeitpläne“ und Stift je Zeitplan öffnen ein Formular (Cron-Text, Name; Löschen mit Rückfrage). Option `edit_schedules` (Standard: an) blendet es aus; die Projekt-Karte zeigt nur an. Browser-Test: 206 Prüfungen.
 - Noch **nicht an einer echten Instanz geprüft** (Aufbau der Anfragen aus dem Semaphore-Quellcode abgeleitet) – siehe Issue #1.
 - README: Hinweis für Repo-Betreiber zu Bildpfaden entfernt.
 

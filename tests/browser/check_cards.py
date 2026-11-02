@@ -283,6 +283,56 @@ def wait_for(predicate, seconds: float = 25.0) -> bool:
     return False
 
 
+def test_schedule_editing(page: Page) -> None:
+    """Zeitpläne in der Template-Karte anlegen, ändern und löschen (Aktionen create/update/delete_schedule)."""
+    deploy, host = tcard(page, "Deploy"), tcard(page, "Host-Update")
+    before = ctl("schedules")
+
+    # anlegen
+    deploy.locator('[data-action="sched-new"]').click()
+    form = deploy.locator(".sform")
+    check("Zeitplan anlegen: Formular mit Cron-Text und Name", form.count() == 1 and form.locator('[data-sf="cron"]').count() == 1 and form.locator('[data-sf="name"]').count() == 1)
+    form.locator('[data-sf="cron"]').fill("kein cron")
+    form.locator('[data-action="sched-save"]').click()
+    time.sleep(1.5)
+    check("Ungültiger Cron-Text: Formular bleibt offen, nichts wurde angelegt", deploy.locator(".sform").count() == 1 and ctl("schedules") == before, ctl("schedules"))
+    deploy.locator('[data-sf="cron"]').fill("15 6 * * 1")
+    deploy.locator('[data-sf="name"]').fill("Montags früh")
+    deploy.locator('[data-action="sched-save"]').click()
+    time.sleep(3)
+    created = [s for s in ctl("schedules") if s["name"] == "Montags früh"]
+    check("Zeitplan angelegt: Semaphore kennt ihn mit Cron-Text und Template", len(created) == 1 and created[0]["cron"] == "15 6 * * 1" and created[0]["active"] is True, ctl("schedules"))
+    rows = deploy.locator(".sched-row")
+    check("Neuer Zeitplan erscheint in der Karte, Formular ist zu", deploy.locator(".sform").count() == 0 and rows.count() == 1 and "15 6 * * 1" in rows.first.inner_text(), rows.count())
+
+    # ändern (Text im Formular bleibt, wenn zwischendurch neu gezeichnet wird)
+    rows.first.locator('[data-action="sched-edit"]').click()
+    check("Bearbeiten: Formular enthält die bisherigen Werte", deploy.locator('[data-sf="cron"]').input_value() == "15 6 * * 1" and deploy.locator('[data-sf="name"]').input_value() == "Montags früh")
+    deploy.locator('[data-sf="cron"]').fill("45 7 * * 2")
+    deploy.locator('[data-action="sched-save"]').click()
+    time.sleep(3)
+    changed = [s for s in ctl("schedules") if s["name"] == "Montags früh"]
+    check("Zeitplan geändert: neuer Cron-Text in Semaphore", len(changed) == 1 and changed[0]["cron"] == "45 7 * * 2", changed)
+
+    # abbrechen ändert nichts
+    deploy.locator('[data-action="sched-edit"]').click()
+    deploy.locator('[data-sf="cron"]').fill("1 1 1 1 1")
+    deploy.locator('[data-action="sched-cancel"]').click()
+    time.sleep(0.5)
+    check("Abbrechen: Formular zu, nichts gesendet", deploy.locator(".sform").count() == 0 and [s for s in ctl("schedules") if s["name"] == "Montags früh"][0]["cron"] == "45 7 * * 2")
+
+    # löschen: erst nachfragen
+    deploy.locator('[data-action="sched-edit"]').click()
+    deploy.locator('[data-action="sched-delete"]').click()
+    time.sleep(0.5)
+    check("Löschen fragt erst nach", "Wirklich" in deploy.locator('[data-action="sched-delete"]').inner_text() and len(ctl("schedules")) == len(before) + 1)
+    deploy.locator('[data-action="sched-delete"]').click()
+    time.sleep(3)
+    check("Zeitplan gelöscht: weg in Semaphore und in der Karte", ctl("schedules") == before and deploy.locator(".sched-row").count() == 0, ctl("schedules"))
+    check("Projekt-Karte hat keine Bearbeiten-Knöpfe", page.locator("semaphore-ui-project-card").first.locator('[data-action="sched-edit"], [data-action="sched-new"]').count() == 0)
+    check("Template-Karte: bestehende Zeitpläne haben einen Bearbeiten-Knopf", host.locator('[data-action="sched-edit"]').count() == 2)
+
+
 def test_schedules_ui(page: Page) -> None:
     """0.2.0: Zeitpläne, „Nächster Lauf“ und „Zuletzt erfolgreich“ in den Karten; der Schalter wirkt auf Semaphore."""
     host, docker, deploy = tcard(page, "Host-Update"), tcard(page, "docker-system"), tcard(page, "Deploy")
@@ -304,7 +354,7 @@ def test_schedules_ui(page: Page) -> None:
     check("Template-Karte (Fehler): Zeile „Nächster Lauf“ und „Zuletzt erfolgreich“", next_row.count() == 1 and success_row.count() == 1, (next_row.count(), success_row.count()))
     check("Zuletzt erfolgreich nennt Datum und relative Zeit", "·" in success_row.inner_text() and any(w in success_row.inner_text() for w in ("vorgestern", "vor 2 Tag", "vor 3 Tag")), success_row.inner_text())
     check("Template-Karte (Erfolg): keine Zeile „Zuletzt erfolgreich“, aber der nächste Lauf", docker.locator(".row.click", has_text="Zuletzt erfolgreich").count() == 0 and docker.locator(".row.click", has_text="Nächster Lauf").count() == 1)
-    check("Template ohne Zeitplan: kein Abschnitt, keine Zeile", deploy.locator(".sched").count() == 0 and deploy.locator(".row.click", has_text="Nächster Lauf").count() == 0)
+    check("Template ohne Zeitplan: nur „+“ zum Anlegen, keine Zeitplan-Zeile, keine Zeile „Nächster Lauf“", deploy.locator(".sched-row").count() == 0 and deploy.locator('.sched [data-action="sched-new"]').count() == 1 and deploy.locator(".row.click", has_text="Nächster Lauf").count() == 0)
 
     watch_more_info(page)
     seen = []
@@ -398,6 +448,12 @@ def test_docs_screenshots(playwright) -> None:
                 tcard(page, "docker-system").locator(".host").first.locator('button[data-action="pkgs"]').click()
                 time.sleep(0.5)
                 take(tcard(page, "docker-system"), "template-card-updates-open")
+                host = tcard(page, "Host-Update")
+                host.locator('[data-action="sched-edit"]').first.click()
+                time.sleep(0.5)
+                take(host, "template-card-schedule-edit")
+                host.locator('[data-action="sched-cancel"]').click()
+                time.sleep(0.4)
                 tcard(page, "docker-system").locator(".host").first.locator('button[data-action="pkgs"]').click()
                 time.sleep(0.4)
             dashboard_shot(page, f"dashboard{suffix}")
@@ -1139,6 +1195,7 @@ def main() -> int:
             test_project_filters(page)
             test_schedules_ui(page)
             test_busy_schedule(page)
+            test_schedule_editing(page)
             test_interactions(page)
             test_confirm_and_project_list(page)
             test_editor(page)

@@ -68,6 +68,15 @@ const TEXTS = {
     schedule_next: "nächster Lauf",
     schedule_tz: "Zeitzone",
     schedule_switch: "Zeitplan {name} ein- oder ausschalten",
+    sched_add: "Zeitplan hinzufügen",
+    sched_edit: "Zeitplan {name} bearbeiten",
+    sched_cron: "Cron-Text",
+    sched_name: "Name",
+    sched_hint: "Minute Stunde Tag Monat Wochentag, z. B. 0 3 * * 1 (montags 3 Uhr)",
+    sched_save: "Speichern",
+    sched_cancel: "Abbrechen",
+    sched_delete: "Löschen",
+    sched_delete_sure: "Wirklich löschen?",
     last_task: "Zuletzt gelaufen",
     no_templates: "Keine Templates gefunden",
     choose_device_t: "Bitte im Karten-Editor das Template wählen (Eintrag „Projekt › Template“).",
@@ -111,6 +120,7 @@ const TEXTS = {
       show_integration_version: "Version der Integration anzeigen",
       hacs_update_entity: "Update-Entität der Integration (HACS), optional",
       show_schedules: "Zeitpläne anzeigen",
+      edit_schedules: "Zeitpläne anlegen, ändern und löschen erlauben",
     },
   },
   en: {
@@ -167,6 +177,15 @@ const TEXTS = {
     schedule_next: "next run",
     schedule_tz: "Time zone",
     schedule_switch: "Switch schedule {name} on or off",
+    sched_add: "Add schedule",
+    sched_edit: "Edit schedule {name}",
+    sched_cron: "Cron expression",
+    sched_name: "Name",
+    sched_hint: "minute hour day month weekday, e.g. 0 3 * * 1 (Mondays 3 am)",
+    sched_save: "Save",
+    sched_cancel: "Cancel",
+    sched_delete: "Delete",
+    sched_delete_sure: "Really delete?",
     last_task: "Last run",
     no_templates: "No templates found",
     choose_device_t: "Please choose the template in the card editor (entry \"Project › Template\").",
@@ -210,6 +229,7 @@ const TEXTS = {
       show_integration_version: "Show the version of the integration",
       hacs_update_entity: "Update entity of the integration (HACS), optional",
       show_schedules: "Show schedules",
+      edit_schedules: "Allow creating, changing and deleting schedules",
     },
   },
 };
@@ -438,7 +458,15 @@ const STYLE = `
   .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sched { margin-top: 12px; border-top: 1px solid var(--divider-color); padding-top: 6px; }
-  .sched-title { color: var(--secondary-text-color); font-size: 0.85em; font-weight: 500; margin: 4px 0 2px; }
+  .sched-title { color: var(--secondary-text-color); font-size: 0.85em; font-weight: 500; margin: 4px 0 2px; display: flex; align-items: center; justify-content: space-between; }
+  .sched-title button.icon, .sched-row button.icon { --mdc-icon-size: 18px; }
+  .sform { display: grid; gap: 8px; padding: 8px 0 4px; }
+  .sform label { display: grid; gap: 4px; font-size: 0.85em; color: var(--secondary-text-color); }
+  .sform input { font: inherit; color: var(--primary-text-color); background: var(--card-background-color, #fff);
+            border: 1px solid var(--divider-color); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+  .sform input:focus { outline: 2px solid var(--primary-color); outline-offset: -1px; }
+  .sform .hint { font-size: 0.8em; color: var(--secondary-text-color); }
+  .sform .actions { margin-top: 2px; }
   .sched-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
   .sched-row .main { flex: 1; min-width: 0; cursor: pointer; }
   .sched-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -481,6 +509,11 @@ class SemaphoreBaseCard extends HTMLElement {
     this._ticker = null;
     this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
     this.shadowRoot.addEventListener("change", (ev) => this._onChange(ev));
+    // typed text of the schedule form survives a redraw
+    this.shadowRoot.addEventListener("input", (ev) => {
+      const field = ev.target && ev.target.dataset && ev.target.dataset.sf;
+      if (field && this._sf) this._sf[field] = ev.target.value;
+    });
     // the clickable header areas are no <button>s: make them work with Enter / Space, too
     this.shadowRoot.addEventListener("keydown", (ev) => {
       if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches('[data-action="more-info"], [data-action="filter"]')) {
@@ -646,11 +679,68 @@ class SemaphoreBaseCard extends HTMLElement {
     const text = bits.filter(Boolean).join(" · ");
     const when = on && item.next_run ? fmtDate(item.next_run, hass) : "";
     const label = T.schedule_switch.replace("{name}", item.name);
+    if (this._sf && this._sf.id === item.id) return this._scheduleForm(T, hass);
+    const editLabel = T.sched_edit.replace("{name}", item.name);
+    const editBtn = this._config.edit_schedules && item.entity_id
+      ? `<button class="icon" data-action="sched-edit" data-id="${esc(item.id)}" data-entity="${esc(item.entity_id)}" aria-label="${esc(editLabel)}" title="${esc(editLabel)}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button>`
+      : "";
     return `<div class="sched-row">
       <button class="tgl${on ? " on" : ""}${busy ? " busy" : ""}" role="switch" aria-checked="${on}" aria-label="${esc(label)}" title="${esc(busy ? tx(hass).busy : label)}"${busy ? ' aria-busy="true"' : ""} data-action="schedule" data-entity="${esc(item.entity_id || "")}" ${usable ? "" : "disabled"}><span class="knob"></span></button>
       <div class="main"${item.entity_id ? ` data-action="more-info" data-entity="${esc(item.entity_id)}"` : ""}>
         <div class="name">${esc(item.name)}</div><div class="sub" title="${esc(when ? `${text} (${when})` : text)}">${esc(text)}</div>
+      </div>${editBtn}</div>`;
+  }
+
+  /** Inline form to create (``id`` null) or change a schedule of this template. */
+  _scheduleForm(T, hass) {
+    const f = this._sf;
+    const sure = !!f.confirmDelete;
+    const busy = this._busy.has("sched-form");
+    return `<div class="sform" data-sform="1">
+      <label>${esc(T.sched_cron)}<input type="text" maxlength="200" data-sf="cron" value="${esc(f.cron)}" autocomplete="off" spellcheck="false" placeholder="0 3 * * 1"></label>
+      <label>${esc(T.sched_name)}<input type="text" maxlength="100" data-sf="name" value="${esc(f.name)}" autocomplete="off"></label>
+      <div class="hint">${esc(T.sched_hint)}</div>
+      <div class="actions">
+        <button class="btn primary${busy ? " busy" : ""}" data-action="sched-save"${busy ? " disabled" : ""}><ha-icon icon="mdi:check"></ha-icon>${esc(T.sched_save)}</button>
+        <button class="btn" data-action="sched-cancel"><ha-icon icon="mdi:close"></ha-icon>${esc(T.sched_cancel)}</button>
+        ${f.id != null ? `<button class="btn danger" data-action="sched-delete"${busy ? " disabled" : ""}><ha-icon icon="mdi:delete-outline"></ha-icon>${esc(sure ? T.sched_delete_sure : T.sched_delete)}</button>` : ""}
       </div></div>`;
+  }
+  _openScheduleForm(init) {
+    this._sf = { id: null, entity: "", cron: "", name: "", confirmDelete: false, ...init };
+    this._sig = "";
+    this._update();
+    // put the cursor into the first field
+    setTimeout(() => this.shadowRoot.querySelector('[data-sf="cron"]')?.focus(), 0);
+  }
+  _closeScheduleForm() {
+    this._sf = null;
+    this._sig = "";
+    this._update();
+  }
+  async _saveSchedule() {
+    const f = this._sf;
+    if (!f) return;
+    const cron = (f.cron || "").trim();
+    if (!cron) return this.shadowRoot.querySelector('[data-sf="cron"]')?.focus();
+    const name = (f.name || "").trim();
+    const ok = await this._busyRun("sched-form", true, () =>
+      f.id == null
+        ? this._call(SEMAPHORE_DOMAIN, "create_schedule", { device_id: this._config.device_id, cron, ...(name ? { name } : {}) })
+        : this._call(SEMAPHORE_DOMAIN, "update_schedule", { entity_id: f.entity, cron, ...(name ? { name } : {}) })
+    );
+    if (ok) this._closeScheduleForm();
+  }
+  async _deleteSchedule() {
+    const f = this._sf;
+    if (!f || f.id == null) return;
+    if (!f.confirmDelete) {
+      f.confirmDelete = true; // second click confirms
+      this._sig = "";
+      return this._update();
+    }
+    const ok = await this._busyRun("sched-form", true, () => this._call(SEMAPHORE_DOMAIN, "delete_schedule", { entity_id: f.entity }));
+    if (ok) this._closeScheduleForm();
   }
   _toggleSchedule(entity) {
     if (!entity) return;
@@ -673,7 +763,7 @@ class SemaphoreBaseCard extends HTMLElement {
 /* ======================================================== template card */
 class SemaphoreTemplateCard extends SemaphoreBaseCard {
   static get defaults() {
-    return { show_survey: true, show_details: true, confirm_start: false, show_schedules: true };
+    return { show_survey: true, show_details: true, confirm_start: false, show_schedules: true, edit_schedules: true };
   }
   static getConfigElement() {
     return document.createElement("semaphore-ui-card-editor");
@@ -700,7 +790,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       const s = this._hass.states[id];
       return s ? `${id}=${s.state}|${s.state === "unavailable" ? "" : JSON.stringify(s.attributes)}` : `${id}=?`;
     });
-    return [JSON.stringify(c), this._message, this._confirmUntil > Date.now(), langOf(this._hass), Math.floor(Date.now() / 60000), ...parts].join("\n");
+    return [JSON.stringify(c), JSON.stringify(this._sf || null), this._message, this._confirmUntil > Date.now(), langOf(this._hass), Math.floor(Date.now() / 60000), ...parts].join("\n");
   }
 
   _html() {
@@ -778,8 +868,13 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
 
     let schedHtml = "";
     const schedItems = ((this._state(byKey["sensor:next_run"]) || {}).attributes || {}).schedules;
-    if (c.show_schedules !== false && Array.isArray(schedItems) && schedItems.length) {
-      schedHtml = `<div class="sched"><div class="sched-title">${esc(T.schedules)}</div>${schedItems.map((item) => this._scheduleRow(item, T, hass, false)).join("")}</div>`;
+    const items = Array.isArray(schedItems) ? schedItems : [];
+    if (c.show_schedules !== false && (items.length || c.edit_schedules)) {
+      const add = c.edit_schedules
+        ? `<button class="icon" data-action="sched-new" aria-label="${esc(T.sched_add)}" title="${esc(T.sched_add)}"><ha-icon icon="mdi:plus"></ha-icon></button>`
+        : "";
+      const newForm = this._sf && this._sf.id == null ? this._scheduleForm(T, hass) : "";
+      schedHtml = `<div class="sched"><div class="sched-title"><span>${esc(T.schedules)}</span>${add}</div>${items.map((item) => this._scheduleRow(item, T, hass, false)).join("")}${newForm}</div>`;
     }
 
     let surveyHtml = "";
@@ -1024,6 +1119,14 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const entity = target.dataset.entity;
     if (action === "more-info") return this._moreInfo(entity);
     if (action === "schedule") return this._toggleSchedule(entity);
+    if (action === "sched-new") return this._openScheduleForm({});
+    if (action === "sched-edit") {
+      const item = (((this._state(this._ents().byKey["sensor:next_run"]) || {}).attributes || {}).schedules || []).find((i) => String(i.id) === target.dataset.id);
+      return item && this._openScheduleForm({ id: item.id, entity, cron: item.type === "run_at" ? "" : item.cron || "", name: item.name || "" });
+    }
+    if (action === "sched-save") return this._saveSchedule();
+    if (action === "sched-cancel") return this._closeScheduleForm();
+    if (action === "sched-delete") return this._deleteSchedule();
     if (action === "pkgs") {
       const key = target.dataset.key || "";
       this._pkgsOpen = this._pkgsOpen || new Set();
@@ -1383,7 +1486,7 @@ class SemaphoreCardEditor extends HTMLElement {
         { name: "show_schedules", selector: { boolean: {} } }
       );
     } else {
-      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } });
+      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } }, { name: "edit_schedules", selector: { boolean: {} } });
     }
     return base;
   }
