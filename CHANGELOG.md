@@ -1,5 +1,10 @@
 # Changelog
 
+## Unveröffentlicht – Cron in Worten, einmalige Zeitpläne
+- **Template-Karte:** Unter dem Cron-Text im Formular steht, was er bedeutet (Deutsch/Englisch, aktualisiert sich beim Tippen). Beim Anlegen lässt sich auf **Einmalig** umschalten (Datum/Uhrzeit, „Nach dem Lauf löschen“); einmalige Zeitpläne sind auch bearbeitbar.
+- **Aktionen:** `create_schedule` nimmt `cron` **oder** `run_at` (plus `delete_after_run`), `update_schedule` ebenso. Zeitpunkte gehen als UTC an Semaphore.
+- Browser-Test: 214 Prüfungen; pytest: 278. Einmalige Zeitpläne sind noch nicht an einer echten Instanz geprüft (Issue #1).
+
 ## Unveröffentlicht – Zeitpläne per Aktion anlegen, ändern, löschen
 - Neue Aktionen `semaphore_ui.create_schedule` (Ziel: Template-Gerät), `update_schedule` und `delete_schedule` (Ziel: Zeitplan-Schalter).
   Cron-Text wird vorab geprüft (klare Meldung statt „bad request“); beim Ändern wird der ganze Zeitplan an Semaphore geschickt.

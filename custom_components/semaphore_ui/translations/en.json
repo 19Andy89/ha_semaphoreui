@@ -281,6 +281,9 @@
     },
     "schedule_change_failed": {
       "message": "Schedule \"{schedule}\" could not be changed: {error}"
+    },
+    "cron_or_run_at": {
+      "message": "Give either \"Cron expression\" or \"Run once at\"."
     }
   },
   "services": {
@@ -333,6 +336,14 @@
         "active": {
           "name": "Active",
           "description": "Switch the schedule on right away."
+        },
+        "run_at": {
+          "name": "Run once at",
+          "description": "One-time schedule: date and time (in the time zone of Home Assistant). Instead of \"Cron expression\"."
+        },
+        "delete_after_run": {
+          "name": "Delete after run",
+          "description": "Delete the schedule in Semaphore after it ran."
         }
       }
     },
@@ -355,6 +366,14 @@
         "active": {
           "name": "Active",
           "description": "Switch on or off."
+        },
+        "run_at": {
+          "name": "Run once at",
+          "description": "One-time schedule: date and time (in the time zone of Home Assistant). Instead of \"Cron expression\"."
+        },
+        "delete_after_run": {
+          "name": "Delete after run",
+          "description": "Delete the schedule in Semaphore after it ran."
         }
       }
     },

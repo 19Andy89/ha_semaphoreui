@@ -76,6 +76,10 @@ const TEXTS = {
     sched_save: "Speichern",
     sched_cancel: "Abbrechen",
     sched_delete: "Löschen",
+    sched_recurring: "Wiederkehrend",
+    sched_once: "Einmalig",
+    sched_when: "Zeitpunkt",
+    sched_delete_after: "Nach dem Lauf löschen",
     sched_delete_sure: "Wirklich löschen?",
     last_task: "Zuletzt gelaufen",
     no_templates: "Keine Templates gefunden",
@@ -185,6 +189,10 @@ const TEXTS = {
     sched_save: "Save",
     sched_cancel: "Cancel",
     sched_delete: "Delete",
+    sched_recurring: "Recurring",
+    sched_once: "Once",
+    sched_when: "Date and time",
+    sched_delete_after: "Delete after it ran",
     sched_delete_sure: "Really delete?",
     last_task: "Last run",
     no_templates: "No templates found",
@@ -465,6 +473,11 @@ const STYLE = `
   .sform input { font: inherit; color: var(--primary-text-color); background: var(--card-background-color, #fff);
             border: 1px solid var(--divider-color); border-radius: 8px; padding: 8px 10px; min-width: 0; }
   .sform input:focus { outline: 2px solid var(--primary-color); outline-offset: -1px; }
+  .sform .desc { font-size: 0.9em; color: var(--primary-text-color); min-height: 1.3em; }
+  .sform .seg { display: inline-flex; border: 1px solid var(--divider-color); border-radius: 18px; overflow: hidden; width: fit-content; }
+  .sform .seg button { font: inherit; background: none; border: 0; padding: 6px 14px; color: var(--primary-text-color); cursor: pointer; }
+  .sform .seg button.sel { background: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .sform label.chk { display: flex; align-items: center; gap: 8px; color: var(--primary-text-color); font-size: 0.95em; }
   .sform .hint { font-size: 0.8em; color: var(--secondary-text-color); }
   .sform .actions { margin-top: 2px; }
   .sched-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
@@ -512,7 +525,12 @@ class SemaphoreBaseCard extends HTMLElement {
     // typed text of the schedule form survives a redraw
     this.shadowRoot.addEventListener("input", (ev) => {
       const field = ev.target && ev.target.dataset && ev.target.dataset.sf;
-      if (field && this._sf) this._sf[field] = ev.target.value;
+      if (!field || !this._sf) return;
+      this._sf[field] = ev.target.type === "checkbox" ? ev.target.checked : ev.target.value;
+      if (field === "cron") {
+        const desc = this.shadowRoot.querySelector("[data-desc]"); // plain-language text, no redraw while typing
+        if (desc) desc.textContent = describeCron(ev.target.value, langOf(this._hass));
+      }
     });
     // the clickable header areas are no <button>s: make them work with Enter / Space, too
     this.shadowRoot.addEventListener("keydown", (ev) => {
@@ -696,10 +714,19 @@ class SemaphoreBaseCard extends HTMLElement {
     const f = this._sf;
     const sure = !!f.confirmDelete;
     const busy = this._busy.has("sched-form");
+    const once = f.mode === "once";
+    const seg = f.id == null
+      ? `<div class="seg" role="group"><button type="button" class="${once ? "" : "sel"}" aria-pressed="${!once}" data-action="sched-mode" data-mode="cron">${esc(T.sched_recurring)}</button><button type="button" class="${once ? "sel" : ""}" aria-pressed="${once}" data-action="sched-mode" data-mode="once">${esc(T.sched_once)}</button></div>`
+      : "";
+    const body = once
+      ? `<label>${esc(T.sched_when)}<input type="datetime-local" data-sf="when" value="${esc(f.when)}"></label>
+      <label class="chk"><input type="checkbox" data-sf="del"${f.del ? " checked" : ""}>${esc(T.sched_delete_after)}</label>`
+      : `<label>${esc(T.sched_cron)}<input type="text" maxlength="200" data-sf="cron" value="${esc(f.cron)}" autocomplete="off" spellcheck="false" placeholder="0 3 * * 1" aria-describedby="sf-desc"></label>
+      <div class="desc" id="sf-desc" data-desc="1" aria-live="polite">${esc(describeCron(f.cron, langOf(hass)))}</div>
+      <div class="hint">${esc(T.sched_hint)}</div>`;
     return `<div class="sform" data-sform="1">
-      <label>${esc(T.sched_cron)}<input type="text" maxlength="200" data-sf="cron" value="${esc(f.cron)}" autocomplete="off" spellcheck="false" placeholder="0 3 * * 1"></label>
+      ${seg}${body}
       <label>${esc(T.sched_name)}<input type="text" maxlength="100" data-sf="name" value="${esc(f.name)}" autocomplete="off"></label>
-      <div class="hint">${esc(T.sched_hint)}</div>
       <div class="actions">
         <button class="btn primary${busy ? " busy" : ""}" data-action="sched-save"${busy ? " disabled" : ""}><ha-icon icon="mdi:check"></ha-icon>${esc(T.sched_save)}</button>
         <button class="btn" data-action="sched-cancel"><ha-icon icon="mdi:close"></ha-icon>${esc(T.sched_cancel)}</button>
@@ -707,11 +734,11 @@ class SemaphoreBaseCard extends HTMLElement {
       </div></div>`;
   }
   _openScheduleForm(init) {
-    this._sf = { id: null, entity: "", cron: "", name: "", confirmDelete: false, ...init };
+    this._sf = { id: null, entity: "", mode: "cron", cron: "", when: localInput(new Date(Date.now() + 3600e3)), del: false, name: "", confirmDelete: false, ...init };
     this._sig = "";
     this._update();
     // put the cursor into the first field
-    setTimeout(() => this.shadowRoot.querySelector('[data-sf="cron"]')?.focus(), 0);
+    setTimeout(() => this.shadowRoot.querySelector('[data-sf="cron"], [data-sf="when"]')?.focus(), 0);
   }
   _closeScheduleForm() {
     this._sf = null;
@@ -721,13 +748,16 @@ class SemaphoreBaseCard extends HTMLElement {
   async _saveSchedule() {
     const f = this._sf;
     if (!f) return;
+    const once = f.mode === "once";
     const cron = (f.cron || "").trim();
-    if (!cron) return this.shadowRoot.querySelector('[data-sf="cron"]')?.focus();
+    const when = f.when ? new Date(f.when) : null; // datetime-local = time of the browser
+    if (once ? !when || isNaN(when) : !cron) return this.shadowRoot.querySelector('[data-sf="cron"], [data-sf="when"]')?.focus();
     const name = (f.name || "").trim();
+    const data = { ...(once ? { run_at: when.toISOString(), delete_after_run: !!f.del } : { cron }), ...(name ? { name } : {}) };
     const ok = await this._busyRun("sched-form", true, () =>
       f.id == null
-        ? this._call(SEMAPHORE_DOMAIN, "create_schedule", { device_id: this._config.device_id, cron, ...(name ? { name } : {}) })
-        : this._call(SEMAPHORE_DOMAIN, "update_schedule", { entity_id: f.entity, cron, ...(name ? { name } : {}) })
+        ? this._call(SEMAPHORE_DOMAIN, "create_schedule", { device_id: this._config.device_id, ...data })
+        : this._call(SEMAPHORE_DOMAIN, "update_schedule", { entity_id: f.entity, ...data })
     );
     if (ok) this._closeScheduleForm();
   }
@@ -758,6 +788,111 @@ class SemaphoreBaseCard extends HTMLElement {
     }
     return `<span class="chip ${st.pulse ? "pulse" : ""}" style="--chip-color:${st.color}"><ha-icon icon="${st.icon}"></ha-icon>${label}</span>`;
   }
+}
+
+/** "2026-11-05T09:30" (value of <input type="datetime-local">) in the time zone of the browser. */
+function localInput(date) {
+  if (!(date instanceof Date) || isNaN(date)) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
+}
+
+/* ===================================================== cron in words */
+const CRON_WORDS = {
+  de: {
+    days: ["sonntags", "montags", "dienstags", "mittwochs", "donnerstags", "freitags", "samstags"],
+    months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+    daily: "täglich", everyMinute: "jede Minute", everyNMinutes: "alle {n} Minuten", hourly: "stündlich zur vollen Stunde",
+    hourlyAt: "stündlich zur Minute {m}", everyNHours: "alle {n} Stunden ab {t} Uhr", at: "um {t} Uhr", hoursFromTo: "stündlich von {a} bis {b} Uhr",
+    minutesBetween: "alle {n} Minuten zwischen {a} und {b} Uhr", to: "bis", and: "und", onDom: "am {d} eines Monats", onDomMonth: "am {d} {m}", ord: "{n}.", inMonth: "im {m}",
+    every: "alle {d} (der Takt beginnt beim Laden in Semaphore)",
+  },
+  en: {
+    days: ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"],
+    months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    daily: "every day", everyMinute: "every minute", everyNMinutes: "every {n} minutes", hourly: "every hour on the hour",
+    hourlyAt: "every hour at minute {m}", everyNHours: "every {n} hours from {t}", at: "at {t}", hoursFromTo: "every hour from {a} to {b}",
+    minutesBetween: "every {n} minutes between {a} and {b}", to: "to", and: "and", onDom: "on day {d} of the month", onDomMonth: "on day {d} of {m}", ord: "{n}", inMonth: "in {m}",
+    every: "every {d} (the clock starts when Semaphore loads it)",
+  },
+};
+/** Plain-language description of a five-field cron text (Semaphore dialect); "" when it is too unusual to describe. */
+function describeCron(expr, lang) {
+  const W = CRON_WORDS[lang === "de" ? "de" : "en"];
+  const fill = (t, o) => t.replace(/\{(\w+)\}/g, (_, k) => o[k]);
+  let e = String(expr || "").trim().replace(/^(?:CRON_)?TZ=\S+\s+/i, "");
+  const macros = { "@yearly": "0 0 1 1 *", "@annually": "0 0 1 1 *", "@monthly": "0 0 1 * *", "@weekly": "0 0 * * 0", "@daily": "0 0 * * *", "@midnight": "0 0 * * *", "@hourly": "0 * * * *" };
+  if (macros[e.toLowerCase()]) e = macros[e.toLowerCase()];
+  const ev = /^@every\s+(\S+)$/i.exec(e);
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  if (ev) return cap(fill(W.every, { d: ev[1] }));
+  const f = e.split(/\s+/);
+  if (f.length !== 5) return "";
+  const names = (field, list, offset) =>
+    field.replace(/[a-z]{3}/gi, (m) => {
+      const i = list.indexOf(m.toLowerCase());
+      return i < 0 ? m : String(i + offset);
+    });
+  const [mi, h, dom] = f;
+  const mon = names(f[3], ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1);
+  const dow = names(f[4], ["sun", "mon", "tue", "wed", "thu", "fri", "sat"], 0).replace(/\?/g, "*");
+  const int = (x) => (/^\d+$/.test(x) ? Number(x) : null);
+  const pad = (n) => String(n).padStart(2, "0");
+  const step = (x) => {
+    const m = /^\*\/(\d+)$/.exec(x);
+    return m && Number(m[1]) > 0 ? Number(m[1]) : null;
+  };
+  const items = (x) => {
+    // "1,3,5-7" -> [1,3,5,6,7]; null if anything else
+    const out = [];
+    for (const part of x.split(",")) {
+      const m = /^(\d+)(?:-(\d+))?$/.exec(part);
+      if (!m) return null;
+      const a = Number(m[1]);
+      const b = m[2] === undefined ? a : Number(m[2]);
+      if (b < a || b - a > 60) return null;
+      for (let i = a; i <= b; i++) out.push(i);
+    }
+    return out;
+  };
+  const join = (arr) => (arr.length < 2 ? arr.join("") : `${arr.slice(0, -1).join(", ")} ${W.and} ${arr[arr.length - 1]}`);
+
+  // time of day -> {text, exact}; exact = a clock time ("um 02:00 Uhr") that can follow the day directly
+  let time = null;
+  const m = int(mi);
+  const hs = step(h);
+  const hl = h === "*" ? null : items(h);
+  if (mi === "*" && h === "*") time = { text: W.everyMinute };
+  else if (step(mi) && h === "*") time = { text: fill(W.everyNMinutes, { n: step(mi) }) };
+  else if (m !== null && m < 60 && h === "*") time = { text: m === 0 ? W.hourly : fill(W.hourlyAt, { m }) };
+  else if (m !== null && m < 60 && hs) time = { text: fill(W.everyNHours, { n: hs, t: `00:${pad(m)}` }) };
+  else if (m !== null && m < 60 && hl && hl.length <= 6 && hl.every((x) => x < 24) && /^[\d,]+$/.test(h)) time = { text: fill(W.at, { t: join(hl.map((x) => `${pad(x)}:${pad(m)}`)) }), exact: true };
+  else if (m !== null && m < 60 && hl && /^\d+-\d+$/.test(h) && hl[hl.length - 1] < 24) time = { text: fill(W.hoursFromTo, { a: `${pad(hl[0])}:${pad(m)}`, b: `${pad(hl[hl.length - 1])}:${pad(m)}` }) };
+  else if (step(mi) && hl && /^\d+-\d+$/.test(h) && hl[hl.length - 1] < 24) time = { text: fill(W.minutesBetween, { n: step(mi), a: `${pad(hl[0])}:00`, b: `${pad(hl[hl.length - 1])}:59` }) };
+  if (!time) return "";
+
+  // day part
+  let day = W.daily;
+  if (dom !== "*" && dow !== "*") return "";
+  if (dow !== "*") {
+    const d = items(dow);
+    if (!d || d.some((x) => x > 6)) return "";
+    day = /^\d+-\d+$/.test(dow) ? `${W.days[d[0]]} ${W.to} ${W.days[d[d.length - 1]]}` : join(d.map((x) => W.days[x]));
+  } else if (dom !== "*") {
+    const d = items(dom);
+    if (!d || d.some((x) => x < 1 || x > 31)) return "";
+    day = join(d.map((x) => fill(W.ord, { n: x })));
+    day = fill(mon !== "*" ? W.onDomMonth : W.onDom, { d: day, m: "" }).replace(/\s+$/, "");
+  }
+  if (mon !== "*") {
+    const mm = items(mon);
+    if (!mm || mm.some((x) => x < 1 || x > 12)) return "";
+    const months = join(mm.map((x) => W.months[x - 1]));
+    if (dom !== "*") day += ` ${months}`;
+    else day += ` ${fill(W.inMonth, { m: months })}`;
+  }
+  if (!time.exact && day === W.daily) return cap(time.text);
+  return cap(time.exact || day !== W.daily ? `${day}${time.exact ? " " : ", "}${time.text}` : time.text);
 }
 
 /* ======================================================== template card */
@@ -1122,7 +1257,15 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     if (action === "sched-new") return this._openScheduleForm({});
     if (action === "sched-edit") {
       const item = (((this._state(this._ents().byKey["sensor:next_run"]) || {}).attributes || {}).schedules || []).find((i) => String(i.id) === target.dataset.id);
-      return item && this._openScheduleForm({ id: item.id, entity, cron: item.type === "run_at" ? "" : item.cron || "", name: item.name || "" });
+      if (!item) return;
+      const once = item.type === "run_at";
+      return this._openScheduleForm({ id: item.id, entity, mode: once ? "once" : "cron", cron: once ? "" : item.cron || "", when: once && item.run_at ? localInput(new Date(item.run_at)) : "", del: !!item.delete_after_run, name: item.name || "" });
+    }
+    if (action === "sched-mode") {
+      this._sf.mode = target.dataset.mode;
+      this._sig = "";
+      this._update();
+      return setTimeout(() => this.shadowRoot.querySelector('[data-sf="cron"], [data-sf="when"]')?.focus(), 0);
     }
     if (action === "sched-save") return this._saveSchedule();
     if (action === "sched-cancel") return this._closeScheduleForm();

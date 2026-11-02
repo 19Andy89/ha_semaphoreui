@@ -49,10 +49,19 @@ create_schedule:
       model: Template
   fields:
     cron:
-      required: true
+      required: false
       example: "0 3 * * 1"
       selector:
         text:
+    run_at:
+      required: false
+      selector:
+        datetime:
+    delete_after_run:
+      required: false
+      default: false
+      selector:
+        boolean:
     name:
       required: false
       selector:
@@ -74,6 +83,14 @@ update_schedule:
       example: "30 4 * * *"
       selector:
         text:
+    run_at:
+      required: false
+      selector:
+        datetime:
+    delete_after_run:
+      required: false
+      selector:
+        boolean:
     name:
       required: false
       selector:

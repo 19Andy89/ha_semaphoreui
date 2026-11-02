@@ -355,10 +355,20 @@ class FakeSemaphore:
             self.requests.append(("POST", request.path, body))
             if self.schedules_error is not None:
                 return web.Response(status=self.schedules_error[0], text=self.schedules_error[1])
-            if not isinstance(body, dict) or body.get("template_id") not in self.templates or not body.get("cron_format"):
+            if (
+                not isinstance(body, dict)
+                or body.get("template_id") not in self.templates
+                or not (body.get("cron_format") or (body.get("type") == "run_at" and body.get("run_at")))
+            ):
                 return web.json_response({"error": "bad body"}, status=400)
             created = self.add_schedule(
-                body["template_id"], body["cron_format"], name=body.get("name", ""), active=bool(body.get("active"))
+                body["template_id"],
+                body.get("cron_format", ""),
+                name=body.get("name", ""),
+                active=bool(body.get("active")),
+                type=body.get("type", ""),
+                run_at=body.get("run_at"),
+                delete_after_run=bool(body.get("delete_after_run")),
             )
             return web.json_response(created, status=201)
 
@@ -374,7 +384,7 @@ class FakeSemaphore:
             if sid not in self.schedules:
                 return web.Response(status=404, text="Not Found")
             # like Semaphore: the whole object is expected, with the matching id
-            if not isinstance(body, dict) or body.get("id") != sid or not body.get("cron_format") or "template_id" not in body:
+            if not isinstance(body, dict) or body.get("id") != sid or not (body.get("cron_format") or (body.get("type") == "run_at" and body.get("run_at"))) or "template_id" not in body:
                 return web.json_response({"error": "bad body"}, status=400)
             self.schedules[sid] = {
                 **self.schedules[sid],

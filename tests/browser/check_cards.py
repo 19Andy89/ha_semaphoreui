@@ -297,12 +297,22 @@ def test_schedule_editing(page: Page) -> None:
     time.sleep(1.5)
     check("Ungültiger Cron-Text: Formular bleibt offen, nichts wurde angelegt", deploy.locator(".sform").count() == 1 and ctl("schedules") == before, ctl("schedules"))
     deploy.locator('[data-sf="cron"]').fill("15 6 * * 1")
+    check("Cron-Text wird darunter in Worten erklärt", deploy.locator("[data-desc]").inner_text().strip() == "Montags um 06:15 Uhr", deploy.locator("[data-desc]").inner_text())
+    deploy.locator('[data-sf="cron"]').fill("0 */2 * * *")
+    check("Cron-Text: alle 2 Stunden", deploy.locator("[data-desc]").inner_text().strip() == "Alle 2 Stunden ab 00:00 Uhr", deploy.locator("[data-desc]").inner_text())
+    deploy.locator('[data-sf="cron"]').fill("kein cron")
+    check("Unverständlicher Cron-Text: keine Erklärung", deploy.locator("[data-desc]").inner_text().strip() == "")
+    deploy.locator('[data-sf="cron"]').fill("15 6 * * 1")
     deploy.locator('[data-sf="name"]').fill("Montags früh")
     deploy.locator('[data-action="sched-save"]').click()
     time.sleep(3)
     created = [s for s in ctl("schedules") if s["name"] == "Montags früh"]
     check("Zeitplan angelegt: Semaphore kennt ihn mit Cron-Text und Template", len(created) == 1 and created[0]["cron"] == "15 6 * * 1" and created[0]["active"] is True, ctl("schedules"))
     rows = deploy.locator(".sched-row")
+    for _ in range(20):  # die Karte zieht nach, sobald Home Assistant den Zeitplan abgerufen hat
+        if rows.count() == 1 and deploy.locator(".sform").count() == 0:
+            break
+        time.sleep(0.5)
     check("Neuer Zeitplan erscheint in der Karte, Formular ist zu", deploy.locator(".sform").count() == 0 and rows.count() == 1 and "15 6 * * 1" in rows.first.inner_text(), rows.count())
 
     # ändern (Text im Formular bleibt, wenn zwischendurch neu gezeichnet wird)
@@ -313,6 +323,31 @@ def test_schedule_editing(page: Page) -> None:
     time.sleep(3)
     changed = [s for s in ctl("schedules") if s["name"] == "Montags früh"]
     check("Zeitplan geändert: neuer Cron-Text in Semaphore", len(changed) == 1 and changed[0]["cron"] == "45 7 * * 2", changed)
+
+    # einmaliger Zeitplan
+    deploy.locator('[data-action="sched-new"]').click()
+    deploy.locator('[data-action="sched-mode"][data-mode="once"]').click()
+    check("Einmalig: Feld für Datum und Uhrzeit statt Cron-Text", deploy.locator('[data-sf="when"]').count() == 1 and deploy.locator('[data-sf="cron"]').count() == 0 and deploy.locator('[data-sf="del"]').count() == 1)
+    deploy.locator('[data-sf="when"]').fill("2030-05-06T07:08")
+    deploy.locator('[data-sf="del"]').check()
+    deploy.locator('[data-sf="name"]').fill("Einmal 2030")
+    deploy.locator('[data-action="sched-save"]').click()
+    time.sleep(3)
+    once = [x for x in ctl("schedules") if x["name"] == "Einmal 2030"]
+    check("Einmaliger Zeitplan angelegt (Typ run_at, löschen nach dem Lauf)", len(once) == 1 and once[0]["type"] == "run_at" and once[0]["run_at"].startswith("2030-05-0") and once[0]["delete_after_run"] is True and once[0]["cron"] == "", once)
+    once_row = deploy.locator(".sched-row", has_text="Einmal 2030")
+    for _ in range(20):
+        if once_row.count() == 1:
+            break
+        time.sleep(0.5)
+    check("Karte nennt ihn „einmalig“", once_row.count() == 1 and "einmalig" in once_row.inner_text())
+    once_row.locator('[data-action="sched-edit"]').click()
+    check("Bearbeiten: Zeitpunkt vorbelegt, kein Wechsel zwischen einmalig und wiederkehrend", deploy.locator('[data-sf="when"]').input_value() == "2030-05-06T07:08" and deploy.locator('[data-action="sched-mode"]').count() == 0)
+    deploy.locator('[data-action="sched-delete"]').click()
+    time.sleep(0.4)
+    deploy.locator('[data-action="sched-delete"]').click()
+    time.sleep(3)
+    check("Einmaliger Zeitplan wieder gelöscht", not [x for x in ctl("schedules") if x["name"] == "Einmal 2030"])
 
     # abbrechen ändert nichts
     deploy.locator('[data-action="sched-edit"]').click()

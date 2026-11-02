@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import logging
 import re
 import time
@@ -64,7 +64,7 @@ from .report import (
     task_started,
     task_status,
 )
-from .schedule import load_timezone, next_run_of, validate_cron
+from .schedule import SCHEDULE_TYPE_RUN_AT, load_timezone, next_run_of, validate_cron
 from .survey import SurveyError, SurveyVar, build_survey_payload, parse_survey_vars
 
 _LOGGER = logging.getLogger(__name__)
@@ -478,25 +478,40 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
             )
         return template
 
+    @staticmethod
+    def _run_at_text(run_at: datetime) -> str:
+        """One-time schedules go to Semaphore as UTC time stamp ("2026-11-05T08:30:00Z")."""
+        if run_at.tzinfo is None:
+            run_at = run_at.replace(tzinfo=dt_util.get_default_time_zone())
+        return run_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     async def async_create_schedule(
-        self, template_id: int, cron: str, *, name: str | None = None, active: bool = True
+        self,
+        template_id: int,
+        cron: str | None = None,
+        *,
+        run_at: datetime | None = None,
+        name: str | None = None,
+        active: bool = True,
+        delete_after_run: bool = False,
     ) -> dict[str, Any]:
-        """Create a cron schedule for a template in Semaphore; returns the new schedule."""
+        """Create a cron schedule (``cron``) or a one-time schedule (``run_at``) for a template."""
         template = self._known_template(template_id)
-        cron = self._check_cron(cron)
+        if (cron is None) == (run_at is None):
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="cron_or_run_at")
         label = name or str(template.get("name") or template_id)
+        body: dict[str, Any] = {
+            "template_id": template_id,
+            "name": label,
+            "active": active,
+            "delete_after_run": delete_after_run,
+        }
+        if cron is not None:
+            body |= {"type": "", "cron_format": self._check_cron(cron)}
+        else:
+            body |= {"type": SCHEDULE_TYPE_RUN_AT, "cron_format": "", "run_at": self._run_at_text(run_at)}
         try:
-            created = await self.client.create_schedule(
-                self.project_id,
-                {
-                    "template_id": template_id,
-                    "cron_format": cron,
-                    "name": label,
-                    "active": active,
-                    "type": "",
-                    "delete_after_run": False,
-                },
-            )
+            created = await self.client.create_schedule(self.project_id, body)
         except SemaphoreError as err:
             raise self._schedule_error(err, label) from err
         await self.async_request_refresh()
@@ -507,9 +522,11 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         schedule_id: int,
         *,
         cron: str | None = None,
+        run_at: datetime | None = None,
         name: str | None = None,
         template_id: int | None = None,
         active: bool | None = None,
+        delete_after_run: bool | None = None,
     ) -> None:
         """Change cron text, name, template or on/off of a schedule (the rest stays as it is)."""
         schedule = self.data.schedules.get(schedule_id)
@@ -520,8 +537,14 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                 translation_placeholders={"schedule_id": str(schedule_id)},
             )
         changes: dict[str, Any] = {}
-        if cron is not None:
-            changes["cron_format"] = self._check_cron(cron)
+        if cron is not None and run_at is not None:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="cron_or_run_at")
+        if cron is not None:  # a cron text makes it a recurring schedule
+            changes |= {"cron_format": self._check_cron(cron), "type": "", "run_at": None}
+        if run_at is not None:  # a time makes it a one-time schedule
+            changes |= {"cron_format": "", "type": SCHEDULE_TYPE_RUN_AT, "run_at": self._run_at_text(run_at)}
+        if delete_after_run is not None:
+            changes["delete_after_run"] = delete_after_run
         if name is not None:
             changes["name"] = name
         if template_id is not None:

@@ -378,3 +378,47 @@ async def test_delete_schedule_removes_switch_and_reports_errors(hass: HomeAssis
     assert list(server.schedules) == [2]
     assert er.async_get(hass).async_get_entity_id("switch", DOMAIN, f"{hass.config_entries.async_entries(DOMAIN)[0].entry_id}_1_schedule") is None
     assert len(switch_ids(hass)) == 1
+
+
+async def test_create_one_time_schedule(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    await setup(hass, make_entry)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "create_schedule",
+        {"device_id": device_id_of(hass, 2), "run_at": "2026-11-05T09:30:00+01:00", "delete_after_run": True, "name": "Einmal"},
+        blocking=True,
+        return_response=True,
+    )
+    await hass.async_block_till_done()
+
+    post = [r for r in server.requests if r[0] == "POST" and r[1].endswith("/schedules")][-1][2]
+    assert post["type"] == "run_at" and post["run_at"] == "2026-11-05T08:30:00Z"  # sent as UTC
+    assert post["cron_format"] == "" and post["delete_after_run"] is True
+    state = hass.states.get(switch_id(hass, 1))
+    assert state.attributes["type"] == "run_at" and state.attributes["delete_after_run"] is True
+
+
+@pytest.mark.parametrize("data", [{}, {"cron": "0 1 * * *", "run_at": "2026-11-05T09:30:00+01:00"}])
+async def test_create_needs_exactly_one_of_cron_and_run_at(hass: HomeAssistant, fake, make_entry, data) -> None:
+    server, _ = fake
+    await setup(hass, make_entry)
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "create_schedule", {"device_id": device_id_of(hass, 2), **data}, blocking=True)
+    assert server.schedules == {}
+
+
+async def test_update_turns_a_cron_schedule_into_a_one_time_one_and_back(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    server.add_schedule(2, "0 2 * * *", name="nightly")
+    await setup(hass, make_entry)
+    entity = switch_id(hass, 1)
+
+    await hass.services.async_call(DOMAIN, "update_schedule", {"entity_id": entity, "run_at": "2026-11-05T08:30:00Z"}, blocking=True)
+    await hass.async_block_till_done()
+    assert (server.schedules[1]["type"], server.schedules[1]["run_at"], server.schedules[1]["cron_format"]) == ("run_at", "2026-11-05T08:30:00Z", "")
+
+    await hass.services.async_call(DOMAIN, "update_schedule", {"entity_id": entity, "cron": "5 5 * * *"}, blocking=True)
+    await hass.async_block_till_done()
+    assert (server.schedules[1]["type"], server.schedules[1]["cron_format"]) == ("", "5 5 * * *")

@@ -84,15 +84,19 @@ SERVICE_CREATE_SCHEDULE_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_DEVICE_ID): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
-        vol.Required("cron"): _CRON,
+        vol.Optional("cron"): _CRON,
+        vol.Optional("run_at"): cv.datetime,
         vol.Optional("name"): vol.All(cv.string, vol.Length(min=1, max=100)),
         vol.Optional("active", default=True): cv.boolean,
+        vol.Optional("delete_after_run", default=False): cv.boolean,
     }
 )
 SERVICE_UPDATE_SCHEDULE_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
         vol.Optional("cron"): _CRON,
+        vol.Optional("run_at"): cv.datetime,
+        vol.Optional("delete_after_run"): cv.boolean,
         vol.Optional("name"): vol.All(cv.string, vol.Length(min=1, max=100)),
         vol.Optional("template_id"): vol.All(vol.Coerce(int), vol.Range(min=1)),
         vol.Optional("active"): cv.boolean,
@@ -195,7 +199,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             )
         coordinator, template_id = targets[0]
         created = await coordinator.async_create_schedule(
-            template_id, call.data["cron"], name=call.data.get("name"), active=call.data["active"]
+            template_id,
+            call.data.get("cron"),
+            run_at=call.data.get("run_at"),
+            name=call.data.get("name"),
+            active=call.data["active"],
+            delete_after_run=call.data["delete_after_run"],
         )
         return {"schedule_id": created.get("id"), "name": created.get("name")}
 
@@ -204,6 +213,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             await coordinator.async_update_schedule(
                 schedule_id,
                 cron=call.data.get("cron"),
+                run_at=call.data.get("run_at"),
+                delete_after_run=call.data.get("delete_after_run"),
                 name=call.data.get("name"),
                 template_id=call.data.get("template_id"),
                 active=call.data.get("active"),
