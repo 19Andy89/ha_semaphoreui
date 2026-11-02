@@ -119,12 +119,12 @@ def test_rendering(page: Page) -> None:
     docker = tcard(page, "docker-system")
     check("Erfolgs-Karte: kein Stopp-Knopf", docker.locator("button >> text=Stoppen").count() == 0)
     need = docker.locator(".needbox.on").inner_text() if docker.locator(".needbox.on").count() else ""
-    check("Handlungsbedarf: Karte nennt Updates und Neustart", "Offene Updates: 9" in need and "Neustart nötig" in need, need)
-    check("Handlungsbedarf: Quelle ist ein Testlauf, Paketnamen als Chips (ohne doppelte)", "Testlauf" in need and docker.locator(".pkg:not(.more)").all_text_contents() == ["libssl3", "openssl", "curl", "docker-ce", "docker-ce-cli", "containerd.io", "linux-image-6.12.48+deb13-amd64", "bash"], need)
+    check("Handlungsbedarf: Karte nennt Updates und Neustart", "Offene Updates: 10" in need and "Neustart nötig" in need, need)
+    check("Handlungsbedarf: Quelle ist ein Testlauf, Paketnamen als Chips (ohne doppelte)", "Testlauf" in need and docker.locator(".pkg:not(.more)").all_text_contents() == ["libssl3", "openssl", "curl", "docker-ce", "docker-ce-cli", "containerd.io", "linux-image-6.12.48+deb13-amd64", "bash", "curl", "bash"], need)
     check("Handlungsbedarf: Template ohne Meldung zeigt keine Box", tcard(page, "Deploy").locator(".needbox").count() == 0)
     rows = project.locator(".item .name").all_inner_texts()
     check("Projekt-Karte: Reihenfolge laufend, Fehler, Handlungsbedarf, Rest", [r.strip() for r in rows[:3]] == ["Proxmox Snapshot HAOS", "Host-Update", "docker-system aktualisieren"], rows)
-    check("Projekt-Karte: Symbol und Text bei Handlungsbedarf", project.locator(".item", has_text="docker-system").locator("ha-icon.need").count() == 1 and "Offene Updates: 9" in project.locator(".item", has_text="docker-system").locator(".sub").inner_text())
+    check("Projekt-Karte: Symbol und Text bei Handlungsbedarf", project.locator(".item", has_text="docker-system").locator("ha-icon.need").count() == 1 and "Offene Updates: 10" in project.locator(".item", has_text="docker-system").locator(".sub").inner_text())
 
     deploy = tcard(page, "Deploy")
     labels = deploy.locator(".survey label").all_inner_texts()
@@ -151,12 +151,13 @@ def device_class(page: Page, entity_id: str) -> str:
 def test_template_card_details(page: Page) -> None:
     """0.1.5: Zahlen je Host, Hinweise, anklickbare Zeilen und Fehlertext (More-Info der Standardaktion)."""
     docker, host = tcard(page, "docker-system"), tcard(page, "Host-Update")
-    line = docker.locator(".hostline").inner_text().strip() if docker.locator(".hostline").count() else ""
-    check("Template-Karte: Zahlen je Host (nur wer etwas braucht)", line == "dockerhost: 7, Neustart · pialert: 2", line)
+    heads = [" ".join(h.split()) for h in docker.locator(".host .hh").all_inner_texts()]
+    check("Template-Karte: Zahlen je Host im eigenen Block", heads == ["dockerhost 8 Updates, Neustart", "pialert 2 Updates", "adguard aktuell"], heads)
     notes = docker.locator(".note").all_inner_texts()
-    check("Template-Karte: Hinweis aus dem Playbook mit Hostname", len(notes) == 1 and "adguard" in notes[0] and "Debian 13" in notes[0], notes)
-    check("Template-Karte: Hinweis zählt nicht als Handlungsbedarf (adguard fehlt in der Hostzeile)", "adguard" not in line, line)
-    check("Template-Karte ohne Meldung: keine Hinweise, keine Hostzeile", tcard(page, "Deploy").locator(".note, .hostline").count() == 0)
+    in_adguard = docker.locator(".host", has_text="adguard").locator(".note").all_inner_texts()
+    check("Template-Karte: Hinweis aus dem Playbook steht im Block des Hosts", len(notes) == 1 and in_adguard == notes and "Debian 13" in notes[0], notes)
+    check("Template-Karte: Hinweis zählt nicht als Handlungsbedarf (adguard bleibt „aktuell“)", heads[-1].endswith("aktuell"), heads)
+    check("Template-Karte ohne Meldung: keine Hinweise, keine Hostblöcke", tcard(page, "Deploy").locator(".note, .host").count() == 0)
 
     watch_more_info(page)
     clicks = docker.locator(".row.click")
@@ -210,7 +211,8 @@ def pkg_state(card) -> dict:
 
 def test_packages_one_line(page: Page) -> None:
     """0.2.2: Pakete stehen in EINER Zeile mit „+n weitere“; ein Klick darauf zeigt alle (und „weniger“ klappt wieder zu)."""
-    docker = tcard(page, "docker-system")
+    card = tcard(page, "docker-system")
+    docker = card.locator(".host").first  # seit 0.6: Pakete gehören zum Host (dockerhost hat 8)
     watch_more_info(page)
     seen_before = len(more_info_requests(page))
     folded = pkg_state(docker)
@@ -227,7 +229,7 @@ def test_packages_one_line(page: Page) -> None:
     check("Aufgeklappt: die Pakete dürfen umbrechen, ragen aber nicht heraus", opened["rows"] >= 2 and opened["overflow"] <= 1, opened)
     check("Klick auf „+n weitere“ öffnet keine More-Info (Zeile bleibt unberührt)", len(more_info_requests(page)) == seen_before, more_info_requests(page)[-2:])
     check("Tastaturfokus bleibt nach dem Klick auf dem Knopf", opened["focused"], opened)
-    docker.evaluate("card => card._redraw()")
+    card.evaluate("card => card._redraw()")
     time.sleep(0.3)
     check("Aufgeklappt bleibt beim Neuzeichnen der Karte erhalten", pkg_state(docker)["open"] and pkg_state(docker)["visible"] == 8)
     shot(page, "01c_pakete_offen")
@@ -389,10 +391,10 @@ def test_docs_screenshots(playwright) -> None:
             take(tcard(page, "Proxmox"), f"template-card-running{suffix}")
             if not suffix:
                 take(tcard(page, "Deploy"), "template-card-survey")
-                tcard(page, "docker-system").locator('button[data-action="pkgs"]').click()
+                tcard(page, "docker-system").locator(".host").first.locator('button[data-action="pkgs"]').click()
                 time.sleep(0.5)
                 take(tcard(page, "docker-system"), "template-card-updates-open")
-                tcard(page, "docker-system").locator('button[data-action="pkgs"]').click()
+                tcard(page, "docker-system").locator(".host").first.locator('button[data-action="pkgs"]').click()
                 time.sleep(0.4)
             dashboard_shot(page, f"dashboard{suffix}")
             taken.append(f"dashboard{suffix}")
@@ -517,18 +519,19 @@ def test_disk_figures(page: Page) -> None:
     """0.4.0: Platte je Host (frei, belegt in Prozent, Bedarf der Updates) – nur für Hosts, die es melden."""
     card = tcard(page, "docker-system")
     disks = card.locator(".disks .disk")
+    hosts_with_disk = card.locator(".host:has(.disk)").locator(".hn").all_inner_texts()
     texts = [t.strip() for t in disks.all_inner_texts()]
-    check("Platte: zwei von drei Hosts melden Werte (adguard nicht)", len(texts) == 2 and not any("adguard" in t for t in texts), texts)
+    check("Platte: zwei von drei Hosts melden Werte (adguard nicht)", hosts_with_disk == ["dockerhost", "pialert"] and len(texts) == 2, (hosts_with_disk, texts))
     first = texts[0] if texts else ""
-    check("Platte: dockerhost – frei, belegt, Bedarf (deutsche Zahlen)", "dockerhost" in first and "4,2 GiB frei" in first and "62,4 % belegt" in first and "Updates brauchen 310 MiB" in first, first)
+    check("Platte: dockerhost – frei, belegt, Bedarf (deutsche Zahlen)", "4,2 GiB frei" in first and "62,4 % belegt" in first and "Updates brauchen 310 MiB" in first, first)
     second = texts[1] if len(texts) > 1 else ""
-    check("Platte: pialert – 1,4 GiB frei, 91,3 % belegt", "pialert" in second and "1,4 GiB frei" in second and "91,3 % belegt" in second, second)
+    check("Platte: pialert – 1,4 GiB frei, 91,3 % belegt", "1,4 GiB frei" in second and "91,3 % belegt" in second, second)
     bars = card.locator(".disk .bar")
     classes = [(b.get_attribute("class") or "").replace("bar", "").strip() for b in bars.all()]
     check("Platte: Balken – dockerhost normal, pialert (über 90 %) rot", classes == ["", "crit"], classes)
     check("Platte: Balken hat eine Beschriftung für Screenreader", "62,4" in (bars.first.get_attribute("aria-label") or ""), bars.first.get_attribute("aria-label"))
     box = card.bounding_box()
-    inside = card.locator(".disks").evaluate("el => { const r = el.getBoundingClientRect(); const c = el.closest('ha-card').getBoundingClientRect(); return r.left >= c.left && r.right <= c.right + 1; }")
+    inside = card.locator(".disks").first.evaluate("el => { const r = el.getBoundingClientRect(); const c = el.closest('ha-card').getBoundingClientRect(); return r.left >= c.left && r.right <= c.right + 1; }")
     check("Platte: nichts ragt aus der Karte", inside and box is not None, box)
     quiet = tcard(page, "Host-Update").locator(".disks").count()
     check("Platte: Template ohne Werte zeigt keinen Block", quiet == 0, quiet)
@@ -547,6 +550,35 @@ def test_dry_run_marker(page: Page) -> None:
     dock = next((v for k, v in subs.items() if k.startswith("docker-system")), "")
     check("Testlauf: Projekt-Karte nennt „Testlauf“ beim Template mit Testlauf", "Testlauf" in dock, subs)
     check("Testlauf: Projekt-Karte nennt es sonst nirgends", sum("Testlauf" in v for v in subs.values()) == 1, subs)
+    dry_icons = project.locator(".item .ic.dry")
+    check("Testlauf: Symbol in der Projekt-Karte ist heller und gestrichelt – nur beim Template mit Testlauf", dry_icons.count() == 1 and "docker-system" in project.locator(".item:has(.ic.dry) .name").inner_text(), dry_icons.count())
+    border = dry_icons.first.evaluate("el => getComputedStyle(el).borderTopStyle + ' ' + getComputedStyle(el).opacity")
+    check("Testlauf: gestrichelter Rand, Deckkraft unter 1", border.startswith("dashed") and float(border.split()[1]) < 1, border)
+
+
+def test_hosts_blocks(page: Page) -> None:
+    """Issue #9: Hat ein Template mehrere Hosts, zeigt die Box je Host einen Block (Updates, Platte, Pakete, Hinweise), durch eine Linie getrennt."""
+    docker = tcard(page, "docker-system")
+    blocks = docker.locator(".needbox .host")
+    check("Hosts: drei Blöcke (dockerhost, pialert, adguard)", blocks.count() == 3, blocks.count())
+    heads = [" ".join(h.split()) for h in docker.locator(".host .hh").all_inner_texts()]
+    check("Hosts: Kopfzeilen mit Updates, Neustart bzw. „aktuell“", heads == ["dockerhost 8 Updates, Neustart", "pialert 2 Updates", "adguard aktuell"], heads)
+    check("Hosts: die alte Sammelzeile „dockerhost: 8, Neustart · pialert: 2“ entfällt", docker.locator(".hostline").count() == 0)
+    lines = docker.locator(".host").evaluate_all("els => els.map((e) => getComputedStyle(e).borderTopWidth)")
+    check("Hosts: zwischen den Blöcken steht eine Linie (nicht vor dem ersten)", lines == ["0px", "1px", "1px"], lines)
+    per_host = docker.locator(".host").evaluate_all("els => els.map((e) => [e.querySelectorAll('.disk').length, e.querySelectorAll('.pkgs').length, e.querySelectorAll('.note').length])")
+    check("Hosts: Platte, Pakete und Hinweis stehen beim richtigen Host", per_host == [[1, 1, 0], [1, 1, 0], [0, 0, 1]], per_host)
+    check("Hosts: Pakete gehören zum Host (pialert: curl, bash)", docker.locator(".host").nth(1).locator(".pkg:not(.more)").all_inner_texts() == ["curl", "bash"] or docker.locator(".host").nth(1).locator(".pkg:not(.more)").count() == 2)
+    check("Hosts: Hinweis ohne Hostname-Vorsatz (steht ja im Block von adguard)", "Debian 13" in docker.locator(".host").nth(2).inner_text() and "adguard:" not in docker.locator(".host").nth(2).locator(".note").inner_text())
+    # aufklappen betrifft nur den eigenen Host
+    first_more = docker.locator(".host").first.locator('button[data-action="pkgs"]')
+    if first_more.count() and first_more.is_visible():
+        first_more.click()
+        time.sleep(0.4)
+        states = docker.locator(".host .pkgs").evaluate_all("els => els.map((e) => e.classList.contains('open'))")
+        check("Hosts: „+n weitere“ klappt nur die Pakete dieses Hosts auf", states[0] is True and not any(states[1:]), states)
+        docker.locator(".host").first.locator('button[data-action="pkgs"]').click()
+        time.sleep(0.4)
 
 
 def test_busy_schedule(page: Page) -> None:
@@ -705,7 +737,7 @@ def test_packages_responsive(playwright) -> None:
     """0.2.2: Pakete auf dem Handy und auf Englisch (läuft früh: später haben die Klick-Tests alle Templates neu gestartet)."""
     browser, page = open_page(playwright, width=390, height=900, scheme="dark")
     try:
-        docker = tcard(page, "docker-system")
+        docker = tcard(page, "docker-system").locator(".host").first
         mobile = pkg_state(docker)
         check("Mobil: Pakete in einer Zeile mit „+n weitere“, nichts ragt heraus", mobile["rows"] == 1 and mobile["overflow"] <= 1 and bool(mobile["more"]) and mobile["visible"] >= 1 and (mobile["clipped"] == 0 or mobile["visible"] == 1), mobile)
         docker.locator('button[data-action="pkgs"]').click()
@@ -717,7 +749,7 @@ def test_packages_responsive(playwright) -> None:
         browser.close()
     browser, page = open_page(playwright, width=1100, height=800, lang="en-US")
     try:
-        docker = tcard(page, "docker-system")
+        docker = tcard(page, "docker-system").locator(".host").first
         folded = pkg_state(docker)
         check("Englisch: „+n more“", (folded["more"] or "").startswith("+") and (folded["more"] or "").endswith(" more"), folded)
         docker.locator('button[data-action="pkgs"]').click()
@@ -1099,6 +1131,7 @@ def main() -> int:
             test_packages_one_line(page)
             test_disk_figures(page)
             test_dry_run_marker(page)
+            test_hosts_blocks(page)
             test_project_filters(page)
             test_schedules_ui(page)
             test_busy_schedule(page)

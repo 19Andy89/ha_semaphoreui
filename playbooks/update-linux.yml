@@ -86,7 +86,19 @@
              | list
              | length }}
 
-    - name: Benötigten Speicherplatz der Updates aus der Simulation berechnen
+    # "apt-get -s" (Simulation) gibt die Zeilen "Need to get ..." und "After this operation ..." NICHT aus.
+    # "--assume-no" druckt sie und bricht danach ab: es wird nichts installiert und nichts heruntergeladen.
+    - name: Platzbedarf der Updates bei apt erfragen (ohne etwas zu installieren)
+      ansible.builtin.command:
+        cmd: timeout 120s apt-get upgrade --assume-no
+      environment:
+        LC_ALL: C
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      register: upgrade_size
+
+    - name: Benötigten Speicherplatz der Updates berechnen
       ansible.builtin.shell: |
         python3 -c '
         import sys, re
@@ -97,7 +109,7 @@
         download = 0.0
         additional = 0.0
         for line in text.splitlines():
-            m = re.search(r"Need to get ([\d.,]+)\s*(B|kB|MB|GB)\s+of archives", line)
+            m = re.search(r"Need to get ([\d.,]+)\s*(B|kB|MB|GB)(?:/[\d.,]+\s*(?:B|kB|MB|GB))?\s+of archives", line)
             if m:
                 download = conv(m.group(1), m.group(2))
             m = re.search(r"After this operation, ([\d.,]+)\s*(B|kB|MB|GB) of additional disk space will be (used|freed)\.", line)
@@ -108,7 +120,7 @@
         print(int(peak))
         '
       args:
-        stdin: "{{ upgrade_simulation.stdout }}"
+        stdin: "{{ upgrade_size.stdout | default('') }}"
       changed_when: false
       register: required_space_kib
 

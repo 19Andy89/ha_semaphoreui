@@ -32,7 +32,7 @@ OK_OUT = "PLAY RECAP\ndockerhost : ok=5 changed=1 unreachable=0 failed=0"
 # Testlauf mit drei Hosts (HA_RESULT): dockerhost 3 Updates + Neustart, pialert 2 Updates, adguard nichts, aber ein Hinweis
 PENDING_OUT = """TASK [Ergebnis fuer Home Assistant melden] *************************************
 ok: [dockerhost] =>
-    msg: 'HA_RESULT {"updates": 7, "reboot_required": true, "packages": ["libssl3", "openssl", "curl", "docker-ce", "docker-ce-cli", "containerd.io", "linux-image-6.12.48+deb13-amd64"], "disk_free_mib": 4300.5, "disk_required_mib": 310.2, "disk_used_percent": 62.4}'
+    msg: 'HA_RESULT {"updates": 8, "reboot_required": true, "packages": ["libssl3", "openssl", "curl", "docker-ce", "docker-ce-cli", "containerd.io", "linux-image-6.12.48+deb13-amd64", "bash"], "disk_free_mib": 4300.5, "disk_required_mib": 310.2, "disk_used_percent": 62.4}'
 ok: [pialert] =>
     msg: 'HA_RESULT {"updates": 2, "reboot_required": false, "packages": ["curl", "bash"], "disk_free_mib": 1400, "disk_required_mib": 80, "disk_used_percent": 91.3}'
 ok: [adguard] =>

@@ -35,10 +35,10 @@ def test_two_hosts_are_summed_up(name: str) -> None:
     assert result["updates"] == 4
     assert result["reboot_required"] is False
     assert result["hosts"] == {
-        "adguard": {"needed": True, "updates": 2, "reboot_required": False},
-        "dockerhost": {"needed": True, "updates": 2, "reboot_required": False},
+        "adguard": {"needed": True, "updates": 2, "reboot_required": False, "packages": ["libssl3", "openssl"]},
+        "dockerhost": {"needed": True, "updates": 2, "reboot_required": False, "packages": ["libssl3", "openssl"]},
     }
-    assert result["packages"] == ["libssl3", "openssl"]  # no duplicates across hosts
+    assert result["packages"] == ["libssl3", "openssl"]  # no duplicates across hosts, each host keeps its own list
 
 
 @pytest.mark.parametrize("name", ["long_yaml.log", "long_json.log"])
@@ -176,10 +176,20 @@ def test_host_name_of_delegated_and_looped_tasks() -> None:
 
 
 def test_package_list_is_limited() -> None:
-    names = ", ".join(f'"pkg-{i}"' for i in range(200))
+    names = ", ".join(f'"pkg-{i}"' for i in range(300))
     result = parse_ha_result(["ok: [h] => ", f"    msg: 'HA_RESULT {{\"packages\": [{names}]}}'"])
     assert result is not None
-    assert len(result["packages"]) == 50
+    assert len(result["packages"]) == 200
+    assert result["hosts"]["h"]["packages_omitted"] == 100  # the card says how many are not listed
+
+
+def test_two_hundred_packages_all_arrive() -> None:
+    """199 updates (a real run) are listed completely - the list was cut at 50 before."""
+    names = ", ".join(f'"lib-{i}"' for i in range(199))
+    result = parse_ha_result(["ok: [h] => ", f"    msg: 'HA_RESULT {{\"updates\": 199, \"packages\": [{names}]}}'"])
+    assert result["updates"] == 199
+    assert len(result["hosts"]["h"]["packages"]) == 199
+    assert "packages_omitted" not in result["hosts"]["h"]
 
 
 def test_marker_in_stdout_of_a_shell_task() -> None:

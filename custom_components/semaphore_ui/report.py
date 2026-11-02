@@ -47,7 +47,7 @@ STRING_BODY_RE = re.compile(r'(?:[^"\\]|\\.)*')
 #   HA_RESULT {"updates": 3, "reboot_required": false}
 HA_MARKER = "HA_RESULT"
 MAX_MARKER_LINES = 300
-MAX_PACKAGES = 50
+MAX_PACKAGES = 200  # package names kept per host (the number of updates is always the full count)
 MAX_PACKAGE_NAME = 80
 # optional disk figures a host may report in HA_RESULT (key -> highest accepted value)
 DISK_KEYS: dict[str, float | None] = {
@@ -534,10 +534,17 @@ def parse_ha_result(lines: list[str]) -> dict[str, Any] | None:
             hosts[host]["notes"] = notes
         names = payload.get("packages")
         if isinstance(names, list):
+            own: list[str] = []
             for name in names:
                 text = truncate(str(name), MAX_PACKAGE_NAME)
+                if text and text not in own:
+                    own.append(text)
                 if text and text not in packages:
                     packages.append(text)
+            if own:
+                hosts[host]["packages"] = own[:MAX_PACKAGES]  # the card shows them per host
+                if len(own) > MAX_PACKAGES:
+                    hosts[host]["packages_omitted"] = len(own) - MAX_PACKAGES
     if not hosts:
         return None
     counts = [h["updates"] for h in hosts.values() if h["updates"] is not None]

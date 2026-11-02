@@ -1,5 +1,12 @@
 # Changelog
 
+## Unveröffentlicht – Updates je Host, Playbook-Fix
+- **Template-Karte:** Bei mehreren Hosts zeigt die Box „Offene Updates“ je Host einen eigenen Block, getrennt durch eine dünne Linie:
+  Name, Status („8 Updates, Neustart“ / „aktuell“ / „Handlungsbedarf“), Platte, eigene Paketliste und Hinweise. Mit einem Host bleibt das Layout wie bisher.
+- **Parser:** Die Paketliste steht jetzt auch je Host (`hosts[host].packages`, max. 200); bei mehr Paketen `packages_omitted`. Das Limit stieg von 50 auf 200, die Karte nennt den Rest („n weitere Pakete nicht aufgelistet“).
+- **Playbook `update-linux.yml`:** „Updates brauchen 0,0 MiB“ war falsch, weil `apt-get -s` keine Größenzeilen ausgibt. Jetzt fragt ein Schritt `apt-get upgrade --assume-no` (ändert nichts) und liest „Need to get …“ daraus.
+- **Projekt-Karte:** Der Haken bei einem Testlauf ist heller und gestrichelt umrandet.
+
 ## 0.5.1 (alpha) – Testlauf im Status-Kennzeichen
 - Das Testlauf-Kennzeichen der Template-Karte sitzt jetzt **im Status-Kennzeichen oben rechts**: zweiteilig „TESTLAUF / Erfolgreich“ (bzw. „Fehler“),
   in hellerer Farbe mit gestricheltem Rand, weil es nur ein Test war. Die eigene Marke in der Zeile „Letzter Lauf“ entfällt.

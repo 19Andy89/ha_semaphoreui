@@ -594,7 +594,7 @@ URL, Token oder die SSL-Prüfung später ändern: *Einstellungen → Geräte & D
 * Token-Erneuerung: gegen den Nachbau der API und ein frisches Home Assistant getestet, **noch nicht an einer echten Instanz mit
   ablaufendem Token** (die Felder `expires_at`/`name` gibt es ab Semaphore 2.18.2; `POST /api/user/tokens` mit dem Token selbst
   ist aus dem Quellcode abgeleitet). Bitte beim ersten Mal mit einem Token mit kurzer Laufzeit prüfen.
-* Hinweise (`notes`) und Paketlisten werden gekürzt (10 Hinweise zu je 200 Zeichen, 50 Pakete je Lauf); der Rest bleibt im Log von Semaphore.
+* Hinweise (`notes`) und Paketlisten werden gekürzt (10 Hinweise zu je 200 Zeichen, 200 Pakete je Lauf und Host); fehlende Pakete meldet die Karte als „n weitere Pakete nicht aufgelistet“, der Rest bleibt im Log von Semaphore.
 * Zeitpläne: Die Integration schaltet sie nur ein/aus und zeigt sie an (anlegen und ändern geht in Semaphore). Der Endpunkt
   `…/schedules/<id>/active` ist im Quellcode von Semaphore 2.19 geprüft, gegen den Nachbau getestet und an einer echten Instanz
   (2.19.17) zum **Ausschalten** bestätigt; das Einschalten ruft denselben Endpunkt mit `true` auf. Fehlt dem Token die

@@ -41,6 +41,11 @@ const TEXTS = {
     checked: "Geprüft",
     reboot_short: "Neustart",
     more_n: "+{n} weitere",
+    updates_n: "{n} Updates",
+    update_1: "1 Update",
+    pkgs_omitted: "{n} weitere Pakete nicht aufgelistet",
+    host_ok: "aktuell",
+    host_action: "Handlungsbedarf",
     disk_free: "frei",
     disk_used: "belegt",
     disk_need: "Updates brauchen",
@@ -135,6 +140,11 @@ const TEXTS = {
     checked: "Checked",
     reboot_short: "reboot",
     more_n: "+{n} more",
+    updates_n: "{n} updates",
+    update_1: "1 update",
+    pkgs_omitted: "{n} more packages not listed",
+    host_ok: "up to date",
+    host_action: "action needed",
     disk_free: "free",
     disk_used: "used",
     disk_need: "updates need",
@@ -342,6 +352,17 @@ const STYLE = `
   .notes { margin-top: 6px; display: grid; gap: 4px; }
   .note { display: flex; gap: 6px; align-items: flex-start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   .note ha-icon { --mdc-icon-size: 16px; flex: none; margin-top: 1px; }
+  .hosts { margin-top: 8px; display: grid; }
+  .host { padding: 8px 0; min-width: 0; }
+  .host + .host { border-top: 1px solid color-mix(in srgb, var(--warning-color, #ffa600) 45%, var(--divider-color, #ccc)); }
+  .needbox.off .host + .host { border-top-color: var(--divider-color, #ccc); }
+  .host:first-child { padding-top: 2px; }
+  .host:last-child { padding-bottom: 0; }
+  .host .hh { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .host .hn { font-weight: 600; color: var(--primary-text-color); }
+  .host .hs { color: var(--secondary-text-color); font-size: 0.9em; }
+  .host .hs.need { color: var(--primary-text-color); }
+  .host .disks, .host .pkgs, .host .notes { margin-top: 4px; }
   .disks { margin-top: 6px; display: grid; gap: 4px; }
   .disk { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 6px; row-gap: 3px; align-items: start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   .needbox .disk ha-icon { --mdc-icon-size: 16px; margin-top: 1px; color: var(--secondary-text-color); }
@@ -412,6 +433,7 @@ const STYLE = `
   .item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--divider-color); }
   .item:first-child { border-top: none; }
   .item .ic { --mdc-icon-size: 24px; flex: none; }
+  .item .ic.dry { --mdc-icon-size: 20px; padding: 2px; border: 1.5px dashed currentColor; border-radius: 50%; opacity: 0.6; }
   .item .main { flex: 1; min-width: 0; cursor: pointer; }
   .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -598,7 +620,7 @@ class SemaphoreBaseCard extends HTMLElement {
     if (sig === this._sig && !force) return;
     this._sig = sig;
     this._renderPending = false;
-    if (active && active.getAttribute && active.getAttribute("data-action") === "pkgs") this._focusPkgs = true;
+    if (active && active.getAttribute && active.getAttribute("data-action") === "pkgs") this._focusPkgs = active.dataset.key || "";
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${this._html()}`;
     for (const el of this.shadowRoot.querySelectorAll('[data-action="more-info"], [data-action="filter"]')) {
       el.setAttribute("role", "button");
@@ -808,61 +830,72 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const on = state.state === "on";
     const meta = [];
     if (a.checked) meta.push(`${T.checked} ${fmtRelative(a.checked, hass)}${a.dry_run ? ` (${T.dry_run})` : ""}`);
-    // with several hosts: which of them has how many updates ("adguard: 5 · pialert: 6, reboot")
     const allHosts = Object.entries(a.hosts || {}).filter(([, h]) => h && typeof h === "object");
-    const needing = allHosts.filter(([, h]) => h.needed);
-    let hostLine = "";
-    if (on && allHosts.length > 1 && needing.length) {
-      hostLine = needing
-        .map(([name, h]) => {
-          const parts = [];
-          if (h.updates) parts.push(String(h.updates));
-          if (h.reboot_required) parts.push(T.reboot_short);
-          return parts.length ? `${name}: ${parts.join(", ")}` : name;
-        })
-        .join(" · ");
-    }
-    // hints of the playbook (e.g. "Debian 13 is out"), shown whether or not something is to do
-    const notes = (Array.isArray(a.notes) ? a.notes : []).filter((n) => n && typeof n === "object" && n.text);
-    const notesHtml = notes.length
-      ? `<div class="notes">${notes
-          .slice(0, 3)
-          .map((n) => `<div class="note"><ha-icon icon="mdi:information-outline"></ha-icon><span>${allHosts.length > 1 && n.host ? `<b>${esc(n.host)}:</b> ` : ""}${esc(n.text)}</span></div>`)
-          .join("")}${notes.length > 3 ? `<div class="note"><span>${esc(T.more_n.replace("{n}", notes.length - 3))}</span></div>` : ""}</div>`
-      : "";
-    // disk figures of the hosts (root file system), if the playbook reports them
+    const multi = allHosts.length > 1;
     const lang = langOf(hass);
     const num = (n, digits = 1) => new Intl.NumberFormat(hass.locale?.language || lang, { maximumFractionDigits: digits }).format(n);
     const size = (mib) => (mib >= 1024 ? `${num(mib / 1024)} GiB` : `${num(mib, 0)} MiB`);
-    const disks = allHosts.filter(([, h]) => ["disk_free_mib", "disk_used_percent", "disk_required_mib"].some((k) => typeof h[k] === "number"));
-    const diskHtml = disks.length
-      ? `<div class="disks">${disks
-          .slice(0, 5)
-          .map(([name, h]) => {
-            const parts = [];
-            if (typeof h.disk_free_mib === "number") parts.push(`${size(h.disk_free_mib)} ${T.disk_free}`);
-            if (typeof h.disk_used_percent === "number") parts.push(`${num(h.disk_used_percent)} % ${T.disk_used}`);
-            if (h.disk_required_mib > 0) parts.push(`${T.disk_need} ${size(h.disk_required_mib)}`);
-            const pct = typeof h.disk_used_percent === "number" ? Math.min(100, h.disk_used_percent) : null;
-            const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
-            const text = `${allHosts.length > 1 ? `${name}: ` : ""}${parts.join(" · ")}`;
-            return `<div class="disk"><ha-icon icon="mdi:harddisk"></ha-icon><span class="dtext">${allHosts.length > 1 ? `<b>${esc(name)}:</b> ` : ""}${esc(parts.join(" · "))}</span>${pct === null ? "" : `<span class="bar ${level}" role="img" aria-label="${esc(text)}"><i style="width:${pct}%"></i></span>`}</div>`;
-          })
-          .join("")}${disks.length > 5 ? `<div class="disk"><span>${esc(T.more_n.replace("{n}", disks.length - 5))}</span></div>` : ""}</div>`
-      : "";
-    const names = on && Array.isArray(a.packages) ? a.packages : [];
-    const open = !!this._pkgsOpen;
-    // all chips are rendered; _fitPackages() folds them into one line and writes "+n more" into the button
-    const pkgs = names.length
-      ? `<div class="pkgs${open ? " open" : ""}">${names.map((n) => `<span class="pkg" title="${esc(n)}">${esc(n)}</span>`).join("")}${
-          names.length > 1
-            ? `<button type="button" class="pkg more" data-action="pkgs" aria-expanded="${open}" title="${esc(open ? T.show_less : T.show_all)}" hidden>${esc(open ? T.less : "")}</button>`
-            : ""
-        }</div>`
-      : "";
+
+    // hint lines ("Debian 13 is out"), shown whether or not something is to do
+    const noteLines = (items) =>
+      items.length
+        ? `<div class="notes">${items
+            .slice(0, 3)
+            .map((n) => `<div class="note"><ha-icon icon="mdi:information-outline"></ha-icon><span>${n.host ? `<b>${esc(n.host)}:</b> ` : ""}${esc(n.text)}</span></div>`)
+            .join("")}${items.length > 3 ? `<div class="note"><span>${esc(T.more_n.replace("{n}", items.length - 3))}</span></div>` : ""}</div>`
+        : "";
+
+    // disk of one host (root file system), if the playbook reports it
+    const hasDisk = (h) => ["disk_free_mib", "disk_used_percent", "disk_required_mib"].some((k) => typeof h[k] === "number");
+    const diskRow = (name, h) => {
+      const parts = [];
+      if (typeof h.disk_free_mib === "number") parts.push(`${size(h.disk_free_mib)} ${T.disk_free}`);
+      if (typeof h.disk_used_percent === "number") parts.push(`${num(h.disk_used_percent)} % ${T.disk_used}`);
+      if (h.disk_required_mib > 0) parts.push(`${T.disk_need} ${size(h.disk_required_mib)}`);
+      const pct = typeof h.disk_used_percent === "number" ? Math.min(100, h.disk_used_percent) : null;
+      const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
+      const label = `${name ? `${name}: ` : ""}${parts.join(" · ")}`;
+      return `<div class="disk"><ha-icon icon="mdi:harddisk"></ha-icon><span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(parts.join(" · "))}</span>${pct === null ? "" : `<span class="bar ${level}" role="img" aria-label="${esc(label)}"><i style="width:${pct}%"></i></span>`}</div>`;
+    };
+
+    // package chips; all are rendered, _fitPackages() folds them into one line and writes "+n more" into the button
+    const pkgBox = (names, key, omitted = 0) => {
+      if (!names.length) return "";
+      const open = this._isOpen(key);
+      const tail = omitted > 0 ? `<div class="note"><span>${esc(T.pkgs_omitted.replace("{n}", num(omitted, 0)))}</span></div>` : "";
+      return `<div class="pkgs${open ? " open" : ""}" data-key="${esc(key)}">${names.map((n) => `<span class="pkg" title="${esc(n)}">${esc(n)}</span>`).join("")}${
+        names.length > 1
+          ? `<button type="button" class="pkg more" data-action="pkgs" data-key="${esc(key)}" aria-expanded="${open}" title="${esc(open ? T.show_less : T.show_all)}" hidden>${esc(open ? T.less : "")}</button>`
+          : ""
+      }</div>${tail}`;
+    };
+
+    let inner;
+    if (!multi) {
+      // one host (or none): as before
+      const notes = (Array.isArray(a.notes) ? a.notes : []).filter((n) => n && typeof n === "object" && n.text).map((n) => ({ text: n.text }));
+      const diskHtml = allHosts.length && hasDisk(allHosts[0][1]) ? `<div class="disks">${diskRow("", allHosts[0][1])}</div>` : "";
+      const names = on && Array.isArray(a.packages) ? a.packages : [];
+      inner = `${diskHtml}${pkgBox(names, "", allHosts.length ? allHosts[0][1].packages_omitted || 0 : 0)}${noteLines(notes)}`;
+    } else {
+      // several hosts: one block per host, separated by a thin line
+      const shown = allHosts.slice(0, 8);
+      const blocks = shown.map(([name, h]) => {
+        const status = [];
+        if (h.updates) status.push((h.updates === 1 ? T.update_1 : T.updates_n.replace("{n}", num(h.updates, 0))));
+        if (h.reboot_required) status.push(T.reboot_short);
+        const need = !!h.needed;
+        const text = status.length ? status.join(", ") : need ? T.host_action : T.host_ok;
+        const own = Array.isArray(h.notes) ? h.notes.filter(Boolean).map((t) => ({ text: String(t) })) : [];
+        const names = Array.isArray(h.packages) ? h.packages : [];
+        return `<div class="host"><div class="hh"><span class="hn">${esc(name)}</span><span class="hs${need ? " need" : ""}">${esc(text)}</span></div>${hasDisk(h) ? `<div class="disks">${diskRow("", h)}</div>` : ""}${pkgBox(names, name, h.packages_omitted || 0)}${noteLines(own)}</div>`;
+      });
+      if (allHosts.length > shown.length) blocks.push(`<div class="host"><span class="hs">${esc(T.more_n.replace("{n}", allHosts.length - shown.length))}</span></div>`);
+      inner = `<div class="hosts">${blocks.join("")}</div>`;
+    }
     return `<div class="needbox ${on ? "on" : "off"}" data-action="more-info" data-entity="${entityId}">
       <ha-icon icon="${on ? "mdi:package-up" : "mdi:check-circle-outline"}"></ha-icon>
-      <div class="t"><div class="what">${esc(a.explanation || T.action_n)}</div>${hostLine ? `<div class="meta hostline">${esc(hostLine)}</div>` : ""}${meta.length ? `<div class="meta">${meta.map(esc).join(" · ")}</div>` : ""}${diskHtml}${pkgs}${notesHtml}</div>
+      <div class="t"><div class="what">${esc(a.explanation || T.action_n)}</div>${meta.length ? `<div class="meta">${meta.map(esc).join(" · ")}</div>` : ""}${inner}</div>
     </div>`;
   }
 
@@ -901,11 +934,16 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     });
   }
 
+  _isOpen(key) {
+    return !!this._pkgsOpen && this._pkgsOpen.has(key);
+  }
+
   /** A redraw replaces the buttons: put the keyboard focus back on "+n more" / "less". */
   _restoreFocus() {
-    if (!this._focusPkgs) return;
+    if (typeof this._focusPkgs !== "string") return;
+    const key = this._focusPkgs;
     this._focusPkgs = false;
-    const button = this.shadowRoot.querySelector('[data-action="pkgs"]');
+    const button = [...this.shadowRoot.querySelectorAll('[data-action="pkgs"]')].find((b) => (b.dataset.key || "") === key);
     if (button && !button.hidden) button.focus();
   }
 
@@ -948,7 +986,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       chips.forEach((c) => setHidden(c, false));
       const natural = chips.reduce((sum, c) => sum + c.offsetWidth, 0) + gap * (chips.length - 1);
       const fits = natural <= width + 0.5;
-      if (this._pkgsOpen) {
+      if (this._isOpen(box.dataset.key || "")) {
         setText(more, T.less);
         setHidden(more, fits); // everything fits into one line anyway: nothing to fold, so nothing to unfold
         continue;
@@ -985,8 +1023,10 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     if (action === "more-info") return this._moreInfo(entity);
     if (action === "schedule") return this._toggleSchedule(entity);
     if (action === "pkgs") {
-      this._pkgsOpen = !this._pkgsOpen;
-      this._focusPkgs = true; // the click redraws the card: keep the keyboard focus on the button
+      const key = target.dataset.key || "";
+      this._pkgsOpen = this._pkgsOpen || new Set();
+      if (!this._pkgsOpen.delete(key)) this._pkgsOpen.add(key);
+      this._focusPkgs = key; // the click redraws the card: keep the keyboard focus on the button
       return this._redraw();
     }
     if (action === "start") {
@@ -1227,6 +1267,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     }
     if (t.status === "error" && t.rep.error && t.rep.error.reason) bits.push(t.rep.error.reason);
     else if (t.needs === "on" && t.needText) bits.push(t.needText);
+    const dryItem = !!(t.rep && t.rep.dry_run) && !active && t.status !== "never_run"; // a dry run: lighter, dashed icon
     const needIcon = t.needs === "on" ? `<ha-icon class="need" icon="mdi:package-up" title="${esc(t.needText)}"></ha-icon>` : "";
     const startId = t.byKey["button:start"];
     const stopId = t.byKey["button:stop"];
@@ -1242,7 +1283,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
         : `<button class="icon${this._busy.has(startId) ? " busy" : ""}" data-action="start" data-entity="${startId}"${this._busyAttrs(startId)} ${unavailable ? "disabled" : ""} aria-label="${esc(T.start)} ${esc(t.name)}" title="${esc(T.start)}">${this._ico(startId, "mdi:play")}</button>`;
     }
     return `<div class="item">
-      <ha-icon class="ic ${st.pulse ? "pulse" : ""}" icon="${st.icon}" style="color:${st.color}"></ha-icon>
+      <ha-icon class="ic ${st.pulse ? "pulse" : ""}${dryItem ? " dry" : ""}" icon="${st.icon}" style="color:${st.color}"${dryItem ? ` title="${esc(T.dry_run_hint)}"` : ""}></ha-icon>
       <div class="main" data-action="more-info" data-entity="${t.byKey["sensor:status"]}">
         <div class="name">${esc(t.name)}${needIcon}</div><div class="sub" title="${esc(bits.join(" · "))}">${esc(bits.join(" · "))}</div>
       </div>${action}</div>`;
