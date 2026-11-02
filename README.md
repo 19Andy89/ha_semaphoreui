@@ -7,6 +7,16 @@ Zwei **Dashboard-Karten** (Template und Projekt) werden mitgeliefert und von der
 
 Getestet mit Home Assistant 2026.10 (siehe `tests/`). Läuft rein lokal, keine Cloud, kein HACS nötig.
 
+> **Inoffiziell:** Dieses Projekt ist ein unabhängiges Community-Projekt und steht in **keiner Verbindung** zu Semaphore UI
+> und seinen Entwicklern; es wird weder von ihnen unterstützt noch empfohlen. Es nutzt ausschließlich die öffentliche
+> REST-API einer Semaphore-Instanz. Ändert sich diese API, muss die Integration hier angepasst werden – Fehler bitte
+> in **diesem** Repository melden, nicht beim Semaphore-Projekt.
+> „Semaphore“ und „Semaphore UI“ sind Namen des jeweiligen Projekts und dienen hier nur dazu, zu benennen, womit die Integration spricht.
+> Das Symbol ist eine **eigene Grafik** (siehe [Symbol](#symbol-icon)) und hat mit dem Original nichts zu tun – eine Erlaubnis,
+> das Semaphore-Logo zu verwenden, liegt nicht vor.
+> Das eigentliche Projekt: [semaphoreui/semaphore](https://github.com/semaphoreui/semaphore) ·
+> [Webseite](https://semaphoreui.com) · [Dokumentation und API](https://docs.semaphoreui.com).
+
 ## So sieht es aus
 
 Die Bilder entstehen im Browser-Test aus Beispieldaten (siehe [Tests](#tests)); Namen und Hosts sind erfunden.
@@ -236,6 +246,10 @@ Abfrage von `deb.debian.org/debian/dists/stable/Release`) und wandert dann in `n
 Ein vollständiges, getestetes Playbook (Speicherplatz-Prüfung, Update, Neustart-Prüfung, Debian-Prüfung, `HA_RESULT` mit
 Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); die Ausgabe im Format `yaml` und `json` ist
 als Testfall hinterlegt.
+
+**Auch bei Fehlern melden:** Bricht eine Vorprüfung ab (zu wenig Platz, apt-Fehler), entstünde ohne Meldung nie ein Handlungsbedarf-Sensor
+für den Host. Das mitgelieferte Playbook fasst die Vorprüfungen deshalb in einen `block`; im `rescue` gibt es
+`HA_RESULT {"needed": true, "notes": ["Update nicht gestartet: …"], "disk_free_mib": …}` aus und lässt den Lauf danach mit `fail` scheitern.
 
 **Dashboard:** In der Karte unter **Sichtbarkeit** eine Bedingung „Entität → Zustand“ auf den Sensor *Handlungsbedarf*
 setzen (Zustand `Ein`) – die Karte erscheint nur, wenn etwas zu tun ist. Die Projekt-Karte kann alles in einer Liste
