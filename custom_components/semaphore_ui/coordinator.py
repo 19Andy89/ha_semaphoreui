@@ -152,6 +152,8 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self._success_checked: dict[int, int] = {}
         # True once the schedules were read successfully (a failed read keeps the old ones)
         self.schedules_loaded = False
+        # why the last poll failed: {"reason": token_rejected | unreachable | project_missing, "detail": text}
+        self.problem: dict[str, str] | None = None
         self._first_done = False
 
     # ------------------------------------------------------------------ #
@@ -583,6 +585,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
     def _auth_failed(self, err: SemaphoreAuthError) -> ConfigEntryAuthFailed:
         """The token was rejected: show the repair and let Home Assistant ask for a new one."""
         issues.report_token_rejected(self.hass, self.config_entry)
+        self.problem = {"reason": "token_rejected", "detail": str(err)}
         return ConfigEntryAuthFailed(str(err))
 
     def _auth_failed_in_action(self, err: SemaphoreAuthError) -> HomeAssistantError:
@@ -738,19 +741,23 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                     ISSUE_PROJECT,
                     f"HTTP {err.status}",
                 )
+                self.problem = {"reason": "project_missing", "detail": f"HTTP {err.status}"}
                 raise UpdateFailed(
                     f"Project {self.project_id} not found: {err}"
                 ) from err
             issues.report_failure(
                 self.hass, self.config_entry, ISSUE_UNREACHABLE, str(err)
             )
+            self.problem = {"reason": "unreachable", "detail": str(err)}
             raise UpdateFailed(str(err)) from err
         except SemaphoreConnectionError as err:
             issues.report_failure(
                 self.hass, self.config_entry, ISSUE_UNREACHABLE, str(err)
             )
+            self.problem = {"reason": "unreachable", "detail": str(err)}
             raise UpdateFailed(f"Semaphore not reachable: {err}") from err
         issues.report_ok(self.hass, self.config_entry)
+        self.problem = None
 
         all_templates = {
             tpl["id"]: tpl.get("name") or f"#{tpl['id']}" for tpl in raw

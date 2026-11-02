@@ -586,6 +586,14 @@ Ab Semaphore 2.18.2 können API-Tokens ein **Ablaufdatum** haben. Die Integratio
 
 ![Reparatur „Token erneuern“](docs/screenshots/token-repair.png)
 
+**In der Projekt-Karte:** Nähert sich das Ende (innerhalb der eingestellten Tage, höchstens die halbe Gültigkeit), steht oben ein Hinweis
+„Token läuft ab in 20 Stunden · wird automatisch erneuert“ (orange) bzw. „· Erneuerung ist aus“ / „· Erneuerung fehlgeschlagen: …“ (rot);
+ein Klick öffnet den Sensor. Ist Semaphore nicht erreichbar, nennt das Banner den **Grund** (Token abgelehnt, Server nicht erreichbar mit
+der technischen Meldung, Projekt nicht gefunden) und verlinkt auf die Integration, wo „Neu authentifizieren“ bzw. die Reparatur wartet.
+Dafür hat der Sensor „Verbindung“ die Attribute `reason` (`token_rejected`, `unreachable`, `project_missing`), `detail` und `config_entry_id`.
+
+![Projekt-Karte: Token abgelehnt](docs/screenshots/project-card-offline.png)
+
 **Notfall-Login (optional):** Ein Token, das Semaphore **schon ablehnt** (abgelaufen oder gelöscht), lässt sich nicht mehr mit sich
 selbst ersetzen. Trägst du in den Optionen Benutzer und Passwort ein (oder beim Erneut-Authentifizieren mit dem Haken
 „Benutzer und Passwort speichern“), meldet sich die Integration in diesem Fall an, legt ein neues Token an und **meldet sich wieder ab**.

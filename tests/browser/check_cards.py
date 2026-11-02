@@ -297,6 +297,8 @@ def test_schedule_editing(page: Page) -> None:
     time.sleep(1.5)
     check("Ungültiger Cron-Text: Formular bleibt offen, nichts wurde angelegt", deploy.locator(".sform").count() == 1 and ctl("schedules") == before, ctl("schedules"))
     deploy.locator('[data-sf="cron"]').fill("15 6 * * 1")
+    box_in, box_desc = deploy.locator('[data-sf="cron"]').bounding_box(), deploy.locator("[data-desc]").bounding_box()
+    check("Cron-Text: Erklärung steht in derselben Zeile neben dem Feld", box_in and box_desc and box_desc["x"] > box_in["x"] + box_in["width"] - 1 and abs((box_desc["y"] + box_desc["height"]) - (box_in["y"] + box_in["height"])) < 16, (box_in, box_desc))
     check("Cron-Text wird darunter in Worten erklärt", deploy.locator("[data-desc]").inner_text().strip() == "Montags um 06:15 Uhr", deploy.locator("[data-desc]").inner_text())
     deploy.locator('[data-sf="cron"]').fill("0 */2 * * *")
     check("Cron-Text: alle 2 Stunden", deploy.locator("[data-desc]").inner_text().strip() == "Alle 2 Stunden ab 00:00 Uhr", deploy.locator("[data-desc]").inner_text())
@@ -616,15 +618,19 @@ def test_disk_figures(page: Page) -> None:
     disks = card.locator(".disks .disk")
     hosts_with_disk = card.locator(".host:has(.disk)").locator(".hn").all_inner_texts()
     texts = [t.strip() for t in disks.all_inner_texts()]
+    labels = [(d.get_attribute("aria-label") or "") for d in disks.all()]
     check("Platte: zwei von drei Hosts melden Werte (adguard nicht)", hosts_with_disk == ["dockerhost", "pialert"] and len(texts) == 2, (hosts_with_disk, texts))
-    first = texts[0] if texts else ""
-    check("Platte: dockerhost – frei, belegt, Bedarf (deutsche Zahlen)", "4,2 GiB frei" in first and "62,4 % belegt" in first and "Updates brauchen 310 MiB" in first, first)
-    second = texts[1] if len(texts) > 1 else ""
-    check("Platte: pialert – 1,4 GiB frei, 91,3 % belegt", "1,4 GiB frei" in second and "91,3 % belegt" in second, second)
+    first = labels[0] if labels else ""
+    check("Platte: dockerhost – eine Zeile „4,2 / 11,2 GiB frei“ mit Prozent im Balken", "4,2 / 11,2 GiB frei" in texts[0] and "62 %" in texts[0], texts)
+    check("Platte: Tooltip/Screenreader nennt Belegung und Bedarf der Updates (deutsche Zahlen)", "62,4 % belegt" in first and "Updates brauchen 310 MiB" in first, first)
+    second = labels[1] if len(labels) > 1 else ""
+    check("Platte: pialert – 1,4 / 15,7 GiB frei, 91,3 % belegt", "91,3 % belegt" in second and "1,4 / 15,7 GiB frei" in second, second)
+    heights = [d.locator(".bar").bounding_box()["height"] for d in disks.all()]
+    rows = [d.bounding_box()["height"] for d in disks.all()]
+    check("Platte: Balken ist höher (18 px) und die Zeile bleibt einzeilig", all(h >= 16 for h in heights) and all(r < 30 for r in rows), (heights, rows))
     bars = card.locator(".disk .bar")
     classes = [(b.get_attribute("class") or "").replace("bar", "").strip() for b in bars.all()]
     check("Platte: Balken – dockerhost normal, pialert (über 90 %) rot", classes == ["", "crit"], classes)
-    check("Platte: Balken hat eine Beschriftung für Screenreader", "62,4" in (bars.first.get_attribute("aria-label") or ""), bars.first.get_attribute("aria-label"))
     box = card.bounding_box()
     inside = card.locator(".disks").first.evaluate("el => { const r = el.getBoundingClientRect(); const c = el.closest('ha-card').getBoundingClientRect(); return r.left >= c.left && r.right <= c.right + 1; }")
     check("Platte: nichts ragt aus der Karte", inside and box is not None, box)
@@ -649,6 +655,10 @@ def test_dry_run_marker(page: Page) -> None:
     check("Testlauf: Symbol in der Projekt-Karte ist heller und gestrichelt – nur beim Template mit Testlauf", dry_icons.count() == 1 and "docker-system" in project.locator(".item:has(.ic.dry) .name").inner_text(), dry_icons.count())
     border = dry_icons.first.evaluate("el => getComputedStyle(el).borderTopStyle + ' ' + getComputedStyle(el).opacity")
     check("Testlauf: gestrichelter Rand, Deckkraft unter 1", border.startswith("dashed") and float(border.split()[1]) < 1, border)
+    head = docker.locator(".head .ic.dry")
+    hb = head.first.evaluate("el => getComputedStyle(el).borderTopStyle + ' ' + getComputedStyle(el).opacity") if head.count() else ""
+    check("Testlauf: auch das Symbol oben links in der Template-Karte ist gestrichelt und heller", head.count() == 1 and hb.startswith("dashed") and float(hb.split()[1]) < 1, hb)
+    check("Testlauf: Template-Karte eines echten Laufs hat ein normales Symbol", tcard(page, "Host-Update").locator(".head .ic.dry").count() == 0)
 
 
 def test_hosts_blocks(page: Page) -> None:
@@ -1177,6 +1187,13 @@ def test_token_care(playwright) -> None:
         check("Reparatur: „API-Token läuft bald ab“ wird gemeldet (Erneuerung aus)", row.count() == 1, row.count())
         state = token_sensor()
         check("Token: Sensor zeigt jetzt rund 3 Tage", state is not None and 2 < days_until(state["state"]) < 4, state and state["state"])
+        dash_browser, dash = open_page(playwright)
+        try:
+            time.sleep(2)
+            chip = dash.locator("semaphore-ui-project-card").first.locator(".banner.tok")
+            check("Projekt-Karte: Token-Hinweis „läuft ab in …“ mit „Erneuerung ist aus“ (rot)", chip.count() == 1 and "Token läuft ab" in chip.inner_text() and "Erneuerung ist aus" in chip.inner_text(), chip.inner_text() if chip.count() else None)
+        finally:
+            dash_browser.close()
 
         row.first.click()
         dialog = page.locator("dialog-data-entry-flow")
@@ -1209,6 +1226,32 @@ def test_token_care(playwright) -> None:
         check("Projekt „Homelab“ ist mit dem neuen Token weiter verfügbar (keine Entität „nicht verfügbar“)", len(mine) >= 8 and not gone, (len(mine), gone))
     finally:
         browser.close()
+
+
+def test_offline_banner(playwright) -> None:
+    """Semaphore lehnt das Token ab: die Projekt-Karte nennt den Grund und verlinkt auf die Integration."""
+    ctl("reject")
+    browser, page = open_page(playwright)
+    try:
+        card = page.locator("semaphore-ui-project-card").first
+        banner = card.locator(".banner.off")
+        for _ in range(40):  # nächster Abruf (Intervall 10 s)
+            if banner.count() == 1 and "Token" in banner.inner_text():
+                break
+            time.sleep(1)
+        text = banner.inner_text() if banner.count() else ""
+        check("Karte: Banner nennt den Grund „Semaphore lehnt den API-Token ab“", "lehnt den API-Token ab" in text, text)
+        link = banner.locator("a.link")
+        href = link.get_attribute("href") if link.count() else ""
+        check("Karte: Link „Integration öffnen“ führt zur Integration (mit Eintrag)", "Integration öffnen" in text and (href or "").startswith("/config/integrations/integration/semaphore_ui#config_entry="), href)
+        if DOCS and DOCS.exists():
+            docs_shot(card, "project-card-offline")
+        link.click()
+        time.sleep(2)
+        check("Karte: Klick auf den Link öffnet die Integrationsseite (ohne Neuladen)", "/config/integrations/integration/semaphore_ui" in page.url, page.url)
+    finally:
+        browser.close()
+        ctl("unreject")
 
 
 def main() -> int:
@@ -1245,7 +1288,8 @@ def main() -> int:
         test_setup_errors(playwright)
         test_mobile_dark(playwright)
         test_english(playwright)
-        test_token_care(playwright)  # zuletzt: schaltet die Token-Erneuerung von „Homelab“ aus und lädt den Eintrag neu
+        test_token_care(playwright)  # schaltet die Token-Erneuerung von „Homelab“ aus und lädt den Eintrag neu
+        test_offline_banner(playwright)  # zuletzt: Semaphore lehnt das Token ab
     # Nicht nach „semaphore“ filtern: Fehler wie „this._observeSize is not a function“ nennen die Karte nicht im Text
     mine = [e for e in errors if "semaphore" in e.lower() or "is not a function" in e or "is not defined" in e]
     check("Keine JavaScript-Fehler aus den Semaphore-Karten", not mine, mine)

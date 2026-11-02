@@ -556,8 +556,21 @@ async def test_connectivity_goes_off_while_other_entities_become_unavailable(
     await tick(hass)
     connectivity = hass.states.get(project_eid(hass, "binary_sensor", "connectivity"))
     assert connectivity.state == "off" and connectivity.attributes["error"]
+    assert connectivity.attributes["reason"] == "unreachable" and connectivity.attributes["detail"]
+    assert connectivity.attributes["config_entry_id"]  # the cards link to the integration with it
     assert hass.states.get(eid(hass, "sensor", 1, "status")).state == "unavailable"
     assert hass.states.get(project_eid(hass, "sensor", "template_count")).state == "unavailable"
+
+
+async def test_connectivity_names_a_rejected_token_as_reason(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    entry = await setup(hass, make_entry)
+    server.token = "rotated"  # the token was removed / replaced in Semaphore
+    await tick(hass)
+    connectivity = hass.states.get(project_eid(hass, "binary_sensor", "connectivity"))
+    assert connectivity.state == "off"
+    assert connectivity.attributes["reason"] == "token_rejected"
+    assert connectivity.attributes["config_entry_id"] == entry.entry_id
 
 
 async def test_update_variants(hass: HomeAssistant, fake, make_entry) -> None:

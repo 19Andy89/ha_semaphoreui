@@ -100,6 +100,11 @@ def make_app(fake: FakeSemaphore) -> web.Application:
         if action == "token_soon":  # the own token runs out in 3 days (of 90)
             now = datetime.now(UTC)
             fake.api_tokens["good-token"].update(created=now - timedelta(days=87), expires_at=now + timedelta(days=3))
+        elif action == "reject":  # Semaphore does not accept the token any more (removed / replaced)
+            fake.saved = getattr(fake, "saved", (fake.token, fake.api_tokens))
+            fake.token, fake.api_tokens = "rotated-away", {}
+        elif action == "unreject":
+            fake.token, fake.api_tokens = getattr(fake, "saved", (fake.token, fake.api_tokens))
         elif action == "clear":
             fake.requests.clear()
         elif action in ("slow", "fast"):  # writing calls take 2.5 s: the card must show that it is working

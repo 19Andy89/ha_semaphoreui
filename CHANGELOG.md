@@ -1,5 +1,11 @@
 # Changelog
 
+## Unveröffentlicht – Grund bei Verbindungsproblemen, Token-Hinweis, Karten-Feinschliff
+- **Projekt-Karte:** Das Banner „Semaphore nicht erreichbar“ nennt jetzt den **Grund** (Token abgelehnt / Server nicht erreichbar mit Meldung / Projekt nicht gefunden) und hat einen Link „Integration öffnen“ (ohne Neuladen). Neue Attribute `reason`, `detail`, `config_entry_id` am Sensor „Verbindung“.
+- **Projekt-Karte:** Läuft das Token bald ab, zeigt ein Hinweis „Token läuft ab in … · wird automatisch erneuert / Erneuerung ist aus / fehlgeschlagen“ (Klick öffnet den Sensor).
+- **Template-Karte:** Platte in **einer Zeile** mit höherem Balken, Prozent im Balken und „4,2 / 11,2 GiB frei“ (Belegung und Bedarf der Updates im Tooltip); beim Zeitplan-Formular steht die Cron-Erklärung **neben** dem Feld; das Symbol oben links ist bei einem Testlauf gestrichelt und heller wie in der Projekt-Karte.
+- Browser-Test: 222 Prüfungen, pytest: 279.
+
 ## Unveröffentlicht – Cron in Worten, einmalige Zeitpläne
 - **Template-Karte:** Unter dem Cron-Text im Formular steht, was er bedeutet (Deutsch/Englisch, aktualisiert sich beim Tippen). Beim Anlegen lässt sich auf **Einmalig** umschalten (Datum/Uhrzeit, „Nach dem Lauf löschen“); einmalige Zeitpläne sind auch bearbeitbar.
 - **Aktionen:** `create_schedule` nimmt `cron` **oder** `run_at` (plus `delete_after_run`), `update_schedule` ebenso. Zeitpunkte gehen als UTC an Semaphore.

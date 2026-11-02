@@ -231,7 +231,15 @@ class SemaphoreConnectivitySensor(SemaphoreProjectEntity, BinarySensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Reason of the last failed poll."""
         error = self.coordinator.last_exception
-        return {"error": str(error) if error and not self.is_on else None}
+        down = not self.is_on
+        problem = (self.coordinator.problem or {}) if down else {}
+        return {
+            "error": str(error) if error and down else None,
+            # token_rejected / unreachable / project_missing: the cards say why and link to the integration
+            "reason": problem.get("reason") if down else None,
+            "detail": problem.get("detail") if down else None,
+            "config_entry_id": self.coordinator.config_entry.entry_id,
+        }
 
 
 class SemaphoreProjectProblemSensor(SemaphoreProjectEntity, BinarySensorEntity):

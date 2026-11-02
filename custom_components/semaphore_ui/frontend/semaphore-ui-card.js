@@ -33,6 +33,14 @@ const TEXTS = {
     yes: "Ja",
     no: "Nein",
     offline: "Semaphore nicht erreichbar",
+    offline_unreachable: "Semaphore nicht erreichbar: {detail}",
+    offline_token: "Semaphore lehnt den API-Token ab – bitte einen neuen Token eintragen",
+    offline_project: "Das Projekt gibt es in Semaphore nicht mehr oder der Token darf es nicht lesen ({detail})",
+    open_integration: "Integration öffnen",
+    token_expires_in: "Token läuft ab {rel}",
+    token_renew_auto: "wird automatisch erneuert",
+    token_renew_off: "Erneuerung ist aus",
+    token_renew_failed: "Erneuerung fehlgeschlagen: {detail}",
     update: "Update verfügbar",
     running_n: "Laufend",
     failed_n: "Mit Fehler",
@@ -146,6 +154,14 @@ const TEXTS = {
     yes: "Yes",
     no: "No",
     offline: "Semaphore not reachable",
+    offline_unreachable: "Semaphore not reachable: {detail}",
+    offline_token: "Semaphore rejects the API token - please enter a new token",
+    offline_project: "The project no longer exists in Semaphore or the token may not read it ({detail})",
+    open_integration: "Open integration",
+    token_expires_in: "Token expires {rel}",
+    token_renew_auto: "will be renewed automatically",
+    token_renew_off: "renewal is off",
+    token_renew_failed: "renewal failed: {detail}",
     update: "Update available",
     running_n: "Running",
     failed_n: "Failed",
@@ -355,6 +371,7 @@ const STYLE = `
   ha-card { padding: 16px; overflow: hidden; }
   .head { display: flex; align-items: center; gap: 12px; cursor: pointer; }
   .head .ic { --mdc-icon-size: 32px; flex: none; }
+  .head .ic.dry { --mdc-icon-size: 28px; padding: 2px; border: 1.5px dashed currentColor; border-radius: 50%; opacity: 0.6; }
   .head .titles { flex: 1; min-width: 0; }
   .head .chips { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
   .title { font-size: 1.2em; font-weight: 500; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
@@ -392,11 +409,12 @@ const STYLE = `
   .host .hs.need { color: var(--primary-text-color); }
   .host .disks, .host .pkgs, .host .notes { margin-top: 4px; }
   .disks { margin-top: 6px; display: grid; gap: 4px; }
-  .disk { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 6px; row-gap: 3px; align-items: start; font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
-  .needbox .disk ha-icon { --mdc-icon-size: 16px; margin-top: 1px; color: var(--secondary-text-color); }
-  .disk .dtext { min-width: 0; }
-  .disk .bar { grid-column: 2; width: 100%; max-width: 160px; height: 6px; border-radius: 3px; background: var(--divider-color, #e0e0e0); overflow: hidden; }
-  .disk .bar i { display: block; height: 100%; background: var(--success-color, #43a047); }
+  .disk { display: flex; align-items: center; gap: 8px; font-size: 0.85em; color: var(--secondary-text-color); }
+  .needbox .disk ha-icon { --mdc-icon-size: 16px; flex: none; color: var(--secondary-text-color); }
+  .disk .dtext { flex: none; white-space: nowrap; }
+  .disk .bar { position: relative; flex: 1; min-width: 70px; height: 18px; border-radius: 9px; background: var(--divider-color, #e0e0e0); overflow: hidden; }
+  .disk .bar i { position: absolute; inset: 0 auto 0 0; background: var(--success-color, #43a047); opacity: 0.6; }
+  .disk .bar b { position: relative; display: block; text-align: center; line-height: 18px; font-size: 0.9em; font-weight: 600; color: var(--primary-text-color); }
   .disk .bar.warn i { background: var(--warning-color, #ffa600); }
   .disk .bar.crit i { background: var(--error-color, #db4437); }
   .errbox { margin-top: 12px; padding: 8px 12px; border-radius: 8px; font-size: 0.9em; overflow-wrap: anywhere;
@@ -473,6 +491,8 @@ const STYLE = `
   .sform input { font: inherit; color: var(--primary-text-color); background: var(--card-background-color, #fff);
             border: 1px solid var(--divider-color); border-radius: 8px; padding: 8px 10px; min-width: 0; }
   .sform input:focus { outline: 2px solid var(--primary-color); outline-offset: -1px; }
+  .sform .cronrow { display: grid; grid-template-columns: 18ch minmax(0, 1fr); gap: 4px 10px; align-items: end; }
+  .sform .cronrow .desc { padding-bottom: 9px; }
   .sform .desc { font-size: 0.9em; color: var(--primary-text-color); min-height: 1.3em; }
   .sform .seg { display: inline-flex; border: 1px solid var(--divider-color); border-radius: 18px; overflow: hidden; width: fit-content; }
   .sform .seg button { font: inherit; background: none; border: 0; padding: 6px 14px; color: var(--primary-text-color); cursor: pointer; }
@@ -508,7 +528,10 @@ const STYLE = `
   button.icon ha-icon { --mdc-icon-size: 22px; }
   .banner { margin-top: 12px; padding: 6px 12px; border-radius: 8px; font-size: 0.9em; display: flex; gap: 8px; align-items: center; }
   .banner.off { background: color-mix(in srgb, var(--error-color, #db4437) 14%, transparent); color: var(--error-color, #db4437); }
-  .banner ha-icon { --mdc-icon-size: 18px; }
+  .banner ha-icon { --mdc-icon-size: 18px; flex: none; }
+  .banner .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .banner a.link { color: inherit; font-weight: 500; text-decoration: underline; white-space: nowrap; }
+  .banner.tok { background: color-mix(in srgb, var(--chip-color) 14%, transparent); color: var(--chip-color); cursor: pointer; }
 `;
 
 class SemaphoreBaseCard extends HTMLElement {
@@ -721,8 +744,8 @@ class SemaphoreBaseCard extends HTMLElement {
     const body = once
       ? `<label>${esc(T.sched_when)}<input type="datetime-local" data-sf="when" value="${esc(f.when)}"></label>
       <label class="chk"><input type="checkbox" data-sf="del"${f.del ? " checked" : ""}>${esc(T.sched_delete_after)}</label>`
-      : `<label>${esc(T.sched_cron)}<input type="text" maxlength="200" data-sf="cron" value="${esc(f.cron)}" autocomplete="off" spellcheck="false" placeholder="0 3 * * 1" aria-describedby="sf-desc"></label>
-      <div class="desc" id="sf-desc" data-desc="1" aria-live="polite">${esc(describeCron(f.cron, langOf(hass)))}</div>
+      : `<div class="cronrow"><label>${esc(T.sched_cron)}<input type="text" maxlength="200" data-sf="cron" value="${esc(f.cron)}" autocomplete="off" spellcheck="false" placeholder="0 3 * * 1" aria-describedby="sf-desc"></label>
+      <div class="desc" id="sf-desc" data-desc="1" aria-live="polite">${esc(describeCron(f.cron, langOf(hass)))}</div></div>
       <div class="hint">${esc(T.sched_hint)}</div>`;
     return `<div class="sform" data-sform="1">
       ${seg}${body}
@@ -1040,7 +1063,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
 
     return `<ha-card>
       <div class="head" data-action="more-info" data-entity="${byKey["sensor:status"]}">
-        <ha-icon class="ic ${st.pulse ? "pulse" : ""}" icon="${st.icon}" style="color:${st.color}"></ha-icon>
+        <ha-icon class="ic ${st.pulse ? "pulse" : ""}${rep.dry_run && known !== "never_run" ? " dry" : ""}" icon="${st.icon}" style="color:${st.color}"${rep.dry_run && known !== "never_run" ? ` title="${esc(T.dry_run_hint)}"` : ""}></ha-icon>
         <div class="titles"><div class="title">${esc(title)}</div>${projectSub}</div>
         ${this._chip(known, hass, !!rep.dry_run && known !== "never_run")}
       </div>
@@ -1080,14 +1103,21 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     // disk of one host (root file system), if the playbook reports it
     const hasDisk = (h) => ["disk_free_mib", "disk_used_percent", "disk_required_mib"].some((k) => typeof h[k] === "number");
     const diskRow = (name, h) => {
-      const parts = [];
-      if (typeof h.disk_free_mib === "number") parts.push(`${size(h.disk_free_mib)} ${T.disk_free}`);
-      if (typeof h.disk_used_percent === "number") parts.push(`${num(h.disk_used_percent)} % ${T.disk_used}`);
-      if (h.disk_required_mib > 0) parts.push(`${T.disk_need} ${size(h.disk_required_mib)}`);
+      const free = typeof h.disk_free_mib === "number" ? h.disk_free_mib : null;
       const pct = typeof h.disk_used_percent === "number" ? Math.min(100, h.disk_used_percent) : null;
+      const total = free !== null && pct !== null && pct < 100 ? free / (1 - pct / 100) : null;
+      // "5,6 / 20 GiB frei": both numbers in the unit of the total
+      let text = "";
+      if (free !== null && total !== null) {
+        const gib = total >= 1024;
+        const f = (mib) => num(gib ? mib / 1024 : mib, gib ? 1 : 0);
+        text = `${f(free)} / ${f(total)} ${gib ? "GiB" : "MiB"} ${T.disk_free}`;
+      } else if (free !== null) text = `${size(free)} ${T.disk_free}`;
+      const need = h.disk_required_mib > 0 ? `${T.disk_need} ${size(h.disk_required_mib)}` : "";
       const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
-      const label = `${name ? `${name}: ` : ""}${parts.join(" · ")}`;
-      return `<div class="disk"><ha-icon icon="mdi:harddisk"></ha-icon><span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(parts.join(" · "))}</span>${pct === null ? "" : `<span class="bar ${level}" role="img" aria-label="${esc(label)}"><i style="width:${pct}%"></i></span>`}</div>`;
+      const full = [name, text, pct !== null ? `${num(pct)} % ${T.disk_used}` : "", need].filter(Boolean).join(" · ");
+      const bar = pct === null ? "" : `<span class="bar ${level}"><i style="width:${pct}%"></i><b>${num(pct, 0)} %</b></span>`;
+      return `<div class="disk" role="img" aria-label="${esc(full)}" title="${esc(full)}"><ha-icon icon="mdi:harddisk"></ha-icon>${bar}<span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(text)}</span></div>`;
     };
 
     // package chips; all are rendered, _fitPackages() folds them into one line and writes "+n more" into the button
@@ -1392,6 +1422,9 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     const { byKey } = entitiesOfDevice(hass, c.device_id);
     for (const id of Object.values(byKey)) add(id);
     add(byKey["sensor:project_next_run"], "schedules");
+    add(byKey["binary_sensor:connectivity"], "reason");
+    add(byKey["binary_sensor:connectivity"], "detail");
+    add(byKey["sensor:token_expires"], "renew_error");
     for (const dev of templateDevicesOf(hass, c.device_id)) {
       const k = entitiesOfDevice(hass, dev.id).byKey;
       for (const key of ["sensor:status", "sensor:last_started", "sensor:last_duration", "button:start", "button:stop"]) add(k[key]);
@@ -1407,6 +1440,39 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     const hacsPart = hacs ? `${hacs.state}|${hacs.attributes.installed_version}|${hacs.attributes.latest_version}` : "";
     // the minute counter: relative times need a refresh once a minute
     return [JSON.stringify(c), this._message, this._confirmFor || "", this._filter || "", hacsPart, langOf(hass), Math.floor(Date.now() / 60000), ...parts].join("\n");
+  }
+
+  /** Why Semaphore is not available (reason from the connectivity sensor) with a link to the integration. */
+  _offlineBanner(entityId, T) {
+    const a = (this._state(entityId) || {}).attributes || {};
+    const detail = String(a.detail || a.error || "").slice(0, 200);
+    const text =
+      a.reason === "token_rejected" ? T.offline_token
+      : a.reason === "project_missing" ? T.offline_project.replace("{detail}", detail)
+      : detail ? T.offline_unreachable.replace("{detail}", detail)
+      : T.offline;
+    const entry = a.config_entry_id ? `#config_entry=${encodeURIComponent(a.config_entry_id)}` : "";
+    return `<div class="banner off" role="alert"><ha-icon icon="${a.reason === "token_rejected" ? "mdi:key-alert-outline" : "mdi:lan-disconnect"}"></ha-icon>
+      <span class="grow">${esc(text)}</span>
+      <a class="link" href="/config/integrations/integration/${SEMAPHORE_DOMAIN}${entry}" data-action="open-integration" data-entry="${esc(a.config_entry_id || "")}">${esc(T.open_integration)}</a></div>`;
+  }
+
+  /** Short-lived API token: when it runs out and whether it is renewed automatically (only while the end is near). */
+  _tokenChip(entityId, T, hass) {
+    const st = this._state(entityId);
+    const a = (st && st.attributes) || {};
+    if (!st || !a.token_found || a.never_expires || isNaN(Date.parse(st.state))) return "";
+    const end = Date.parse(st.state);
+    const created = Date.parse(a.created);
+    const life = isNaN(created) ? null : end - created;
+    const window = Math.min((a.renew_days_before || 7) * 86400e3, life ? life / 2 : Infinity); // same rule as the integration
+    const failed = !!a.renew_error;
+    if (end - Date.now() > window && !failed) return "";
+    const how = failed ? T.token_renew_failed.replace("{detail}", String(a.renew_error).slice(0, 120)) : a.auto_renew ? T.token_renew_auto : T.token_renew_off;
+    const bad = failed || !a.auto_renew || end <= Date.now();
+    const color = bad ? "var(--error-color,#db4437)" : "var(--warning-color,#ffa600)";
+    return `<div class="banner tok" style="--chip-color:${color}" data-action="more-info" data-entity="${esc(entityId)}" title="${esc(fmtDate(st.state, hass))}">
+      <ha-icon icon="mdi:clock-alert-outline"></ha-icon><span class="grow">${esc(T.token_expires_in.replace("{rel}", fmtRelative(st.state, hass)))} · ${esc(how)}</span></div>`;
   }
 
   _html() {
@@ -1487,7 +1553,8 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
         <div class="titles"><div class="title">${esc(title)}</div>${versionLine}</div>
         ${hacsChip || updateOn ? `<div class="chips">${hacsChip}${updateOn ? `<span class="chip" style="--chip-color:var(--warning-color,#ffa600)" data-action="more-info" data-entity="${byKey["update:semaphore_update"]}"><ha-icon icon="mdi:arrow-up-bold-circle-outline"></ha-icon>${esc(T.update)}</span>` : ""}</div>` : ""}
       </div>
-      ${online ? "" : `<div class="banner off" role="alert"><ha-icon icon="mdi:lan-disconnect"></ha-icon>${esc(T.offline)}</div>`}
+      ${online ? "" : this._offlineBanner(byKey["binary_sensor:connectivity"], T)}
+      ${online ? this._tokenChip(byKey["sensor:token_expires"], T, hass) : ""}
       <div class="stats ${action !== null ? "four" : ""}">
         ${tile("running", running > 0 ? "busy" : "", running, T.running_n)}
         ${tile("failed", failed > 0 ? "bad" : "", failed, T.failed_n)}
@@ -1544,6 +1611,13 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     const entity = target.dataset.entity;
     if (action === "more-info") return this._moreInfo(entity);
     if (action === "schedule") return this._toggleSchedule(entity);
+    if (action === "open-integration") {
+      // use the router of Home Assistant (no page reload); a plain link would reload the whole UI
+      ev.preventDefault();
+      history.pushState(null, "", target.getAttribute("href"));
+      window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+      return;
+    }
     if (action === "filter") {
       const wanted = target.dataset.filter;
       this._filter = wanted === "all" || this._filter === wanted ? "" : wanted;
