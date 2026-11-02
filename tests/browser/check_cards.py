@@ -83,6 +83,10 @@ def shot(page: Page, name: str) -> None:
 
 
 def test_rendering(page: Page) -> None:
+    # connectedCallback der Basisklasse ruft _observeSize(): jede Karte braucht die Methode (Projekt-Karte warf sonst einen TypeError)
+    for tag in ("semaphore-ui-project-card", "semaphore-ui-template-card"):
+        ok = page.evaluate("t => typeof customElements.get(t)?.prototype._observeSize === 'function'", tag)
+        check(f"{tag}: _observeSize vorhanden", ok)
     project = page.locator("semaphore-ui-project-card").first
     check("Projekt-Karte: Titel", project.locator(".title").inner_text().strip() == "Homelab", project.locator(".title").inner_text())
     stats = project.locator(".stat .n").all_inner_texts()
@@ -1150,7 +1154,8 @@ def main() -> int:
         test_mobile_dark(playwright)
         test_english(playwright)
         test_token_care(playwright)  # zuletzt: schaltet die Token-Erneuerung von „Homelab“ aus und lädt den Eintrag neu
-    mine = [e for e in errors if "semaphore" in e.lower()]
+    # Nicht nach „semaphore“ filtern: Fehler wie „this._observeSize is not a function“ nennen die Karte nicht im Text
+    mine = [e for e in errors if "semaphore" in e.lower() or "is not a function" in e or "is not defined" in e]
     check("Keine JavaScript-Fehler aus den Semaphore-Karten", not mine, mine)
     print(f"\n{sum(results)}/{len(results)} Prüfungen bestanden")
     return 0 if all(results) else 1

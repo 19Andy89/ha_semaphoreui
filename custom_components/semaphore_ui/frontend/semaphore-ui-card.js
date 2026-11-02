@@ -510,6 +510,8 @@ class SemaphoreBaseCard extends HTMLElement {
     this._startTicker();
     this._observeSize();
   }
+  /** Only the template card needs to watch its size (package line); the project card inherits this no-op. */
+  _observeSize() {}
   disconnectedCallback() {
     clearInterval(this._ticker);
     this._ticker = null;
