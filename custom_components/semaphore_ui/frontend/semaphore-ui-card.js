@@ -827,7 +827,7 @@ const CRON_WORDS = {
     months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
     daily: "täglich", everyMinute: "jede Minute", everyNMinutes: "alle {n} Minuten", hourly: "stündlich zur vollen Stunde",
     hourlyAt: "stündlich zur Minute {m}", everyNHours: "alle {n} Stunden ab {t} Uhr", at: "um {t} Uhr", hoursFromTo: "stündlich von {a} bis {b} Uhr",
-    minutesBetween: "alle {n} Minuten zwischen {a} und {b} Uhr", to: "bis", and: "und", onDom: "am {d} eines Monats", onDomMonth: "am {d} {m}", ord: "{n}.", inMonth: "im {m}",
+    minutesBetween: "alle {n} Minuten zwischen {a} und {b} Uhr", minuteBetween: "jede Minute zwischen {a} und {b} Uhr", minuteInHours: "jede Minute in den Stunden {h} Uhr", minuteEveryNHours: "jede Minute, alle {n} Stunden", hourlyAtMinutes: "stündlich zu den Minuten {m}", to: "bis", and: "und", onDom: "am {d} eines Monats", onDomMonth: "am {d} {m}", ord: "{n}.", inMonth: "im {m}",
     every: "alle {d} (der Takt beginnt beim Laden in Semaphore)",
   },
   en: {
@@ -835,7 +835,7 @@ const CRON_WORDS = {
     months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     daily: "every day", everyMinute: "every minute", everyNMinutes: "every {n} minutes", hourly: "every hour on the hour",
     hourlyAt: "every hour at minute {m}", everyNHours: "every {n} hours from {t}", at: "at {t}", hoursFromTo: "every hour from {a} to {b}",
-    minutesBetween: "every {n} minutes between {a} and {b}", to: "to", and: "and", onDom: "on day {d} of the month", onDomMonth: "on day {d} of {m}", ord: "{n}", inMonth: "in {m}",
+    minutesBetween: "every {n} minutes between {a} and {b}", minuteBetween: "every minute between {a} and {b}", minuteInHours: "every minute during the hours {h}", minuteEveryNHours: "every minute, every {n} hours", hourlyAtMinutes: "every hour at minutes {m}", to: "to", and: "and", onDom: "on day {d} of the month", onDomMonth: "on day {d} of {m}", ord: "{n}", inMonth: "in {m}",
     every: "every {d} (the clock starts when Semaphore loads it)",
   },
 };
@@ -885,13 +885,23 @@ function describeCron(expr, lang) {
   const m = int(mi);
   const hs = step(h);
   const hl = h === "*" ? null : items(h);
+  const ml = /^[\d,]+$/.test(mi) ? items(mi) : null; // "0,30"
+  const isRange = /^\d+-\d+$/.test(h) || /^\d+$/.test(h); // one hour or a span of hours
+  const spanOk = hl && isRange && hl[hl.length - 1] < 24;
+  const span = spanOk ? { a: `${pad(hl[0])}:00`, b: `${pad(hl[hl.length - 1])}:59` } : null;
   if (mi === "*" && h === "*") time = { text: W.everyMinute };
   else if (step(mi) && h === "*") time = { text: fill(W.everyNMinutes, { n: step(mi) }) };
+  else if (mi === "*" && span) time = { text: fill(W.minuteBetween, span) };
+  else if (step(mi) && span) time = { text: fill(W.minutesBetween, { n: step(mi), ...span }) };
+  else if (mi === "*" && hs) time = { text: fill(W.minuteEveryNHours, { n: hs }) };
+  else if (mi === "*" && hl && hl.length <= 6 && hl.every((x) => x < 24)) time = { text: fill(W.minuteInHours, { h: join(hl.map(pad)) }) };
   else if (m !== null && m < 60 && h === "*") time = { text: m === 0 ? W.hourly : fill(W.hourlyAt, { m }) };
+  else if (ml && ml.length <= 6 && ml.every((x) => x < 60) && h === "*") time = { text: fill(W.hourlyAtMinutes, { m: join(ml.map(String)) }) };
   else if (m !== null && m < 60 && hs) time = { text: fill(W.everyNHours, { n: hs, t: `00:${pad(m)}` }) };
-  else if (m !== null && m < 60 && hl && hl.length <= 6 && hl.every((x) => x < 24) && /^[\d,]+$/.test(h)) time = { text: fill(W.at, { t: join(hl.map((x) => `${pad(x)}:${pad(m)}`)) }), exact: true };
-  else if (m !== null && m < 60 && hl && /^\d+-\d+$/.test(h) && hl[hl.length - 1] < 24) time = { text: fill(W.hoursFromTo, { a: `${pad(hl[0])}:${pad(m)}`, b: `${pad(hl[hl.length - 1])}:${pad(m)}` }) };
-  else if (step(mi) && hl && /^\d+-\d+$/.test(h) && hl[hl.length - 1] < 24) time = { text: fill(W.minutesBetween, { n: step(mi), a: `${pad(hl[0])}:00`, b: `${pad(hl[hl.length - 1])}:59` }) };
+  else if (ml && ml.every((x) => x < 60) && hl && /^[\d,]+$/.test(h) && hl.every((x) => x < 24) && ml.length * hl.length <= 6) {
+    const times = hl.flatMap((x) => ml.map((y) => `${pad(x)}:${pad(y)}`));
+    time = { text: fill(W.at, { t: join(times) }), exact: true };
+  } else if (m !== null && m < 60 && hl && /^\d+-\d+$/.test(h) && hl[hl.length - 1] < 24) time = { text: fill(W.hoursFromTo, { a: `${pad(hl[0])}:${pad(m)}`, b: `${pad(hl[hl.length - 1])}:${pad(m)}` }) };
   if (!time) return "";
 
   // day part

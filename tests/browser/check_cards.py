@@ -302,6 +302,8 @@ def test_schedule_editing(page: Page) -> None:
     check("Cron-Text wird darunter in Worten erklärt", deploy.locator("[data-desc]").inner_text().strip() == "Montags um 06:15 Uhr", deploy.locator("[data-desc]").inner_text())
     deploy.locator('[data-sf="cron"]').fill("0 */2 * * *")
     check("Cron-Text: alle 2 Stunden", deploy.locator("[data-desc]").inner_text().strip() == "Alle 2 Stunden ab 00:00 Uhr", deploy.locator("[data-desc]").inner_text())
+    deploy.locator('[data-sf="cron"]').fill("* 2 * * *")
+    check("Cron-Text: jede Minute von 2:00 bis 2:59", deploy.locator("[data-desc]").inner_text().strip() == "Jede Minute zwischen 02:00 und 02:59 Uhr", deploy.locator("[data-desc]").inner_text())
     deploy.locator('[data-sf="cron"]').fill("kein cron")
     check("Unverständlicher Cron-Text: keine Erklärung", deploy.locator("[data-desc]").inner_text().strip() == "")
     deploy.locator('[data-sf="cron"]').fill("15 6 * * 1")
