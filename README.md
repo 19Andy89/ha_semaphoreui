@@ -42,9 +42,6 @@ Die Bilder entstehen im Browser-Test aus Beispieldaten (siehe [Tests](#tests)); 
 
 </details>
 
-Hinweis für Repo-Betreiber: Relative Bildpfade zeigt GitHub richtig an, die HACS-Oberfläche nicht immer. Nach dem Veröffentlichen
-die Pfade in dieser Datei durch absolute `https://raw.githubusercontent.com/<Benutzer>/<Repo>/main/docs/screenshots/…`-Adressen ersetzen.
-
 ## Installation
 
 1. Ordner `custom_components/semaphore_ui` nach `/config/custom_components/semaphore_ui` kopieren.
@@ -295,7 +292,15 @@ Semaphore selbst, wann etwas startet, und ein Neustart von Home Assistant änder
   listet alle Zeitpläne des Projekts (der früheste zuerst, ausgeschaltete zuletzt). Option `show_schedules: false` blendet den
   Abschnitt aus.
 * **Automationen:** Der Schalter ist ein normaler `switch` – z. B. „Zeitplan Linux-Updates nur an, wenn jemand zu Hause ist“.
-  Die Zeitpläne selbst anlegen oder ändern geht (noch) nur in Semaphore.
+* **Anlegen, ändern, löschen (Aktionen, ohne Karte):**
+  * `semaphore_ui.create_schedule` – Ziel: das **Template-Gerät**; Felder `cron` (Pflicht, fünf Felder wie oben), `name` (Standard: Name des Templates), `active` (Standard: an). Antwort: `schedule_id` und `name`.
+  * `semaphore_ui.update_schedule` – Ziel: der **Schalter** des Zeitplans; Felder `cron`, `name`, `template_id`, `active`. Nicht genannte Felder bleiben unverändert.
+  * `semaphore_ui.delete_schedule` – Ziel: der **Schalter** des Zeitplans. Der Schalter verschwindet mit dem nächsten Abruf.
+
+  Der Cron-Text wird vorher mit derselben Logik wie für „Nächster Lauf“ geprüft; ein Fehler steht dann klar in der Meldung, Semaphore wird nicht gefragt.
+  Beim Ändern schickt die Integration den **ganzen** Zeitplan (`PUT /api/project/<id>/schedules/<id>`), weil Semaphore das so erwartet.
+  Beispiel: `action: semaphore_ui.create_schedule` mit `target: {device_id: …}` und `data: {cron: "0 3 * * 1", name: "Montags"}`.
+  Einmalige Zeitpläne (`run_at`) und eine eigene Zeitplan-Karte gibt es noch nicht.
 
 ## Dashboard-Karten
 

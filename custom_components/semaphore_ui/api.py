@@ -339,6 +339,24 @@ class SemaphoreClient:
             json_body={"active": active},
         )
 
+    async def create_schedule(self, project_id: int, schedule: dict[str, Any]) -> dict[str, Any]:
+        """Create a schedule (``template_id``, ``cron_format``, ``name``, ``active``); returns it with its new id."""
+        body = {"project_id": project_id, **schedule}
+        return await self._request("POST", f"/project/{project_id}/schedules", json_body=body) or {}
+
+    async def update_schedule(
+        self, project_id: int, schedule_id: int, schedule: dict[str, Any]
+    ) -> None:
+        """Replace a schedule. Semaphore expects the whole object (with ``id`` and ``project_id``), not just changes."""
+        body = {**schedule, "id": schedule_id, "project_id": project_id}
+        await self._request(
+            "PUT", f"/project/{project_id}/schedules/{schedule_id}", json_body=body
+        )
+
+    async def delete_schedule(self, project_id: int, schedule_id: int) -> None:
+        """Delete a schedule."""
+        await self._request("DELETE", f"/project/{project_id}/schedules/{schedule_id}")
+
     async def get_task(self, project_id: int, task_id: int) -> dict[str, Any]:
         """Return one task."""
         return await self._request("GET", f"/project/{project_id}/tasks/{task_id}")

@@ -41,3 +41,56 @@ run_template:
       default: false
       selector:
         boolean:
+
+create_schedule:
+  target:
+    device:
+      integration: semaphore_ui
+      model: Template
+  fields:
+    cron:
+      required: true
+      example: "0 3 * * 1"
+      selector:
+        text:
+    name:
+      required: false
+      selector:
+        text:
+    active:
+      required: false
+      default: true
+      selector:
+        boolean:
+
+update_schedule:
+  target:
+    entity:
+      integration: semaphore_ui
+      domain: switch
+  fields:
+    cron:
+      required: false
+      example: "30 4 * * *"
+      selector:
+        text:
+    name:
+      required: false
+      selector:
+        text:
+    template_id:
+      required: false
+      selector:
+        number:
+          min: 1
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean:
+
+delete_schedule:
+  target:
+    entity:
+      integration: semaphore_ui
+      domain: switch

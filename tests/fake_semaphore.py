@@ -347,6 +347,53 @@ class FakeSemaphore:
             self.requests.append(("GET", request.path, None))
             return web.json_response(list(self.schedules.values()))
 
+        @routes.post("/api/project/{pid}/schedules")
+        async def create_schedule(request: web.Request) -> web.Response:
+            if (resp := self._check(request)) is not None:
+                return resp
+            body = await self._body(request)
+            self.requests.append(("POST", request.path, body))
+            if self.schedules_error is not None:
+                return web.Response(status=self.schedules_error[0], text=self.schedules_error[1])
+            if not isinstance(body, dict) or body.get("template_id") not in self.templates or not body.get("cron_format"):
+                return web.json_response({"error": "bad body"}, status=400)
+            created = self.add_schedule(
+                body["template_id"], body["cron_format"], name=body.get("name", ""), active=bool(body.get("active"))
+            )
+            return web.json_response(created, status=201)
+
+        @routes.put("/api/project/{pid}/schedules/{sid}")
+        async def update_schedule(request: web.Request) -> web.Response:
+            if (resp := self._check(request)) is not None:
+                return resp
+            body = await self._body(request)
+            self.requests.append(("PUT", request.path, body))
+            if self.schedules_error is not None:
+                return web.Response(status=self.schedules_error[0], text=self.schedules_error[1])
+            sid = int(request.match_info["sid"])
+            if sid not in self.schedules:
+                return web.Response(status=404, text="Not Found")
+            # like Semaphore: the whole object is expected, with the matching id
+            if not isinstance(body, dict) or body.get("id") != sid or not body.get("cron_format") or "template_id" not in body:
+                return web.json_response({"error": "bad body"}, status=400)
+            self.schedules[sid] = {
+                **self.schedules[sid],
+                **{k: v for k, v in body.items() if k != "tpl_name"},
+                "tpl_name": self.templates[body["template_id"]]["name"],
+            }
+            return web.Response(status=204)
+
+        @routes.delete("/api/project/{pid}/schedules/{sid}")
+        async def delete_schedule(request: web.Request) -> web.Response:
+            if (resp := self._check(request)) is not None:
+                return resp
+            self.requests.append(("DELETE", request.path, None))
+            if self.schedules_error is not None:
+                return web.Response(status=self.schedules_error[0], text=self.schedules_error[1])
+            if self.schedules.pop(int(request.match_info["sid"]), None) is None:
+                return web.Response(status=404, text="Not Found")
+            return web.Response(status=204)
+
         @routes.put("/api/project/{pid}/schedules/{sid}/active")
         async def set_schedule_active(request: web.Request) -> web.Response:
             if (resp := self._check(request)) is not None:

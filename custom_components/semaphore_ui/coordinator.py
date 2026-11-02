@@ -64,7 +64,7 @@ from .report import (
     task_started,
     task_status,
 )
-from .schedule import load_timezone, next_run_of
+from .schedule import load_timezone, next_run_of, validate_cron
 from .survey import SurveyError, SurveyVar, build_survey_payload, parse_survey_vars
 
 _LOGGER = logging.getLogger(__name__)
@@ -444,6 +444,113 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
             ) from err
         schedule["active"] = active  # show it at once, the next poll confirms it
         self.async_update_listeners()
+        await self.async_request_refresh()
+
+    def _schedule_error(self, err: SemaphoreError, label: str) -> HomeAssistantError:
+        """Translate an API error of a schedule change."""
+        if isinstance(err, SemaphoreAuthError):
+            return self._auth_failed_in_action(err)
+        return HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="schedule_change_failed",
+            translation_placeholders={"schedule": label, "error": str(err)},
+        )
+
+    @staticmethod
+    def _check_cron(cron: str) -> str:
+        """Return the trimmed cron text or raise a clear error (Semaphore would only say "bad request")."""
+        cron = cron.strip()
+        if problem := validate_cron(cron):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_cron",
+                translation_placeholders={"cron": cron, "error": problem},
+            )
+        return cron
+
+    def _known_template(self, template_id: int) -> dict[str, Any]:
+        template = self.data.templates.get(template_id)
+        if template is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="template_not_found",
+                translation_placeholders={"template_id": str(template_id)},
+            )
+        return template
+
+    async def async_create_schedule(
+        self, template_id: int, cron: str, *, name: str | None = None, active: bool = True
+    ) -> dict[str, Any]:
+        """Create a cron schedule for a template in Semaphore; returns the new schedule."""
+        template = self._known_template(template_id)
+        cron = self._check_cron(cron)
+        label = name or str(template.get("name") or template_id)
+        try:
+            created = await self.client.create_schedule(
+                self.project_id,
+                {
+                    "template_id": template_id,
+                    "cron_format": cron,
+                    "name": label,
+                    "active": active,
+                    "type": "",
+                    "delete_after_run": False,
+                },
+            )
+        except SemaphoreError as err:
+            raise self._schedule_error(err, label) from err
+        await self.async_request_refresh()
+        return created
+
+    async def async_update_schedule(
+        self,
+        schedule_id: int,
+        *,
+        cron: str | None = None,
+        name: str | None = None,
+        template_id: int | None = None,
+        active: bool | None = None,
+    ) -> None:
+        """Change cron text, name, template or on/off of a schedule (the rest stays as it is)."""
+        schedule = self.data.schedules.get(schedule_id)
+        if schedule is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_not_found",
+                translation_placeholders={"schedule_id": str(schedule_id)},
+            )
+        changes: dict[str, Any] = {}
+        if cron is not None:
+            changes["cron_format"] = self._check_cron(cron)
+        if name is not None:
+            changes["name"] = name
+        if template_id is not None:
+            self._known_template(template_id)
+            changes["template_id"] = template_id
+        if active is not None:
+            changes["active"] = active
+        label = str(schedule.get("name") or schedule_id)
+        # send the complete schedule; "tpl_name" is only added by the read call
+        body = {k: v for k, v in schedule.items() if k != "tpl_name"} | changes
+        try:
+            await self.client.update_schedule(self.project_id, schedule_id, body)
+        except SemaphoreError as err:
+            raise self._schedule_error(err, label) from err
+        await self.async_request_refresh()
+
+    async def async_delete_schedule(self, schedule_id: int) -> None:
+        """Delete a schedule in Semaphore (its switch disappears with the next update)."""
+        schedule = self.data.schedules.get(schedule_id)
+        if schedule is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_not_found",
+                translation_placeholders={"schedule_id": str(schedule_id)},
+            )
+        try:
+            await self.client.delete_schedule(self.project_id, schedule_id)
+        except SemaphoreError as err:
+            raise self._schedule_error(err, str(schedule.get("name") or schedule_id)) from err
         await self.async_request_refresh()
 
     @property

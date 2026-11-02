@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import voluptuous as vol
 
@@ -74,6 +75,32 @@ SERVICE_RUN_TEMPLATE_SCHEMA = vol.Schema(
 )
 
 
+SERVICE_CREATE_SCHEDULE = "create_schedule"
+SERVICE_UPDATE_SCHEDULE = "update_schedule"
+SERVICE_DELETE_SCHEDULE = "delete_schedule"
+_SCHEDULE_UNIQUE_ID_RE = re.compile(r"^(?P<entry>.+)_(?P<sid>\d+)_schedule$")
+_CRON = vol.All(cv.string, vol.Length(min=1, max=200))
+SERVICE_CREATE_SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_DEVICE_ID): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
+        vol.Required("cron"): _CRON,
+        vol.Optional("name"): vol.All(cv.string, vol.Length(min=1, max=100)),
+        vol.Optional("active", default=True): cv.boolean,
+    }
+)
+SERVICE_UPDATE_SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
+        vol.Optional("cron"): _CRON,
+        vol.Optional("name"): vol.All(cv.string, vol.Length(min=1, max=100)),
+        vol.Optional("template_id"): vol.All(vol.Coerce(int), vol.Range(min=1)),
+        vol.Optional("active"): cv.boolean,
+    }
+)
+SERVICE_DELETE_SCHEDULE_SCHEMA = vol.Schema({vol.Required(ATTR_ENTITY_ID): cv.entity_ids})
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the action ``semaphore_ui.run_template`` and the dashboard cards."""
 
@@ -134,6 +161,71 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             raise_on_failure=call.data["raise_on_failure"],
         )
 
+    def _resolve_schedules(call: ServiceCall) -> list[tuple[SemaphoreCoordinator, int]]:
+        """Find (coordinator, schedule id) for the targeted schedule switches."""
+        ent_reg = er.async_get(hass)
+        found: list[tuple[SemaphoreCoordinator, int]] = []
+        for entity_id in call.data[ATTR_ENTITY_ID]:
+            entity = ent_reg.async_get(entity_id)
+            match = (
+                _SCHEDULE_UNIQUE_ID_RE.match(entity.unique_id)
+                if entity is not None and entity.platform == DOMAIN and entity.domain == "switch"
+                else None
+            )
+            entry = hass.config_entries.async_get_entry(match["entry"]) if match else None
+            if match is None or entry is None:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="not_a_schedule",
+                )
+            if entry.state is not ConfigEntryState.LOADED:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="entry_not_loaded",
+                )
+            found.append((entry.runtime_data, int(match["sid"])))
+        return found
+
+    async def _async_create_schedule(call: ServiceCall) -> ServiceResponse:
+        targets = _resolve(call)
+        if len(targets) != 1:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="exactly_one_template",
+            )
+        coordinator, template_id = targets[0]
+        created = await coordinator.async_create_schedule(
+            template_id, call.data["cron"], name=call.data.get("name"), active=call.data["active"]
+        )
+        return {"schedule_id": created.get("id"), "name": created.get("name")}
+
+    async def _async_update_schedule(call: ServiceCall) -> None:
+        for coordinator, schedule_id in _resolve_schedules(call):
+            await coordinator.async_update_schedule(
+                schedule_id,
+                cron=call.data.get("cron"),
+                name=call.data.get("name"),
+                template_id=call.data.get("template_id"),
+                active=call.data.get("active"),
+            )
+
+    async def _async_delete_schedule(call: ServiceCall) -> None:
+        for coordinator, schedule_id in _resolve_schedules(call):
+            await coordinator.async_delete_schedule(schedule_id)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_SCHEDULE,
+        _async_create_schedule,
+        schema=SERVICE_CREATE_SCHEDULE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_UPDATE_SCHEDULE, _async_update_schedule, schema=SERVICE_UPDATE_SCHEDULE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_DELETE_SCHEDULE, _async_delete_schedule, schema=SERVICE_DELETE_SCHEDULE_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN,
         SERVICE_RUN_TEMPLATE,

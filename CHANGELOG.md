@@ -1,5 +1,12 @@
 # Changelog
 
+## Unveröffentlicht – Zeitpläne per Aktion anlegen, ändern, löschen
+- Neue Aktionen `semaphore_ui.create_schedule` (Ziel: Template-Gerät), `update_schedule` und `delete_schedule` (Ziel: Zeitplan-Schalter).
+  Cron-Text wird vorab geprüft (klare Meldung statt „bad request“); beim Ändern wird der ganze Zeitplan an Semaphore geschickt.
+  Die Schalter erscheinen/verschwinden mit dem nächsten Abruf. Tests: 274 pytest.
+- Noch **nicht an einer echten Instanz geprüft** (Aufbau der Anfragen aus dem Semaphore-Quellcode abgeleitet) – siehe Issue #1.
+- README: Hinweis für Repo-Betreiber zu Bildpfaden entfernt.
+
 ## Unveröffentlicht – Vorprüfung meldet sich immer
 - **Playbook `update-linux.yml`:** Die Vorprüfungen (Platz, Paketlisten, Platzbedarf) laufen in einem `block`. Schlägt eine fehl (z. B. zu wenig Platz),
   gibt `rescue` trotzdem ein `HA_RESULT` mit `needed: true`, Hinweis („Update nicht gestartet: …“) und – soweit bekannt – Plattenwerten aus

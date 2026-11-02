@@ -238,7 +238,7 @@
   },
   "exceptions": {
     "template_not_found": {
-      "message": "Template {template_id} no longer exists in Semaphore."
+      "message": "Template {template_id} does not exist in this project (or it is hidden)."
     },
     "auth_failed": {
       "message": "Semaphore rejected the API token. Please enter a new token under Settings → Devices & services."
@@ -272,6 +272,15 @@
     },
     "schedule_failed": {
       "message": "Schedule “{schedule}” could not be switched: {error}"
+    },
+    "invalid_cron": {
+      "message": "\"{cron}\" is not a valid cron expression: {error}"
+    },
+    "not_a_schedule": {
+      "message": "Please pick the switch of a Semaphore UI schedule."
+    },
+    "schedule_change_failed": {
+      "message": "Schedule \"{schedule}\" could not be changed: {error}"
     }
   },
   "services": {
@@ -308,6 +317,51 @@
           "description": "Values of the survey variables as name: value, e.g. target: dockerhost. Missing values use the default of the template, required ones without a value raise an error. Enum: value or label, select: list, secret: only possible here."
         }
       }
+    },
+    "create_schedule": {
+      "name": "Create schedule",
+      "description": "Creates a new cron schedule for a template in Semaphore. Response: id and name of the new schedule.",
+      "fields": {
+        "cron": {
+          "name": "Cron expression",
+          "description": "Five fields: minute hour day month weekday, e.g. \"0 3 * * 1\" (Mondays 3 am). Time zone as configured in Semaphore."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name of the schedule (default: name of the template)."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Switch the schedule on right away."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Change schedule",
+      "description": "Changes cron expression, name, template or on/off of a schedule. Fields you leave out stay as they are.",
+      "fields": {
+        "cron": {
+          "name": "Cron expression",
+          "description": "New cron expression, e.g. \"30 4 * * *\"."
+        },
+        "name": {
+          "name": "Name",
+          "description": "New name."
+        },
+        "template_id": {
+          "name": "Template id",
+          "description": "Move the schedule to another template (id in Semaphore)."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Switch on or off."
+        }
+      }
+    },
+    "delete_schedule": {
+      "name": "Delete schedule",
+      "description": "Deletes the schedule in Semaphore. This cannot be undone.",
+      "fields": {}
     }
   },
   "issues": {

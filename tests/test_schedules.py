@@ -265,3 +265,116 @@ async def test_a_run_that_is_still_running_keeps_the_last_success(hass: HomeAssi
     # the same task ended: it did not succeed, the earlier success stays
     assert hass.states.get(eid(hass, "sensor", 2, "last_success")).attributes["task_id"] == good["id"]
     assert len([r for r in server.requests if r[1].endswith("/templates/2/tasks/last")]) == 1
+
+
+# --- create / change / delete schedules (actions) ---------------------------------------------------------------
+
+from homeassistant.exceptions import ServiceValidationError  # noqa: E402
+
+from .test_flow_and_entities import device_id_of  # noqa: E402
+
+
+async def test_create_schedule_for_a_template(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    await setup(hass, make_entry)
+    assert switch_ids(hass) == []
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        "create_schedule",
+        {"device_id": device_id_of(hass, 2), "cron": " 0 3 * * 1 ", "name": "Montags"},
+        blocking=True,
+        return_response=True,
+    )
+    await hass.async_block_till_done()
+
+    assert response == {"schedule_id": 1, "name": "Montags"}
+    posts = [r for r in server.requests if r[0] == "POST" and r[1].endswith("/schedules")]
+    assert posts == [
+        (
+            "POST",
+            "/api/project/1/schedules",
+            {
+                "project_id": 1,
+                "template_id": 2,
+                "cron_format": "0 3 * * 1",
+                "name": "Montags",
+                "active": True,
+                "type": "",
+                "delete_after_run": False,
+            },
+        )
+    ]
+    # the new schedule gets its switch (on the device of the template) with the next poll
+    state = hass.states.get(switch_id(hass, 1))
+    assert state.state == "on" and state.attributes["cron"] == "0 3 * * 1"
+
+
+async def test_create_schedule_rejects_bad_cron_before_asking_semaphore(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    await setup(hass, make_entry)
+    with pytest.raises(ServiceValidationError, match="kein gültiger Cron-Text|not a valid cron"):
+        await hass.services.async_call(
+            DOMAIN, "create_schedule", {"device_id": device_id_of(hass, 2), "cron": "every day"}, blocking=True
+        )
+    assert not [r for r in server.requests if r[0] == "POST" and r[1].endswith("/schedules")]
+    assert server.schedules == {}
+
+
+async def test_update_schedule_sends_the_whole_object(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    server.add_schedule(2, "0 2 * * *", name="nightly")
+    await setup(hass, make_entry)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "update_schedule",
+        {"entity_id": switch_id(hass, 1), "cron": "30 4 * * *", "template_id": 1, "name": "Morgens"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    put = [r for r in server.requests if r[0] == "PUT" and r[1] == "/api/project/1/schedules/1"]
+    assert len(put) == 1
+    body = put[0][2]
+    assert body["id"] == 1 and body["project_id"] == 1  # Semaphore wants these in the body
+    assert (body["cron_format"], body["template_id"], body["name"], body["active"]) == ("30 4 * * *", 1, "Morgens", True)
+    assert "tpl_name" not in body
+    state = hass.states.get(switch_id(hass, 1))
+    assert state.attributes["cron"] == "30 4 * * *" and state.attributes["template"] == "docker-system aktualisieren"
+
+
+async def test_update_schedule_checks_input(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    server.add_schedule(2, name="nightly")
+    await setup(hass, make_entry)
+    for data in ({"cron": "61 * * * *"}, {"template_id": 99}):
+        with pytest.raises(ServiceValidationError):
+            await hass.services.async_call(
+                DOMAIN, "update_schedule", {"entity_id": switch_id(hass, 1), **data}, blocking=True
+            )
+    assert not [r for r in server.requests if r[0] == "PUT"]
+    # not the switch of a schedule
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "update_schedule", {"entity_id": eid(hass, "sensor", 2, "status"), "cron": "0 1 * * *"}, blocking=True
+        )
+
+
+async def test_delete_schedule_removes_switch_and_reports_errors(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    server.add_schedule(2, name="nightly")
+    server.add_schedule(1, name="weekly")
+    await setup(hass, make_entry)
+
+    server.schedules_error = (500, "database is locked")
+    with pytest.raises(HomeAssistantError, match="nightly.*database is locked"):
+        await hass.services.async_call(DOMAIN, "delete_schedule", {"entity_id": switch_id(hass, 1)}, blocking=True)
+    assert 1 in server.schedules
+
+    server.schedules_error = None
+    await hass.services.async_call(DOMAIN, "delete_schedule", {"entity_id": switch_id(hass, 1)}, blocking=True)
+    await hass.async_block_till_done()
+    assert list(server.schedules) == [2]
+    assert er.async_get(hass).async_get_entity_id("switch", DOMAIN, f"{hass.config_entries.async_entries(DOMAIN)[0].entry_id}_1_schedule") is None
+    assert len(switch_ids(hass)) == 1

@@ -238,7 +238,7 @@
   },
   "exceptions": {
     "template_not_found": {
-      "message": "Das Template {template_id} gibt es in Semaphore nicht mehr."
+      "message": "Das Template {template_id} gibt es in diesem Projekt nicht (oder es ist ausgeblendet)."
     },
     "auth_failed": {
       "message": "Semaphore hat das API-Token abgelehnt. Bitte unter „Einstellungen → Geräte & Dienste“ ein neues Token eingeben."
@@ -272,6 +272,15 @@
     },
     "schedule_failed": {
       "message": "Zeitplan „{schedule}“ konnte nicht umgeschaltet werden: {error}"
+    },
+    "invalid_cron": {
+      "message": "„{cron}“ ist kein gültiger Cron-Text: {error}"
+    },
+    "not_a_schedule": {
+      "message": "Bitte den Schalter eines Zeitplans von Semaphore UI auswählen."
+    },
+    "schedule_change_failed": {
+      "message": "Zeitplan „{schedule}“ konnte nicht geändert werden: {error}"
     }
   },
   "services": {
@@ -308,6 +317,51 @@
           "description": "Werte der Survey-Variablen als Name: Wert, z. B. target: dockerhost. Fehlende Werte werden mit dem Standardwert des Templates gefüllt, Pflichtfelder ohne Wert führen zu einem Fehler. Enum: Wert oder Beschriftung, Select: Liste, Secret: nur hier möglich."
         }
       }
+    },
+    "create_schedule": {
+      "name": "Zeitplan anlegen",
+      "description": "Legt für ein Template einen neuen Zeitplan (Cron) in Semaphore an. Antwort: Nummer und Name des neuen Zeitplans.",
+      "fields": {
+        "cron": {
+          "name": "Cron-Text",
+          "description": "Fünf Felder: Minute Stunde Tag Monat Wochentag, z. B. „0 3 * * 1“ (montags 3 Uhr). Zeitzone wie in Semaphore eingestellt."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name des Zeitplans (Standard: Name des Templates)."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Zeitplan gleich einschalten."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Zeitplan ändern",
+      "description": "Ändert Cron-Text, Name, Template oder Ein/Aus eines Zeitplans. Nicht angegebene Felder bleiben unverändert.",
+      "fields": {
+        "cron": {
+          "name": "Cron-Text",
+          "description": "Neuer Cron-Text, z. B. „30 4 * * *“."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Neuer Name."
+        },
+        "template_id": {
+          "name": "Template-Nummer",
+          "description": "Zeitplan einem anderen Template (Nummer in Semaphore) zuordnen."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Ein- oder ausschalten."
+        }
+      }
+    },
+    "delete_schedule": {
+      "name": "Zeitplan löschen",
+      "description": "Löscht den Zeitplan in Semaphore. Das kann nicht rückgängig gemacht werden.",
+      "fields": {}
     }
   },
   "issues": {
