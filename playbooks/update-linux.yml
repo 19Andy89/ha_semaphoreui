@@ -17,135 +17,164 @@
     - name: Erreichbarkeit prüfen
       ansible.builtin.ping:
 
-    - name: Freien Speicherplatz prüfen
-      ansible.builtin.command: df -P /
-      changed_when: false
-      check_mode: false
-      register: disk_space
+    - name: Vorprüfungen (Platz, Paketlisten, Updates ermitteln)
+      block:
+        - name: Freien Speicherplatz prüfen
+          ansible.builtin.command: df -P /
+          changed_when: false
+          check_mode: false
+          register: disk_space
 
-    - name: Speicherplatz anzeigen
-      ansible.builtin.debug:
-        var: disk_space.stdout_lines
+        - name: Speicherplatz anzeigen
+          ansible.builtin.debug:
+            var: disk_space.stdout_lines
 
-    - name: Verfügbaren Speicherplatz für Update prüfen
-      ansible.builtin.command:
-        argv:
-          - df
-          - --output=avail
-          - -k
-          - /
-      changed_when: false
-      check_mode: false
-      register: root_available_kib
+        - name: Verfügbaren Speicherplatz für Update prüfen
+          ansible.builtin.command:
+            argv:
+              - df
+              - --output=avail
+              - -k
+              - /
+          changed_when: false
+          check_mode: false
+          register: root_available_kib
 
-    - name: Gesamtgröße der Root-Partition ermitteln
-      ansible.builtin.command:
-        argv:
-          - df
-          - --output=size
-          - -k
-          - /
-      changed_when: false
-      check_mode: false
-      register: root_total_kib
+        - name: Gesamtgröße der Root-Partition ermitteln
+          ansible.builtin.command:
+            argv:
+              - df
+              - --output=size
+              - -k
+              - /
+          changed_when: false
+          check_mode: false
+          register: root_total_kib
 
-    - name: Adaptive Mindestreserve berechnen
-      ansible.builtin.set_fact:
-        effective_min_free_kib: >-
-          {{
-            2097152
-            if (root_total_kib.stdout_lines[-1] | int) >= 15728640
-            else (min_free_space_kib | int)
-          }}
+        - name: Adaptive Mindestreserve berechnen
+          ansible.builtin.set_fact:
+            effective_min_free_kib: >-
+              {{
+                2097152
+                if (root_total_kib.stdout_lines[-1] | int) >= 15728640
+                else (min_free_space_kib | int)
+              }}
 
-    - name: Paketlisten aktualisieren
-      ansible.builtin.apt:
-        auto_install_module_deps: true
-        update_cache: true
-        cache_valid_time: 3600
-        update_cache_retries: 3
-        update_cache_retry_max_delay: 12
-        lock_timeout: 300
-      check_mode: false
+        - name: Paketlisten aktualisieren
+          ansible.builtin.apt:
+            auto_install_module_deps: true
+            update_cache: true
+            cache_valid_time: 3600
+            update_cache_retries: 3
+            update_cache_retry_max_delay: 12
+            lock_timeout: 300
+          check_mode: false
 
-    - name: Verfügbare Paketupdates ermitteln
-      ansible.builtin.command:
-        cmd: timeout 120s apt-get -s upgrade
-      environment:
-        LC_ALL: C
-      changed_when: false
-      check_mode: false
-      register: upgrade_simulation
+        - name: Verfügbare Paketupdates ermitteln
+          ansible.builtin.command:
+            cmd: timeout 120s apt-get -s upgrade
+          environment:
+            LC_ALL: C
+          changed_when: false
+          check_mode: false
+          register: upgrade_simulation
 
-    - name: Anzahl verfügbarer Paketupdates anzeigen
-      ansible.builtin.debug:
-        msg: >-
-          Paketupdates verfügbar:
-          {{ upgrade_simulation.stdout_lines
-             | select('match', '^Inst ')
-             | list
-             | length }}
+        - name: Anzahl verfügbarer Paketupdates anzeigen
+          ansible.builtin.debug:
+            msg: >-
+              Paketupdates verfügbar:
+              {{ upgrade_simulation.stdout_lines
+                 | select('match', '^Inst ')
+                 | list
+                 | length }}
 
-    # "apt-get -s" (Simulation) gibt die Zeilen "Need to get ..." und "After this operation ..." NICHT aus.
-    # "--assume-no" druckt sie und bricht danach ab: es wird nichts installiert und nichts heruntergeladen.
-    - name: Platzbedarf der Updates bei apt erfragen (ohne etwas zu installieren)
-      ansible.builtin.command:
-        cmd: timeout 120s apt-get upgrade --assume-no
-      environment:
-        LC_ALL: C
-      changed_when: false
-      failed_when: false
-      check_mode: false
-      register: upgrade_size
+        # "apt-get -s" (Simulation) gibt die Zeilen "Need to get ..." und "After this operation ..." NICHT aus.
+        # "--assume-no" druckt sie und bricht danach ab: es wird nichts installiert und nichts heruntergeladen.
+        - name: Platzbedarf der Updates bei apt erfragen (ohne etwas zu installieren)
+          ansible.builtin.command:
+            cmd: timeout 120s apt-get upgrade --assume-no
+          environment:
+            LC_ALL: C
+          changed_when: false
+          failed_when: false
+          check_mode: false
+          register: upgrade_size
 
-    - name: Benötigten Speicherplatz der Updates berechnen
-      ansible.builtin.shell: |
-        python3 -c '
-        import sys, re
-        text = sys.stdin.read()
-        units = {"B": 1.0 / 1024.0, "kB": 1.0, "MB": 1024.0, "GB": 1048576.0}
-        def conv(num, unit):
-            return float(num.replace(",", "")) * units.get(unit, 1.0)
-        download = 0.0
-        additional = 0.0
-        for line in text.splitlines():
-            m = re.search(r"Need to get ([\d.,]+)\s*(B|kB|MB|GB)(?:/[\d.,]+\s*(?:B|kB|MB|GB))?\s+of archives", line)
-            if m:
-                download = conv(m.group(1), m.group(2))
-            m = re.search(r"After this operation, ([\d.,]+)\s*(B|kB|MB|GB) of additional disk space will be (used|freed)\.", line)
-            if m:
-                v = conv(m.group(1), m.group(2))
-                additional = v if m.group(3) == "used" else -v
-        peak = download + (additional if additional > 0 else 0.0)
-        print(int(peak))
-        '
-      args:
-        stdin: "{{ upgrade_size.stdout | default('') }}"
-      changed_when: false
-      register: required_space_kib
+        - name: Benötigten Speicherplatz der Updates berechnen
+          ansible.builtin.shell: |
+            python3 -c '
+            import sys, re
+            text = sys.stdin.read()
+            units = {"B": 1.0 / 1024.0, "kB": 1.0, "MB": 1024.0, "GB": 1048576.0}
+            def conv(num, unit):
+                return float(num.replace(",", "")) * units.get(unit, 1.0)
+            download = 0.0
+            additional = 0.0
+            for line in text.splitlines():
+                m = re.search(r"Need to get ([\d.,]+)\s*(B|kB|MB|GB)(?:/[\d.,]+\s*(?:B|kB|MB|GB))?\s+of archives", line)
+                if m:
+                    download = conv(m.group(1), m.group(2))
+                m = re.search(r"After this operation, ([\d.,]+)\s*(B|kB|MB|GB) of additional disk space will be (used|freed)\.", line)
+                if m:
+                    v = conv(m.group(1), m.group(2))
+                    additional = v if m.group(3) == "used" else -v
+            peak = download + (additional if additional > 0 else 0.0)
+            print(int(peak))
+            '
+          args:
+            stdin: "{{ upgrade_size.stdout | default('') }}"
+          changed_when: false
+          register: required_space_kib
 
-    - name: Benötigten Speicherplatz anzeigen
-      ansible.builtin.debug:
-        msg: >-
-          Updates benötigen ca.
-          {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB
-          (Download + zusätzlicher Platz, ohne {{ (update_space_buffer_kib | int / 1024) | round(0) }} MiB Puffer).
+        - name: Benötigten Speicherplatz anzeigen
+          ansible.builtin.debug:
+            msg: >-
+              Updates benötigen ca.
+              {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB
+              (Download + zusätzlicher Platz, ohne {{ (update_space_buffer_kib | int / 1024) | round(0) }} MiB Puffer).
 
-    - name: Update bei zu wenig freiem Speicher verhindern
-      ansible.builtin.assert:
-        that:
-          - (root_available_kib.stdout_lines[-1] | int) >= (required_space_kib.stdout | default('0') | trim | int) + (update_space_buffer_kib | int)
-          - (root_available_kib.stdout_lines[-1] | int) >= (effective_min_free_kib | int)
-        fail_msg: >-
-          Update abgebrochen: Auf / sind nur
-          {{ ((root_available_kib.stdout_lines[-1] | int) / 1048576) | round(2) }} GiB frei.
-          Benötigt werden ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB für die Updates
-          plus {{ (update_space_buffer_kib | int / 1024) | round(0) }} MiB Puffer
-          (Mindestreserve {{ (effective_min_free_kib | int / 1024) | round(0) }} MiB).
-        success_msg: >-
-          Ausreichend Speicherplatz vorhanden:
-          {{ ((root_available_kib.stdout_lines[-1] | int) / 1048576) | round(2) }} GiB frei;
-          Updates benötigen ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB.
+        - name: Update bei zu wenig freiem Speicher verhindern
+          ansible.builtin.assert:
+            that:
+              - (root_available_kib.stdout_lines[-1] | int) >= (required_space_kib.stdout | default('0') | trim | int) + (update_space_buffer_kib | int)
+              - (root_available_kib.stdout_lines[-1] | int) >= (effective_min_free_kib | int)
+            fail_msg: >-
+              Update abgebrochen: Auf / sind nur
+              {{ ((root_available_kib.stdout_lines[-1] | int) / 1048576) | round(2) }} GiB frei.
+              Benötigt werden ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB für die Updates
+              plus {{ (update_space_buffer_kib | int / 1024) | round(0) }} MiB Puffer
+              (Mindestreserve {{ (effective_min_free_kib | int / 1024) | round(0) }} MiB).
+            success_msg: >-
+              Ausreichend Speicherplatz vorhanden:
+              {{ ((root_available_kib.stdout_lines[-1] | int) / 1048576) | round(2) }} GiB frei;
+              Updates benötigen ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB.
+
+      rescue:
+        # Schlägt eine Vorprüfung fehl (zu wenig Platz, apt-Fehler ...), muss Home Assistant das trotzdem erfahren:
+        # sonst entsteht der Handlungsbedarf-Sensor des Hosts nie. Danach schlägt der Lauf wie gewohnt fehl.
+        - name: Fehlgeschlagene Vorprüfung an Home Assistant melden
+          ansible.builtin.debug:
+            msg: >-
+              HA_RESULT {{ (
+                {
+                  'needed': true,
+                  'notes': ['Update nicht gestartet: ' ~ (ansible_failed_result.msg | default('Vorprüfung fehlgeschlagen') | string | replace('\n', ' ') | truncate(180))]
+                }
+                | combine(
+                    {
+                      'disk_free_mib': ((root_available_kib.stdout_lines[-1] | int) / 1024) | round(1),
+                      'disk_used_percent': ((1 - ((root_available_kib.stdout_lines[-1] | int) / (root_total_kib.stdout_lines[-1] | int))) * 100) | round(1)
+                    }
+                    if (root_available_kib.stdout_lines is defined and root_total_kib.stdout_lines is defined
+                        and (root_total_kib.stdout_lines[-1] | int) > 0)
+                    else {}
+                  )
+              ) | to_json }}
+
+        - name: Lauf als fehlgeschlagen beenden
+          ansible.builtin.fail:
+            msg: "{{ ansible_failed_result.msg | default('Vorprüfung fehlgeschlagen') }}"
+
 
     - name: Installierte Pakete aktualisieren
       ansible.builtin.apt:

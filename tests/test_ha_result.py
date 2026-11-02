@@ -99,6 +99,23 @@ def test_ignores_the_marker_in_names_and_other_words() -> None:
     assert parse_ha_result(lines) is None
 
 
+def test_failed_precheck_reports_needed_with_note_and_disk() -> None:
+    """Rescue block of playbooks/update-linux.yml: no ``updates`` key, but ``needed`` plus note and disk figures."""
+    lines = [
+        "TASK [Fehlgeschlagene Vorprüfung an Home Assistant melden] *****",
+        "ok: [pihole] => {",
+        '    "msg": "HA_RESULT {\\"needed\\": true, \\"notes\\": [\\"Update nicht gestartet: Auf / sind nur 0.2 GiB frei.\\"], '
+        '\\"disk_free_mib\\": 200.0, \\"disk_used_percent\\": 95.1}"',
+        "}",
+    ]
+    result = parse_ha_result(lines)
+    assert result is not None
+    assert result["needed"] is True
+    assert result["updates"] is None
+    assert result["hosts"]["pihole"]["disk_free_mib"] == 200.0
+    assert result["notes"][0]["text"].startswith("Update nicht gestartet")
+
+
 def test_explicit_needed_overrides_the_rule() -> None:
     lines = [
         "ok: [a] => ",

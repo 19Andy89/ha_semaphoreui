@@ -1,5 +1,11 @@
 # Changelog
 
+## Unveröffentlicht – Vorprüfung meldet sich immer
+- **Playbook `update-linux.yml`:** Die Vorprüfungen (Platz, Paketlisten, Platzbedarf) laufen in einem `block`. Schlägt eine fehl (z. B. zu wenig Platz),
+  gibt `rescue` trotzdem ein `HA_RESULT` mit `needed: true`, Hinweis („Update nicht gestartet: …“) und – soweit bekannt – Plattenwerten aus
+  und beendet den Lauf danach wie bisher als fehlgeschlagen. So entsteht der Handlungsbedarf-Sensor des Hosts auch dann.
+- **README:** Hinweis, dass das Projekt inoffiziell ist (keine Verbindung zu Semaphore UI, nur dessen API, eigenes Symbol, Link zum Original).
+
 ## Unveröffentlicht – Updates je Host, Playbook-Fix
 - **Template-Karte:** Bei mehreren Hosts zeigt die Box „Offene Updates“ je Host einen eigenen Block, getrennt durch eine dünne Linie:
   Name, Status („8 Updates, Neustart“ / „aktuell“ / „Handlungsbedarf“), Platte, eigene Paketliste und Hinweise. Mit einem Host bleibt das Layout wie bisher.
