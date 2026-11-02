@@ -10,7 +10,7 @@
  * Both are found by `device_id`; the entities of the device are recognised by their
  * translation key, so nothing has to be configured by hand. Plain JavaScript, no build step.
  */
-const SEMAPHORE_CARD_VERSION = "0.5.2";
+const SEMAPHORE_CARD_VERSION = "0.6.0";
 const SEMAPHORE_DOMAIN = "semaphore_ui";
 
 const TEXTS = {
