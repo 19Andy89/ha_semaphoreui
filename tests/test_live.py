@@ -58,6 +58,7 @@ async def test_step_shown_while_running_and_connection_closed_afterwards(
         hass, lambda: hass.states.get(status).attributes.get("current_step") == "Pakete installieren"
     )
     assert hass.states.get(status).attributes["step_number"] == 2
+    assert hass.states.get(status).attributes["live"] is True
 
     server.finish(task_id, "success", "TASK [x] ***\nok")
     await server.broadcast(

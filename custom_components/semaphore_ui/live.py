@@ -48,6 +48,8 @@ class LiveStream:
         self._coordinator = coordinator
         self._task: asyncio.Task[None] | None = None
         self._unsupported = False
+        # True while the WebSocket is really open (shown in the card)
+        self.open = False
         # task_id -> (step number, step name)
         self.steps: dict[int, tuple[int, str]] = {}
         # task_id -> last (status, end) seen, so repeated messages cause no refresh
@@ -80,6 +82,7 @@ class LiveStream:
 
     def stop(self) -> None:
         """Close the connection."""
+        self.open = False
         if self._task is not None:
             self._task.cancel()
             self._task = None
@@ -99,6 +102,8 @@ class LiveStream:
                 async with self._coordinator.client.ws_connect() as ws:
                     delay = _FIRST_DELAY
                     _LOGGER.debug("Live connection to %s open", self._coordinator.base_url)
+                    self.open = True
+                    self._coordinator.async_update_listeners()
                     await self._catch_up()
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
@@ -110,6 +115,7 @@ class LiveStream:
                         ):
                             break
             except asyncio.CancelledError:
+                self.open = False
                 raise
             except aiohttp.WSServerHandshakeError as err:
                 if err.status in (401, 403, 404, 405):
@@ -123,6 +129,9 @@ class LiveStream:
                 _LOGGER.debug("Live connection refused: %s", err)
             except (aiohttp.ClientError, SemaphoreError, OSError, TimeoutError) as err:
                 _LOGGER.debug("Live connection lost: %s", err)
+            if self.open:
+                self.open = False
+                self._coordinator.async_update_listeners()
             await asyncio.sleep(delay)
             delay = min(delay * 2, _MAX_DELAY)
 

@@ -24,6 +24,7 @@ const TEXTS = {
     never: "Noch nie ausgeführt",
     running_since: "Gestartet",
     step: "Schritt",
+    live: "Live-Verbindung aktiv",
     error: "Fehler",
     task: "Task",
     host: "Host",
@@ -150,6 +151,7 @@ const TEXTS = {
     never: "Never run",
     running_since: "Started",
     step: "Step",
+    live: "Live connection active",
     error: "Error",
     task: "Task",
     host: "Host",
@@ -394,6 +396,7 @@ const STYLE = `
   .chip.dry .dry-l { font-size: 0.75em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.85; line-height: 1.3; }
   .chip.dry .dry-s { display: inline-flex; align-items: center; gap: 4px; }
   .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--success-color, #43a047); animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
   @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
   [data-action="more-info"]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; border-radius: 8px; }
@@ -1099,9 +1102,11 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
         );
       }
       const stepAttr = (this._state(byKey["sensor:status"]) || {}).attributes || {};
-      if (running && stepAttr.current_step) {
+      if (running && (stepAttr.live || stepAttr.current_step)) {
         const no = stepAttr.step_number ? `${stepAttr.step_number}. ` : "";
-        rows.push(row(T.step, `<span class="v" title="${esc(stepAttr.current_step)}">${esc(no + stepAttr.current_step)}</span>`, byKey["sensor:status"]));
+        const dot = stepAttr.live ? `<span class="live-dot" title="${esc(T.live)}" aria-label="${esc(T.live)}"></span>` : "";
+        const text = stepAttr.current_step ? no + stepAttr.current_step : "…";
+        rows.push(row(T.step, `<span class="v" title="${esc(stepAttr.current_step || "")}">${dot}${esc(text)}</span>`, byKey["sensor:status"]));
       }
       if (running && startedIso) {
         rows.push(row(T.duration, `<span class="v elapsed" data-since="${esc(startedIso)}"></span>`, byKey["sensor:last_duration"]));

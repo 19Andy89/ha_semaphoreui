@@ -504,13 +504,16 @@ class SemaphoreTemplateSensor(SemaphoreTemplateEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """While a task runs and live updates are on: the Ansible step it is in."""
+        """While a task runs: whether the live connection is open and the Ansible step."""
         if self.entity_description.key != "status":
             return None
-        step = self.coordinator.current_step(self.template_id)
-        if step is None:
+        if not self.coordinator.active_task_ids(self.template_id):
             return None
-        return {"current_step": step[1], "step_number": step[0]}
+        attrs: dict[str, Any] = {"live": self.coordinator.live.open}
+        step = self.coordinator.current_step(self.template_id)
+        if step is not None:
+            attrs.update(current_step=step[1], step_number=step[0])
+        return attrs
 
 
 class SemaphoreSummarySensor(SemaphoreTemplateEntity, SensorEntity):

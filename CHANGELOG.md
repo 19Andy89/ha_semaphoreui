@@ -3,6 +3,7 @@
 ## Unveröffentlicht – Live-Updates per WebSocket (Issue #4)
 - Neue Option **Live-Updates** (Standard: an): Läuft ein Task, öffnet die Integration `GET /api/ws` (Token per Bearer-Header; Verbindung nur solange etwas läuft, Abfrage bleibt als Rückfall). Statuswechsel stoßen sofort eine Abfrage an.
 - **Aktueller Schritt:** aus den Log-Zeilen (`TASK [...]`) – Attribute `current_step`/`step_number` am Status-Sensor, `step` in den Details des Läuft-Sensors, Zeile „Schritt“ in der Template-Karte. Ein vor der Verbindung gestarteter Task wird aus seinem Log nachgelesen.
+- **Anzeige:** Ist die Verbindung offen, pulsiert in der Zeile „Schritt“ der Template-Karte ein grüner Punkt (Tooltip „Live-Verbindung aktiv“); Attribut `live` am Status-Sensor.
 - Nachrichtenformat an Semaphore 2.19 geprüft (`update` mit Status, `log` mit Ausgabezeile). Tests: 5 neue pytest.
 
 ## Unveröffentlicht – Dialog für Secrets und Mehrfachauswahl (Issue #5)
