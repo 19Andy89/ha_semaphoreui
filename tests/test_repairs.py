@@ -27,6 +27,7 @@ from custom_components.semaphore_ui.const import (
 from custom_components.semaphore_ui.issues import issue_id
 from custom_components.semaphore_ui.tokens import ISSUE_TEXT_FAILED
 
+from .helpers import plain
 from .test_flow_and_entities import eid, setup, tick
 from .test_schedules import switch_id
 
@@ -80,7 +81,7 @@ async def test_a_rejected_token_is_reported_at_once_and_fixed_in_the_dialog(hass
     done = await manager.async_configure(bad["flow_id"], {CONF_API_TOKEN: "  rotated "})
     await hass.async_block_till_done()
     assert done["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.data[CONF_API_TOKEN] == "rotated"  # trimmed
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == "rotated"  # trimmed
     assert entry.state is ConfigEntryState.LOADED
     assert hass.states.get(eid(hass, "sensor", 1, "status")).state != "unavailable"
     assert all_issues(hass) == []
