@@ -1,5 +1,10 @@
 # Changelog
 
+## Unveröffentlicht – Dialog für Secrets und Mehrfachauswahl (Issue #5)
+- **Template-Karte:** Hat ein Template Secret- oder Mehrfachauswahl-Variablen, öffnen *Starten* und *Testlauf* einen Dialog (Passwortfeld, Haken, Pflichtfelder, Vorgaben). Die Werte gehen per `semaphore_ui.run_template` an Semaphore, zusammen mit den Werten der normalen Eingabefelder; Secrets landen in keinem Zustand.
+- Start-Schaltfläche: neues Attribut `survey_dialog` (ohne Vorgaben von Secrets).
+- Tests: 280 pytest, 229 Browser-Prüfungen.
+
 ## Unveröffentlicht – Grund bei Verbindungsproblemen, Token-Hinweis, Karten-Feinschliff
 - **Projekt-Karte:** Das Banner „Semaphore nicht erreichbar“ nennt jetzt den **Grund** (Token abgelehnt / Server nicht erreichbar mit Meldung / Projekt nicht gefunden) und hat einen Link „Integration öffnen“ (ohne Neuladen). Neue Attribute `reason`, `detail`, `config_entry_id` am Sensor „Verbindung“.
 - **Projekt-Karte:** Läuft das Token bald ab, zeigt ein Hinweis „Token läuft ab in … · wird automatisch erneuert / Erneuerung ist aus / fehlgeschlagen“ (Klick öffnet den Sensor).

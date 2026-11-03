@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -56,6 +58,25 @@ class SemaphoreStartButton(SemaphoreTemplateEntity, ButtonEntity):
         super().__init__(coordinator, template_id, description.key)
         self.entity_description = description
         self._dry_run = dry_run
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Survey variables without an input entity (secrets, multi-selects): the card asks for them in a dialog."""
+        extra = [
+            {
+                "name": var.name,
+                "title": var.title,
+                "kind": "secret" if var.is_secret else "multi",
+                "required": var.required,
+                "description": var.description or None,
+                "options": var.labels if var.is_multi else None,
+                # a default of a secret is never handed to the browser
+                "default": None if var.is_secret else [var.label_of(d) or d for d in var.default],
+            }
+            for var in self.coordinator.survey_vars(self.template_id)
+            if var.is_secret or var.is_multi
+        ]
+        return {"survey_dialog": extra} if extra else None
 
     async def async_press(self) -> None:
         """Start the task."""

@@ -89,6 +89,10 @@ const TEXTS = {
     sched_when: "Zeitpunkt",
     sched_delete_after: "Nach dem Lauf löschen",
     sched_delete_sure: "Wirklich löschen?",
+    dlg_title: "Eingaben für den Start",
+    dlg_secret_hint: "Wird nur an Semaphore gesendet und nirgends gespeichert.",
+    dlg_required: "{title}: bitte ausfüllen",
+    dlg_required_mark: "erforderlich",
     last_task: "Zuletzt gelaufen",
     no_templates: "Keine Templates gefunden",
     choose_device_t: "Bitte im Karten-Editor das Template wählen (Eintrag „Projekt › Template“).",
@@ -210,6 +214,10 @@ const TEXTS = {
     sched_when: "Date and time",
     sched_delete_after: "Delete after it ran",
     sched_delete_sure: "Really delete?",
+    dlg_title: "Inputs for the start",
+    dlg_secret_hint: "Only sent to Semaphore, not stored anywhere.",
+    dlg_required: "{title}: please fill in",
+    dlg_required_mark: "required",
     last_task: "Last run",
     no_templates: "No templates found",
     choose_device_t: "Please choose the template in the card editor (entry \"Project › Template\").",
@@ -498,6 +506,11 @@ const STYLE = `
   .sform .seg button { font: inherit; background: none; border: 0; padding: 6px 14px; color: var(--primary-text-color); cursor: pointer; }
   .sform .seg button.sel { background: var(--primary-color); color: var(--text-primary-color, #fff); }
   .sform label.chk { display: flex; align-items: center; gap: 8px; color: var(--primary-text-color); font-size: 0.95em; }
+  .sform fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .sform fieldset legend { padding: 0; font-size: 0.85em; color: var(--secondary-text-color); margin-bottom: 2px; }
+  .sform .dtitle { font-weight: 500; }
+  .sform .err { color: var(--error-color, #db4437); font-size: 0.9em; }
+  .sform .req { color: var(--error-color, #db4437); }
   .sform .hint { font-size: 0.8em; color: var(--secondary-text-color); }
   .sform .actions { margin-top: 2px; }
   .sched-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
@@ -547,6 +560,17 @@ class SemaphoreBaseCard extends HTMLElement {
     this.shadowRoot.addEventListener("change", (ev) => this._onChange(ev));
     // typed text of the schedule form survives a redraw
     this.shadowRoot.addEventListener("input", (ev) => {
+      const dv = ev.target && ev.target.dataset && ev.target.dataset.dv;
+      if (dv && this._dlg) {
+        // survey dialog: secrets / multi-select (kept in this object only, never in a state)
+        if (ev.target.type === "checkbox") {
+          const set = new Set(this._dlg.values[dv] || []);
+          if (ev.target.checked) set.add(ev.target.dataset.opt);
+          else set.delete(ev.target.dataset.opt);
+          this._dlg.values[dv] = [...set];
+        } else this._dlg.values[dv] = ev.target.value;
+        return;
+      }
       const field = ev.target && ev.target.dataset && ev.target.dataset.sf;
       if (!field || !this._sf) return;
       this._sf[field] = ev.target.type === "checkbox" ? ev.target.checked : ev.target.value;
@@ -756,6 +780,80 @@ class SemaphoreBaseCard extends HTMLElement {
         ${f.id != null ? `<button class="btn danger" data-action="sched-delete"${busy ? " disabled" : ""}><ha-icon icon="mdi:delete-outline"></ha-icon>${esc(sure ? T.sched_delete_sure : T.sched_delete)}</button>` : ""}
       </div></div>`;
   }
+  /** Survey variables without an input entity (secrets, multi-selects), from the attributes of the start button. */
+  _dialogVars() {
+    const id = this._ents().byKey["button:start"];
+    const vars = id && this._state(id) && this._state(id).attributes.survey_dialog;
+    return Array.isArray(vars) ? vars : [];
+  }
+  _openDialog(vars, dry) {
+    const values = {};
+    for (const v of vars) values[v.name] = v.kind === "secret" ? "" : [...(v.default || [])];
+    this._dlg = { dry, vars, values, error: "" };
+    this._sig = "";
+    this._update();
+    setTimeout(() => this.shadowRoot.querySelector("[data-dv]")?.focus(), 0);
+  }
+  _closeDialog() {
+    this._dlg = null; // the typed secrets are gone with it
+    this._sig = "";
+    this._update();
+  }
+  _dialogHtml(T) {
+    const d = this._dlg;
+    const busy = this._busy.has("dialog");
+    const fields = d.vars
+      .map((v) => {
+        const mark = v.required ? ` <span class="req" title="${esc(T.dlg_required_mark)}">*</span>` : "";
+        const hint = v.description ? `<div class="hint">${esc(v.description)}</div>` : "";
+        if (v.kind === "secret") {
+          return `<label><span>${esc(v.title)}${mark}</span><input type="password" data-dv="${esc(v.name)}" value="${esc(d.values[v.name] || "")}" autocomplete="new-password" spellcheck="false"></label>${hint}<div class="hint">${esc(T.dlg_secret_hint)}</div>`;
+        }
+        const chosen = new Set(d.values[v.name] || []);
+        return `<fieldset><legend>${esc(v.title)}${mark}</legend>${(v.options || [])
+          .map((o) => `<label class="chk"><input type="checkbox" data-dv="${esc(v.name)}" data-opt="${esc(o)}"${chosen.has(o) ? " checked" : ""}>${esc(o)}</label>`)
+          .join("")}${hint}</fieldset>`;
+      })
+      .join("");
+    const label = d.dry ? T.dry_run : T.start;
+    return `<div class="sform dlg" data-dialog="1" role="group" aria-label="${esc(T.dlg_title)}"><div class="dtitle">${esc(T.dlg_title)}</div>${fields}
+      ${d.error ? `<div class="err" role="alert">${esc(d.error)}</div>` : ""}
+      <div class="actions">
+        <button class="btn primary${busy ? " busy" : ""}" data-action="dlg-run"${busy ? " disabled" : ""}><ha-icon icon="${d.dry ? "mdi:flask-outline" : "mdi:play"}"></ha-icon>${esc(label)}</button>
+        <button class="btn" data-action="dlg-cancel"><ha-icon icon="mdi:close"></ha-icon>${esc(T.sched_cancel)}</button>
+      </div></div>`;
+  }
+  async _runDialog() {
+    const d = this._dlg;
+    if (!d) return;
+    for (const v of d.vars) {
+      const val = d.values[v.name];
+      const empty = v.kind === "secret" ? !String(val || "").length : !(val || []).length;
+      if (v.required && empty) {
+        d.error = tx(this._hass).dlg_required.replace("{title}", v.title);
+        this._sig = "";
+        return this._update();
+      }
+    }
+    // the values of the input fields of the card go along (they are what the Start button would send)
+    const survey = {};
+    for (const id of this._ents().survey) {
+      const st = this._state(id);
+      const name = st && st.attributes.variable;
+      if (!name || ["unknown", "unavailable", ""].includes(st.state)) continue;
+      survey[name] = id.startsWith("number.") ? String(Math.trunc(Number(st.state))) : st.state;
+    }
+    for (const v of d.vars) {
+      const val = d.values[v.name];
+      if (v.kind === "secret") {
+        if (String(val || "").length) survey[v.name] = val;
+      } else if ((val || []).length) survey[v.name] = [...val];
+    }
+    const ok = await this._busyRun("dialog", true, () =>
+      this._call(SEMAPHORE_DOMAIN, "run_template", { device_id: this._config.device_id, dry_run: d.dry, survey })
+    );
+    if (ok) this._closeDialog();
+  }
   _openScheduleForm(init) {
     this._sf = { id: null, entity: "", mode: "cron", cron: "", when: localInput(new Date(Date.now() + 3600e3)), del: false, name: "", confirmDelete: false, ...init };
     this._sig = "";
@@ -958,7 +1056,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       const s = this._hass.states[id];
       return s ? `${id}=${s.state}|${s.state === "unavailable" ? "" : JSON.stringify(s.attributes)}` : `${id}=?`;
     });
-    return [JSON.stringify(c), JSON.stringify(this._sf || null), this._message, this._confirmUntil > Date.now(), langOf(this._hass), Math.floor(Date.now() / 60000), ...parts].join("\n");
+    return [JSON.stringify(c), JSON.stringify(this._sf || null), JSON.stringify(this._dlg ? [this._dlg.dry, this._dlg.error] : null), this._message, this._confirmUntil > Date.now(), langOf(this._hass), Math.floor(Date.now() / 60000), ...parts].join("\n");
   }
 
   _html() {
@@ -1082,7 +1180,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       ${details}
       ${schedHtml}
       ${surveyHtml}
-      <div class="actions">${startBtn}${dryBtn}${stopBtn}${link}</div>
+      ${this._dlg ? this._dialogHtml(T) : `<div class="actions">${startBtn}${dryBtn}${stopBtn}${link}</div>`}
       ${this._message ? `<div class="msg" role="alert">${esc(this._message)}</div>` : ""}
     </ha-card>`;
   }
@@ -1294,6 +1392,12 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const entity = target.dataset.entity;
     if (action === "more-info") return this._moreInfo(entity);
     if (action === "schedule") return this._toggleSchedule(entity);
+    if (action === "dlg-run") return this._runDialog();
+    if (action === "dlg-cancel") return this._closeDialog();
+    if (action === "start" || (action === "press" && entity && entity === this._ents().byKey["button:dry_run"])) {
+      const vars = this._dialogVars();
+      if (vars.length) return this._openDialog(vars, action === "press"); // the dialog is the confirmation
+    }
     if (action === "sched-new") return this._openScheduleForm({});
     if (action === "sched-edit") {
       const item = (((this._state(this._ents().byKey["sensor:next_run"]) || {}).attributes || {}).schedules || []).find((i) => String(i.id) === target.dataset.id);

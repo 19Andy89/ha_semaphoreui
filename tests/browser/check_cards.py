@@ -484,6 +484,11 @@ def test_docs_screenshots(playwright) -> None:
             take(tcard(page, "Proxmox"), f"template-card-running{suffix}")
             if not suffix:
                 take(tcard(page, "Deploy"), "template-card-survey")
+                tcard(page, "Deploy").locator("button[data-action=start]").click()
+                time.sleep(0.6)
+                take(tcard(page, "Deploy"), "template-card-survey-dialog")
+                tcard(page, "Deploy").locator("[data-action=dlg-cancel]").click()
+                time.sleep(0.4)
                 tcard(page, "docker-system").locator(".host").first.locator('button[data-action="pkgs"]').click()
                 time.sleep(0.5)
                 take(tcard(page, "docker-system"), "template-card-updates-open")
@@ -794,24 +799,41 @@ def test_interactions(page: Page) -> None:
     text.press("Tab")
     time.sleep(0.8)
     deploy.locator("button[data-action=start]").click()
-    time.sleep(2)
-    message = deploy.locator(".msg")
-    check("Survey: fehlendes Secret zeigt Fehler in der Karte", message.count() == 1 and "token" in message.inner_text().lower(), message.all_inner_texts())
-    check("Survey: bei Fehler wird nichts gesendet", len(posts()) == 0, posts())
+    time.sleep(1)
+    dialog = deploy.locator(".dlg")
+    check("Survey: Start öffnet einen Dialog für Secret (Passwortfeld) und Mehrfachauswahl", dialog.count() == 1 and dialog.locator('input[type=password][data-dv="token"]').count() == 1 and dialog.locator('input[type=checkbox][data-dv="tags"]').count() == 2, dialog.count())
+    checked = dialog.locator("input[type=checkbox]:checked").evaluate_all("els => els.map((e) => e.dataset.opt)")
+    check("Survey: Vorgabe der Mehrfachauswahl ist angehakt", checked == ["A"], checked)
+    check("Survey: Dialog erklärt, dass das Secret nirgends gespeichert wird", "nirgends gespeichert" in dialog.inner_text(), dialog.inner_text())
+    dialog.locator("[data-action=dlg-run]").click()
+    time.sleep(0.8)
+    err = deploy.locator(".dlg .err")
+    check("Survey: fehlendes Pflicht-Secret zeigt Fehler im Dialog, nichts gesendet", err.count() == 1 and "Token" in err.inner_text() and len(posts()) == 0, (err.all_inner_texts(), posts()))
     shot(page, "03_survey_fehler")
-
-    # Secret wird optional (Semaphore-Seite geändert) -> nach dem nächsten Abruf (10 s) wird gestartet
-    ctl("optional_token")
+    dialog.locator("[data-action=dlg-cancel]").click()
+    time.sleep(0.5)
+    check("Survey: Abbrechen schließt den Dialog ohne Start", deploy.locator(".dlg").count() == 0 and len(posts()) == 0, len(posts()))
+    deploy.locator("button[data-action=start]").click()
+    time.sleep(1)
+    dialog = deploy.locator(".dlg")
+    dialog.locator('input[data-dv="tags"][data-opt="A"]').uncheck()
+    dialog.locator('input[data-dv="tags"][data-opt="B"]').check()
+    dialog.locator('input[data-dv="token"]').fill("geheim")
+    dialog.locator("[data-action=dlg-run]").click()
     sent = []
-    for _ in range(12):
-        time.sleep(4)
-        deploy.locator("button[data-action=start]").click()
-        time.sleep(1.5)
+    for _ in range(10):
+        time.sleep(0.8)
         sent = posts()
         if sent:
             break
     env = json.loads(sent[0][2]["environment"]) if sent and sent[0][2].get("environment") else None
-    check("Survey: eingegebene Werte werden gesendet", env == {"target": "pi-hole", "count": "3", "stage": "test", "tags": ["a"]}, env)
+    secret = json.loads(sent[0][2]["secret"]) if sent and sent[0][2].get("secret") else None
+    check("Survey: Werte der Felder und Mehrfachauswahl werden gesendet", env == {"target": "pi-hole", "count": "3", "stage": "test", "tags": ["b"]}, env)
+    check("Survey: das Secret geht als Secret an Semaphore, nicht in die Umgebung", secret == {"token": "geheim"} and "token" not in (env or {}), secret)
+    time.sleep(1)
+    check("Survey: Dialog ist danach zu, Secret nicht mehr in der Karte", deploy.locator(".dlg").count() == 0 and "geheim" not in deep_text(deploy), deploy.locator(".dlg").count())
+    states = json.dumps([x["state"] for x in ha_api("/api/states") if x["entity_id"].startswith(("text.", "number.", "select.", "button."))])
+    check("Survey: das Secret taucht in keinem Zustand von Home Assistant auf", "geheim" not in states)
 
     host.locator(".head").click()
     time.sleep(1.5)

@@ -245,3 +245,21 @@ async def test_survey_entities_follow_template_changes(hass: HomeAssistant, fake
     template["survey_vars"][1]["values"].append({"name": "Dev", "value": "dev"})
     await tick(hass, 120)
     assert "Dev" in hass.states.get(survey_eid(hass, "select", 4, "stage")).attributes["options"]
+
+
+async def test_start_button_lists_secrets_and_multi_selects_for_the_card_dialog(hass: HomeAssistant, fake, make_entry) -> None:
+    """Secrets and multi-selects have no input entity; the card asks for them in a dialog (attribute of the start buttons)."""
+    server, _ = fake
+    server.survey_template["survey_vars"][-1]["default_value"] = "do-not-leak"  # a default of a secret must not reach the browser
+    server.templates[4] = server.survey_template
+    await setup(hass, make_entry)
+
+    attrs = hass.states.get(eid(hass, "button", 4, "start")).attributes
+    dialog = {item["name"]: item for item in attrs["survey_dialog"]}
+    assert set(dialog) == {"tags", "token"}
+    assert dialog["tags"]["kind"] == "multi" and dialog["tags"]["options"] == ["A", "B"] and dialog["tags"]["default"] == ["A"]
+    assert dialog["token"]["kind"] == "secret" and dialog["token"]["required"] is True
+    assert dialog["token"]["default"] is None and dialog["token"]["options"] is None
+    assert "do-not-leak" not in json.dumps(dict(attrs))
+    # templates without such variables have no attribute
+    assert "survey_dialog" not in hass.states.get(eid(hass, "button", 1, "start")).attributes

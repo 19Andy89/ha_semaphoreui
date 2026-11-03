@@ -113,13 +113,23 @@ Die Buttons **Starten** / **Testlauf** schicken genau diese Werte mit.
 | String, Text | `text` |
 | Integer | `number` (ganze Zahlen) |
 | Enum | `select` (Beschriftung sichtbar, gesendet wird der Wert) |
-| Select (Mehrfachauswahl), Secret | **keine Entität** – nur über die Aktion (Secrets sollen nicht im Zustandsspeicher/Datenbank landen) |
+| Select (Mehrfachauswahl), Secret | **keine Entität** (Secrets sollen nicht im Zustandsspeicher/Datenbank landen) – die **Karte** fragt sie beim Start in einem Dialog ab, sonst die Aktion |
 
 Die Werte bleiben nach einem Neustart erhalten. Semaphores API prüft Pflichtfelder und Defaults nicht selbst
 (das macht sonst die Weboberfläche) – deshalb macht es die Integration: fehlende Werte werden mit dem Default gefüllt,
 ein Pflichtfeld ohne Wert, ein unbekannter Name oder ein ungültiger Wert bricht **vor** dem Start mit einer klaren
 Meldung ab (z. B. `missing: stage, token (secret: only via the action)`).
 Geänderte Variablen in Semaphore (neu, entfernt, neue Enum-Werte) werden automatisch übernommen.
+
+**Dialog in der Template-Karte:** Hat ein Template Secrets oder Mehrfachauswahlen, öffnet *Starten* bzw. *Testlauf* in der Karte
+statt sofort zu starten einen kleinen Dialog (Passwortfeld je Secret, Haken je Auswahlmöglichkeit, Vorgaben angehakt, Pflichtfelder
+mit `*`). Erst *Starten* im Dialog startet (der Dialog ersetzt die Rückfrage von `confirm_start`). Die Werte der normalen
+Eingabefelder der Karte gehen mit. Das Secret wird **nur** als Aktionsaufruf `semaphore_ui.run_template` (`survey`) an Home Assistant
+und von dort als Secret an Semaphore gesendet – es steht in keinem Zustand und in keiner Entität und verschwindet mit dem Dialog.
+(Wie jeder Aktionsaufruf läuft es kurz über den Ereignisbus von Home Assistant; Automationen, die auf `call_service` lauschen,
+würden es sehen.) Welche Variablen der Dialog fragt, steht im Attribut `survey_dialog` der Start-Schaltfläche (ohne Vorgaben von Secrets).
+
+![Template-Karte: Dialog für Secret und Mehrfachauswahl](docs/screenshots/template-card-survey-dialog.png)
 
 ## Handlungsbedarf: „Was ist gerade zu tun?“ (`HA_RESULT`)
 
