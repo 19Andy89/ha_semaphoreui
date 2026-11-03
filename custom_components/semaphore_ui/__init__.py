@@ -21,7 +21,7 @@ from homeassistant.core import (
     ServiceResponse,
     SupportsResponse,
 )
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
@@ -30,10 +30,10 @@ from homeassistant.helpers import (
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
-from . import issues, tokens
+from . import issues, secrets_store, tokens
 from .api import SemaphoreClient
 from .cards import async_register_cards
-from .const import CONF_API_TOKEN, DEFAULT_WAIT_TIMEOUT, DOMAIN
+from .const import CONF_API_TOKEN, CONF_RENEW_PASSWORD, DEFAULT_WAIT_TIMEOUT, DOMAIN
 from .coordinator import (
     TEMPLATE_IDENTIFIER_RE,
     SemaphoreConfigEntry,
@@ -107,6 +107,7 @@ SERVICE_DELETE_SCHEDULE_SCHEMA = vol.Schema({vol.Required(ATTR_ENTITY_ID): cv.en
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the action ``semaphore_ui.run_template`` and the dashboard cards."""
+    await secrets_store.async_load_key(hass)
 
     def _resolve(call: ServiceCall) -> list[tuple[SemaphoreCoordinator, int]]:
         """Find (coordinator, template id) for the targeted devices/entities."""
@@ -248,10 +249,33 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+def _seal_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) -> None:
+    """Encrypt a token / password that an older version stored as plain text."""
+    data = dict(entry.data)
+    options = dict(entry.options)
+    changed = False
+    if not secrets_store.is_sealed(data.get(CONF_API_TOKEN)):
+        data[CONF_API_TOKEN] = secrets_store.seal(hass, data[CONF_API_TOKEN])
+        changed = True
+    password = options.get(CONF_RENEW_PASSWORD)
+    if password and not secrets_store.is_sealed(password):
+        options[CONF_RENEW_PASSWORD] = secrets_store.seal(hass, password)
+        changed = True
+    if changed:
+        hass.config_entries.async_update_entry(entry, data=data, options=options)
+        _LOGGER.info("Token and stored login are kept encrypted from now on")
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) -> bool:
     """Set up one Semaphore project."""
+    await secrets_store.async_load_key(hass)
+    token = secrets_store.unseal(hass, entry.data[CONF_API_TOKEN])
+    if token is None:
+        # The key file does not fit (restored config without .storage/semaphore_ui.key, ...)
+        raise ConfigEntryAuthFailed("The stored token cannot be decrypted; enter it again")
+    _seal_entry(hass, entry)
     session = async_get_clientsession(hass, verify_ssl=entry.data[CONF_VERIFY_SSL])
-    client = SemaphoreClient(session, entry.data[CONF_URL], entry.data[CONF_API_TOKEN])
+    client = SemaphoreClient(session, entry.data[CONF_URL], token)
     coordinator = SemaphoreCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator

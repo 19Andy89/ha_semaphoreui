@@ -24,7 +24,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from . import tokens
+from . import secrets_store, tokens
 from .api import (
     REQUEST_TIMEOUT,
     SemaphoreApiError,
@@ -182,6 +182,7 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Choose one of the projects read from the API."""
+        await secrets_store.async_load_key(self.hass)
         if user_input is not None:
             project_id = int(user_input[CONF_PROJECT_ID])
             project = next(p for p in self._projects if p["id"] == project_id)
@@ -191,7 +192,7 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
                 title=f"Semaphore – {project['name']}",
                 data={
                     CONF_URL: self._url,
-                    CONF_API_TOKEN: self._token,
+                    CONF_API_TOKEN: secrets_store.seal(self.hass, self._token),
                     CONF_VERIFY_SSL: self._verify_ssl,
                     CONF_PROJECT_ID: project_id,
                     CONF_PROJECT_NAME: project["name"],
@@ -227,6 +228,7 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Ask for a new API token - or for a login that creates one."""
+        await secrets_store.async_load_key(self.hass)
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         placeholders = _placeholders(entry.data[CONF_URL])
@@ -241,10 +243,10 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
                 _LOGGER.warning("Semaphore re-auth failed (%s): %s", errors["base"], err)
             else:
-                options = tokens.options_with_login(entry, user_input)
+                options = tokens.options_with_login(self.hass, entry, user_input)
                 return self.async_update_reload_and_abort(
                     entry,
-                    data_updates={CONF_API_TOKEN: token},
+                    data_updates={CONF_API_TOKEN: secrets_store.seal(self.hass, token)},
                     **({"options": options} if options is not None else {}),
                 )
         return self.async_show_form(
@@ -266,12 +268,16 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Change URL, token or SSL check without losing devices and history."""
+        await secrets_store.async_load_key(self.hass)
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
         placeholders = _placeholders(entry.data[CONF_URL])
         if user_input is not None:
             url = normalize_base_url(user_input[CONF_URL])
-            token = user_input[CONF_API_TOKEN].strip()
+            # left empty: keep the stored token (it is never shown in the form)
+            token = (user_input.get(CONF_API_TOKEN) or "").strip() or (
+                secrets_store.unseal(self.hass, entry.data[CONF_API_TOKEN]) or ""
+            )
             verify_ssl = user_input[CONF_VERIFY_SSL]
             placeholders = _placeholders(url)
             try:
@@ -297,7 +303,7 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
                     unique_id=unique_id,
                     data_updates={
                         CONF_URL: url,
-                        CONF_API_TOKEN: token,
+                        CONF_API_TOKEN: secrets_store.seal(self.hass, token),
                         CONF_VERIFY_SSL: verify_ssl,
                     },
                 )
@@ -312,9 +318,7 @@ class SemaphoreConfigFlow(ConfigFlow, domain=DOMAIN):
                     ): selector.TextSelector(
                         selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
                     ),
-                    vol.Required(
-                        CONF_API_TOKEN, default=current.get(CONF_API_TOKEN, "")
-                    ): TOKEN_SELECTOR,
+                    vol.Optional(CONF_API_TOKEN): TOKEN_SELECTOR,
                     vol.Required(
                         CONF_VERIFY_SSL, default=current.get(CONF_VERIFY_SSL, True)
                     ): selector.BooleanSelector(),
@@ -345,20 +349,28 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
         A typed login is tried first; an empty password keeps the stored one (it is never
         shown again), ``clear_login`` removes it.
         """
-        stored = tokens.stored_login(self.config_entry)
+        stored = tokens.stored_login(self.hass, self.config_entry)
         if user_input.get(CONF_CLEAR_LOGIN):
             return {}
         user = str(user_input.get(CONF_RENEW_USER) or "").strip()
         password = str(user_input.get(CONF_RENEW_PASSWORD) or "")
         if not user and not password:
             return (
-                {CONF_RENEW_USER: stored[0], CONF_RENEW_PASSWORD: stored[1]} if stored else {}
+                {
+                    CONF_RENEW_USER: stored[0],
+                    CONF_RENEW_PASSWORD: secrets_store.seal(self.hass, stored[1]),
+                }
+                if stored
+                else {}
             )
         if not user or (not password and not (stored and stored[0] == user)):
             errors["base"] = "login_incomplete"
             return {}
         if not password and stored:
-            return {CONF_RENEW_USER: stored[0], CONF_RENEW_PASSWORD: stored[1]}
+            return {
+                CONF_RENEW_USER: stored[0],
+                CONF_RENEW_PASSWORD: secrets_store.seal(self.hass, stored[1]),
+            }
         try:
             await tokens.async_test_login(self.hass, self.config_entry, user, password)
         except SemaphoreLoginError as err:
@@ -368,7 +380,10 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
             _LOGGER.warning("The login could not be tested: %s", err)
             errors["base"] = "login_unreachable"
             return {}
-        return {CONF_RENEW_USER: user, CONF_RENEW_PASSWORD: password}
+        return {
+            CONF_RENEW_USER: user,
+            CONF_RENEW_PASSWORD: secrets_store.seal(self.hass, password),
+        }
 
     def _known_templates(self) -> dict[int, str]:
         """All templates of the project (id -> name) as of the last poll.
@@ -384,6 +399,7 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Edit the options."""
+        await secrets_store.async_load_key(self.hass)
         options = self.config_entry.options
         templates = self._known_templates()
         excluded = {int(tid) for tid in options.get(CONF_EXCLUDED_TEMPLATES, [])}
@@ -420,7 +436,7 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
         current = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         check_updates = options.get(CONF_CHECK_UPDATES, True)
         allow_parallel = options.get(CONF_ALLOW_PARALLEL, False)
-        stored = tokens.stored_login(self.config_entry)
+        stored = tokens.stored_login(self.hass, self.config_entry)
         schema: dict[Any, Any] = {
             vol.Required(CONF_SCAN_INTERVAL, default=current): selector.NumberSelector(
                 selector.NumberSelectorConfig(

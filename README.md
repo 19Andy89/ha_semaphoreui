@@ -611,10 +611,23 @@ Dafür hat der Sensor „Verbindung“ die Attribute `reason` (`token_rejected`,
 **Notfall-Login (optional):** Ein Token, das Semaphore **schon ablehnt** (abgelaufen oder gelöscht), lässt sich nicht mehr mit sich
 selbst ersetzen. Trägst du in den Optionen Benutzer und Passwort ein (oder beim Erneut-Authentifizieren mit dem Haken
 „Benutzer und Passwort speichern“), meldet sich die Integration in diesem Fall an, legt ein neues Token an und **meldet sich wieder ab**.
-Der Versuch wird höchstens alle 10 Minuten wiederholt, damit ein falsches Passwort kein Konto sperrt. Das Passwort liegt – wie das Token –
-**unverschlüsselt** in der Konfiguration von Home Assistant (und ist in der Diagnose geschwärzt). Ein Benutzer mit **zweitem Faktor
+Der Versuch wird höchstens alle 10 Minuten wiederholt, damit ein falsches Passwort kein Konto sperrt. Token und Passwort werden **verschlüsselt** gespeichert
+(siehe „Wie sicher liegen Token und Passwort?“ unten; in der Diagnose sind sie geschwärzt). Ein Benutzer mit **zweitem Faktor
 (MFA)** geht hier nicht. Ohne gespeicherten Login bleibt alles wie bisher: Das abgelehnte Token startet „Erneut authentifizieren“,
 und der Hinweis „API-Token abgelehnt“ erlaubt ein neues Token oder Benutzer und Passwort einzutragen.
+
+### Wie sicher liegen Token und Passwort?
+
+Home Assistant hat keinen Passwort-Safe für Integrationen: Was in einer Integration eingetragen wird, steht normalerweise **im Klartext** in
+`.storage/core.config_entries` (auch bei den offiziellen Integrationen). Diese Integration verschlüsselt deshalb Token und das optionale
+Notfall-Passwort (Fernet: AES mit Prüfsumme) mit einem zufälligen Schlüssel, der in einer **eigenen Datei** liegt:
+`.storage/semaphore_ui.key` (nur für den Home-Assistant-Benutzer lesbar).
+
+- **Geschützt:** Die Konfigurationsdatei allein – etwa in einem Forum gepostet, in einer Teilkopie oder einem Support-Paket – verrät kein Token und kein Passwort.
+- **Nicht geschützt:** Wer den **ganzen `.storage`-Ordner** oder ein komplettes Backup samt Schlüssel bekommt, kann alles entschlüsseln – Home Assistant selbst muss den Schlüssel ja lesen können. Dagegen helfen verschlüsselte Backups.
+- **Bestehende Einrichtungen** werden beim ersten Start nach dem Update automatisch umgestellt, ohne dass du etwas tun musst.
+- **Schlüssel verloren** (z. B. Konfiguration ohne `semaphore_ui.key` wiederhergestellt): Home Assistant fordert ein neues Token an („Erneut authentifizieren“).
+- Beim **Ändern der Verbindung** (Neu konfigurieren) wird das gespeicherte Token nicht mehr angezeigt; das Feld leer lassen behält es.
 
 URL, Token oder die SSL-Prüfung später ändern: *Einstellungen → Geräte & Dienste → Semaphore UI → ⋮ → Neu konfigurieren*
 (alle Geräte, Entitäten und Verläufe bleiben erhalten).

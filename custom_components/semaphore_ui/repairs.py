@@ -13,7 +13,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_URL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
 
-from . import tokens
+from . import secrets_store, tokens
 from .api import (
     SemaphoreApiError,
     SemaphoreAuthError,
@@ -57,6 +57,7 @@ class TokenRepairFlow(RepairsFlow):
         self, user_input: dict[str, str] | None = None
     ) -> Any:
         """Ask for the new token."""
+        await secrets_store.async_load_key(self.hass)
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
         if entry is None:
             return self.async_abort(reason="entry_missing")
@@ -78,8 +79,9 @@ class TokenRepairFlow(RepairsFlow):
             else:
                 self.hass.config_entries.async_update_entry(
                     entry,
-                    data={**entry.data, CONF_API_TOKEN: token},
-                    options=tokens.options_with_login(entry, user_input) or entry.options,
+                    data={**entry.data, CONF_API_TOKEN: secrets_store.seal(self.hass, token)},
+                    options=tokens.options_with_login(self.hass, entry, user_input)
+                    or entry.options,
                 )
                 # the open "re-authenticate" notification is obsolete now
                 for flow in self.hass.config_entries.flow.async_progress_by_handler(

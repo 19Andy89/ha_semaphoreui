@@ -33,6 +33,7 @@ from homeassistant.core import Event, HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 
+from .helpers import plain
 from .fake_semaphore import TOKEN
 from .test_flow_and_entities import find_device, setup
 
@@ -66,7 +67,7 @@ async def test_reconfigure_changes_token_and_ssl(
     assert done["reason"] == "reconfigure_successful"
     await hass.async_block_till_done()
 
-    assert entry.data[CONF_API_TOKEN] == "rotated"
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == "rotated"
     assert entry.data[CONF_URL] == url  # trailing slash removed
     assert entry.data[CONF_VERIFY_SSL] is False
     assert entry.state is ConfigEntryState.LOADED

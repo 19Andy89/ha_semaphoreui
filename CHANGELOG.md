@@ -1,5 +1,11 @@
 # Changelog
 
+## Unveröffentlicht – Token und Passwort verschlüsselt (Issue #11)
+- **Token und Notfall-Passwort** liegen nicht mehr im Klartext in `core.config_entries`, sondern verschlüsselt (Fernet) mit einem Schlüssel in `.storage/semaphore_ui.key`. Bestehende Einrichtungen werden beim Start automatisch umgestellt; ein nicht lesbarer Eintrag (Schlüssel fehlt) löst „Erneut authentifizieren“ aus.
+- Grenzen sind in der README beschrieben: Der Schlüssel muss für Home Assistant lesbar sein, ein komplettes Backup mit Schlüssel schützt das also nicht (dafür verschlüsselte Backups).
+- **Neu konfigurieren** zeigt das gespeicherte Token nicht mehr an; leer lassen behält es.
+- Tests: 3 neue pytest.
+
 ## Unveröffentlicht – Live-Updates per WebSocket (Issue #4)
 - Neue Option **Live-Updates** (Standard: an): Läuft ein Task, öffnet die Integration `GET /api/ws` (Token per Bearer-Header; Verbindung nur solange etwas läuft, Abfrage bleibt als Rückfall). Statuswechsel stoßen sofort eine Abfrage an.
 - **Aktueller Schritt:** aus den Log-Zeilen (`TASK [...]`) – Attribute `current_step`/`step_number` am Status-Sensor, `step` in den Details des Läuft-Sensors, Zeile „Schritt“ in der Template-Karte. Ein vor der Verbindung gestarteter Task wird aus seinem Log nachgelesen.

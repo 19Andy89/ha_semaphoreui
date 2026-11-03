@@ -31,7 +31,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from . import issues
+from . import issues, secrets_store
 from .api import (
     SemaphoreApiError,
     SemaphoreAuthError,
@@ -139,10 +139,10 @@ def known_lifetime(hass: HomeAssistant, entry_id: str) -> timedelta | None:
     return timedelta(days=DEFAULT_NEW_TOKEN_DAYS)
 
 
-def stored_login(entry: ConfigEntry) -> tuple[str, str] | None:
+def stored_login(hass: HomeAssistant, entry: ConfigEntry) -> tuple[str, str] | None:
     """User name and password for replacing a rejected token (``None``: not stored)."""
     user = entry.options.get(CONF_RENEW_USER)
-    password = entry.options.get(CONF_RENEW_PASSWORD)
+    password = secrets_store.unseal(hass, entry.options.get(CONF_RENEW_PASSWORD))
     return (str(user), str(password)) if user and password else None
 
 
@@ -160,7 +160,7 @@ async def _async_adopt(
     """Use ``new_token`` from now on - after it has proven that it works."""
     await _client_for(hass, entry, new_token).get_project(entry.data[CONF_PROJECT_ID])
     hass.config_entries.async_update_entry(
-        entry, data={**entry.data, CONF_API_TOKEN: new_token}
+        entry, data={**entry.data, CONF_API_TOKEN: secrets_store.seal(hass, new_token)}
     )
     client.set_token(new_token)
 
@@ -239,7 +239,7 @@ async def async_recover(
     """
     if client.token != failed_token:
         return True  # somebody else was faster
-    login = stored_login(entry)
+    login = stored_login(hass, entry)
     if login is None:
         return False
     state = hass.data.setdefault(_KEY, {})
@@ -291,14 +291,18 @@ async def async_check_new_token(
 
 
 def options_with_login(
-    entry: ConfigEntry, user_input: dict[str, Any]
+    hass: HomeAssistant, entry: ConfigEntry, user_input: dict[str, Any]
 ) -> dict[str, Any] | None:
     """The options with the typed login in them - if the user asked to keep it."""
     username = str(user_input.get(CONF_USERNAME) or "").strip()
     password = str(user_input.get(CONF_PASSWORD) or "")
     if not user_input.get(STORE_LOGIN) or not username or not password:
         return None
-    return {**entry.options, CONF_RENEW_USER: username, CONF_RENEW_PASSWORD: password}
+    return {
+        **entry.options,
+        CONF_RENEW_USER: username,
+        CONF_RENEW_PASSWORD: secrets_store.seal(hass, password),
+    }
 
 
 def login_error_key(err: SemaphoreLoginError) -> str:
@@ -335,7 +339,7 @@ class SemaphoreTokenCoordinator(DataUpdateCoordinator[TokenData]):
         self.client = client
         self.renew: bool = entry.options.get(CONF_RENEW_TOKEN, True)
         self.days: int = int(entry.options.get(CONF_TOKEN_DAYS, DEFAULT_TOKEN_DAYS))
-        self.has_login: bool = stored_login(entry) is not None
+        self.has_login: bool = stored_login(hass, entry) is not None
         self._last_renewed: datetime | None = None
         self._renew_error: str | None = None
 

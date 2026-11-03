@@ -34,6 +34,7 @@ from custom_components.semaphore_ui.const import (
 from custom_components.semaphore_ui.diagnostics import async_get_config_entry_diagnostics
 from custom_components.semaphore_ui.issues import issue_id
 
+from .helpers import plain
 from .fake_semaphore import TOKEN, FakeSemaphore
 from .test_flow_and_entities import eid, setup, tick
 
@@ -148,7 +149,7 @@ async def test_the_token_is_replaced_before_it_ends(hass: HomeAssistant, fake, m
     entry = await setup(hass, make_entry)
 
     ((new_token, row),) = new_tokens(server)
-    assert entry.data[CONF_API_TOKEN] == new_token != TOKEN
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == new_token != TOKEN
     assert row["name"] == TOKEN_NAME
     assert abs((row["expires_at"] - row["created"]) - 90 * DAY) < timedelta(minutes=2)  # same lifetime as before
     assert server.api_tokens[TOKEN]["expired"] is False  # the old one is NOT deleted (it may be used elsewhere)
@@ -232,7 +233,7 @@ async def test_with_the_renewal_off_a_repair_replaces_the_token_on_request(hass:
     await hass.async_block_till_done()
     assert done["type"] is FlowResultType.CREATE_ENTRY
     ((new_token, _row),) = new_tokens(server)
-    assert entry.data[CONF_API_TOKEN] == new_token
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == new_token
     assert issue(hass, entry) is None
     assert hass.states.get(token_sensor(hass, entry)).attributes["last_renewed"]
 
@@ -289,7 +290,7 @@ async def test_a_failed_renewal_is_reported_and_tried_again(hass: HomeAssistant,
     server.tokens_create_error = (500, "database is locked")
     entry = await setup(hass, make_entry)
 
-    assert entry.state is ConfigEntryState.LOADED and entry.data[CONF_API_TOKEN] == TOKEN
+    assert entry.state is ConfigEntryState.LOADED and plain(hass, entry.data[CONF_API_TOKEN]) == TOKEN
     found = issue(hass, entry)
     assert found is not None and found.translation_key == "token_renew_failed"
     assert "500" in found.translation_placeholders["detail"]
@@ -314,7 +315,7 @@ async def test_a_new_token_that_does_not_work_is_not_taken(hass: HomeAssistant, 
 
     monkeypatch.setattr(FakeSemaphore, "_token_valid", reject_new_tokens)
     entry = await setup(hass, make_entry)
-    assert entry.data[CONF_API_TOKEN] == TOKEN
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == TOKEN
     assert entry.runtime_data.client.token == TOKEN
     assert issue(hass, entry).translation_key == "token_renew_failed"
 
@@ -333,7 +334,7 @@ async def test_a_rejected_token_is_replaced_by_the_stored_login(hass: HomeAssist
 
     assert entry.state is ConfigEntryState.LOADED
     ((new_token, row),) = new_tokens(server)
-    assert entry.data[CONF_API_TOKEN] == new_token and row["name"] == TOKEN_NAME
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == new_token and row["name"] == TOKEN_NAME
     assert abs((row["expires_at"] - row["created"]) - DEFAULT_NEW_TOKEN_DAYS * DAY) < timedelta(minutes=2)
     kinds = [kind for kind, _path, _body in server.token_requests]
     assert kinds.count("LOGIN") == 1 and kinds.count("LOGOUT") == 1 and not server.sessions  # signed out again
@@ -423,7 +424,7 @@ async def test_reauth_with_a_login_creates_the_token(hass: HomeAssistant, fake, 
     await hass.async_block_till_done()
     assert done["type"] is FlowResultType.ABORT and done["reason"] == "reauth_successful"
     ((new_token, _row),) = new_tokens(server)
-    assert entry.data[CONF_API_TOKEN] == new_token
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == new_token
     assert entry.options.get(CONF_RENEW_USER) is None  # not kept without the tick
     assert not server.sessions
 
@@ -435,14 +436,14 @@ async def test_reauth_can_keep_the_login(hass: HomeAssistant, fake, make_entry) 
     )
     await hass.async_block_till_done()
     assert done["reason"] == "reauth_successful"
-    assert entry.options[CONF_RENEW_USER] == "andy" and entry.options[CONF_RENEW_PASSWORD] == "secret"
+    assert entry.options[CONF_RENEW_USER] == "andy" and plain(hass, entry.options[CONF_RENEW_PASSWORD]) == "secret"
 
 
 async def test_reauth_with_a_typed_token_still_works(hass: HomeAssistant, fake, make_entry) -> None:
     server, entry, flow = await reauth_flow(hass, fake, make_entry)
     done = await hass.config_entries.flow.async_configure(flow["flow_id"], {CONF_API_TOKEN: "rotated"})
     await hass.async_block_till_done()
-    assert done["reason"] == "reauth_successful" and entry.data[CONF_API_TOKEN] == "rotated"
+    assert done["reason"] == "reauth_successful" and plain(hass, entry.data[CONF_API_TOKEN]) == "rotated"
     assert not new_tokens(server)
 
 
@@ -458,7 +459,7 @@ async def test_the_repair_dialog_takes_a_login_too(hass: HomeAssistant, fake, ma
     await hass.async_block_till_done()
     assert done["type"] is FlowResultType.CREATE_ENTRY
     ((new_token, _row),) = new_tokens(server)
-    assert entry.data[CONF_API_TOKEN] == new_token and entry.options[CONF_RENEW_USER] == "andy"
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == new_token and entry.options[CONF_RENEW_USER] == "andy"
     assert entry.state is ConfigEntryState.LOADED
 
 
@@ -498,7 +499,7 @@ async def test_the_options_keep_and_check_the_login(hass: HomeAssistant, fake, m
     saved = await options_of(hass, entry, {CONF_RENEW_USER: "andy", CONF_RENEW_PASSWORD: "secret", CONF_TOKEN_DAYS: 14})
     assert saved["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
-    assert entry.options[CONF_RENEW_USER] == "andy" and entry.options[CONF_RENEW_PASSWORD] == "secret"
+    assert entry.options[CONF_RENEW_USER] == "andy" and plain(hass, entry.options[CONF_RENEW_PASSWORD]) == "secret"
     assert entry.options[CONF_TOKEN_DAYS] == 14 and entry.options[CONF_RENEW_TOKEN] is True
 
     # empty password: the stored one stays (it is never shown again), nothing is tested again
@@ -506,7 +507,7 @@ async def test_the_options_keep_and_check_the_login(hass: HomeAssistant, fake, m
     kept = await options_of(hass, entry, {CONF_RENEW_USER: "andy"})
     assert kept["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
-    assert entry.options[CONF_RENEW_PASSWORD] == "secret"
+    assert plain(hass, entry.options[CONF_RENEW_PASSWORD]) == "secret"
     assert len([k for k, _p, _b in server.token_requests if k == "LOGIN"]) == logins
 
     # the form never shows the password and offers to remove the login

@@ -27,6 +27,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .helpers import plain
 from .fake_semaphore import TOKEN
 
 FAIL_LOG = """\
@@ -418,7 +419,7 @@ async def test_auth_error_triggers_reauth(hass: HomeAssistant, fake, make_entry)
     done = await hass.config_entries.flow.async_configure(flow["flow_id"], {CONF_API_TOKEN: "rotated"})
     assert done["type"] is FlowResultType.ABORT and done["reason"] == "reauth_successful"
     await hass.async_block_till_done()
-    assert entry.data[CONF_API_TOKEN] == "rotated"
+    assert plain(hass, entry.data[CONF_API_TOKEN]) == "rotated"
     assert entry.state is ConfigEntryState.LOADED
 
 
