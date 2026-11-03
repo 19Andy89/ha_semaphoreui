@@ -428,6 +428,30 @@ class SemaphoreClient:
         )
 
 
+async def async_docker_release_available(
+    session: aiohttp.ClientSession, url_template: str, version: str
+) -> bool | None:
+    """Does the Docker image of ``version`` exist? ``None``: could not be found out.
+
+    Tags are tried with and without a leading ``v``. Only a clear "not found" for all of
+    them counts as ``False``; any other problem (no internet, rate limit) is ``None`` so that
+    the update is shown as before.
+    """
+    unknown = False
+    for tag in (f"v{version}", version):
+        try:
+            async with asyncio.timeout(REQUEST_TIMEOUT):
+                async with session.get(url_template.format(tag=tag)) as resp:
+                    if resp.status == 200:
+                        return True
+                    if resp.status != 404:
+                        unknown = True
+        except (TimeoutError, aiohttp.ClientError) as err:
+            _LOGGER.debug("Could not check the Docker tag %s: %s", tag, err)
+            unknown = True
+    return None if unknown else False
+
+
 async def async_get_latest_release(
     session: aiohttp.ClientSession, url: str
 ) -> tuple[str, str | None] | None:

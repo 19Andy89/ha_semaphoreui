@@ -31,6 +31,7 @@ async def fake(socket_enabled, monkeypatch) -> AsyncGenerator[tuple[FakeSemaphor
     server = FakeSemaphore()
     url = await server.start_server()
     monkeypatch.setattr(coordinator, "GITHUB_LATEST_URL", f"{url}/github/latest")
+    monkeypatch.setattr(coordinator, "DOCKER_TAG_URL", f"{url}/docker/tags/{{tag}}")
     yield server, url
     await server.close()
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unveröffentlicht – Docker: kein Update, solange das Image fehlt (Issue #12)
+- Bei einer **Docker-Installation** (Version mit Build-Anhang wie `v2.19.17-f8cefe6-1792391878`) wird ein neues GitHub-Release nur dann als Update gezeigt, wenn es auch als Image auf Docker Hub existiert (`semaphoreui/semaphore`, Tag mit und ohne `v`). GitHub ist oft früher da als das Image. Bis dahin steht die Update-Entität auf „aus“ mit dem Attribut `release_not_yet_in_docker`.
+- Ist Docker Hub nicht erreichbar oder antwortet unklar (Limit, kein Internet), wird das Update wie bisher angezeigt. Andere Installationsarten werden nicht gegen Docker Hub geprüft. Das Semaphore-Token geht nie an Docker Hub.
+- Tests: 5 neue pytest.
+
 ## Unveröffentlicht – Token und Passwort verschlüsselt (Issue #11)
 - **Token und Notfall-Passwort** liegen nicht mehr im Klartext in `core.config_entries`, sondern verschlüsselt (Fernet) mit einem Schlüssel in `.storage/semaphore_ui.key`. Bestehende Einrichtungen werden beim Start automatisch umgestellt; ein nicht lesbarer Eintrag (Schlüssel fehlt) löst „Erneut authentifizieren“ aus.
 - Grenzen sind in der README beschrieben: Der Schlüssel muss für Home Assistant lesbar sein, ein komplettes Backup mit Schlüssel schützt das also nicht (dafür verschlüsselte Backups).

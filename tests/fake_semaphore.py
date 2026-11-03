@@ -39,6 +39,9 @@ class FakeSemaphore:
         self.server: TestServer | None = None
         # live WebSocket (/api/ws): False answers 404 like an old Semaphore
         self.ws_enabled = True
+        # Docker Hub: None = every tag exists; a set = only these versions; status = fixed answer
+        self.docker_tags: set[str] | None = None
+        self.docker_status: int | None = None
         self.sockets: list[web.WebSocketResponse] = []
         self.ws_connects = 0
         self.start_status = "waiting"
@@ -291,6 +294,16 @@ class FakeSemaphore:
             self.token_requests.append(("LOGOUT", request.path, None))
             self.sessions.pop(request.cookies.get("semaphore", ""), None)
             return web.Response(status=204)
+
+        @routes.get("/docker/tags/{tag}")
+        async def docker_tag(request: web.Request) -> web.Response:
+            self.requests.append(("DOCKER", request.path, request.headers.get("Authorization")))
+            if self.docker_status is not None:
+                return web.Response(status=self.docker_status)
+            tag = request.match_info["tag"]
+            if self.docker_tags is not None and tag.removeprefix("v") not in self.docker_tags:
+                return web.Response(status=404)
+            return web.json_response({"name": tag})
 
         @routes.get("/github/latest")
         async def github(request: web.Request) -> web.Response:

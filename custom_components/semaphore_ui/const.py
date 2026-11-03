@@ -100,6 +100,9 @@ CONF_CHECK_UPDATES: Final = "check_for_updates"
 GITHUB_LATEST_URL: Final = (
     "https://api.github.com/repos/semaphoreui/semaphore/releases/latest"
 )
+# A Docker installation can only update to a release whose image exists. GitHub and Docker Hub
+# publish at different times, so for a Docker build the tag is looked up before an update is shown.
+DOCKER_TAG_URL: Final = "https://hub.docker.com/v2/repositories/semaphoreui/semaphore/tags/{tag}"
 VERSION_SCAN_INTERVAL: Final = 6 * 60 * 60
 
 # Event types of the project "Tasks" event entity

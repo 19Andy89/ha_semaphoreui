@@ -64,8 +64,14 @@ class SemaphoreUpdate(CoordinatorEntity[SemaphoreVersionCoordinator], UpdateEnti
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """The version string exactly as Semaphore reports it (incl. build suffix)."""
+        """The version as Semaphore reports it; a release that has no Docker image yet."""
         data = self.coordinator.data
-        if data is None or not data.installed_raw or data.installed_raw == data.installed:
+        if data is None:
             return None
-        return {"installed_version_reported": data.installed_raw}
+        attrs: dict[str, Any] = {}
+        if data.installed_raw and data.installed_raw != data.installed:
+            attrs["installed_version_reported"] = data.installed_raw
+        if data.pending_release:
+            # shown as "no update" until the image exists
+            attrs["release_not_yet_in_docker"] = data.pending_release
+        return attrs or None

@@ -27,6 +27,7 @@ from homeassistant.util import dt as dt_util
 
 from . import const, issues, tokens
 from .api import (
+    async_docker_release_available,
     SemaphoreApiError,
     SemaphoreAuthError,
     SemaphoreClient,
@@ -46,6 +47,7 @@ from .const import (
     DOMAIN,
     EVENT_TASK_FINISHED,
     EVENT_TASK_STARTED,
+    DOCKER_TAG_URL,
     GITHUB_LATEST_URL,
     ISSUE_PROJECT,
     ISSUE_UNREACHABLE,
@@ -1116,11 +1118,16 @@ class SemaphoreVersionData:
     release_url: str | None
     installed_raw: str | None = None
     schedule_timezone: str | None = None
+    # newer release on GitHub that does not exist as a Docker image yet (Docker builds only)
+    pending_release: str | None = None
 
 
 # Docker/CI builds append "-<commit sha>[-<unix time>]" to the release number;
 # SemVer "+build" metadata is dropped as well. Pre-release names (beta1, rc.2)
 # are kept - they are real versions.
+# "2.19.17-f8cefe6-1792391878": commit and build time -> built by the Docker image pipeline
+_DOCKER_BUILD = re.compile(r"-[0-9a-f]{7,40}-\d{6,}$")
+
 _BUILD_SUFFIX = re.compile(r"(?:-[0-9a-f]{7,40}(?:-\d{6,})?|\+.*)$")
 
 
@@ -1187,10 +1194,24 @@ class SemaphoreVersionCoordinator(DataUpdateCoordinator[SemaphoreVersionData]):
             if release:
                 latest = _clean_version(release[0])
                 release_url = release[1]
+        pending: str | None = None
+        if (
+            latest
+            and latest != installed
+            and raw_version
+            and _DOCKER_BUILD.search(str(raw_version).strip())
+        ):
+            # Docker: GitHub has the release first, the image follows later
+            available = await async_docker_release_available(
+                async_get_clientsession(self.hass), DOCKER_TAG_URL, latest
+            )
+            if available is False:
+                pending, latest = latest, installed
         return SemaphoreVersionData(
             installed,
             latest,
             release_url,
             str(raw_version).strip() if raw_version else None,
             info.get("schedule_timezone") or None,
+            pending,
         )
