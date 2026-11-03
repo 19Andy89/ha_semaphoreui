@@ -532,6 +532,10 @@ sequence:
 ## Optionen (Zahnrad am Eintrag)
 
 * Abfrage-Intervall (Standard 30 s; während ein Task läuft automatisch 5 s)
+* Live-Updates (Standard: an) – solange ein Task läuft, hält Home Assistant eine WebSocket-Verbindung zu Semaphore (`/api/ws`) offen:
+  Status und der gerade laufende Ansible-Schritt („Schritt 7: Paketlisten aktualisieren“, Attribut `current_step` am Status-Sensor
+  und Zeile in der Template-Karte) erscheinen sofort. Ohne laufenden Task besteht keine Verbindung; fällt sie aus oder kennt
+  die Semaphore-Version `/api/ws` nicht, wird einfach weiter abgefragt.
 * Auf neue Semaphore-Version prüfen (fragt alle 6 Std. die GitHub-Releases ab; ohne Token, nur diese eine Anfrage)
 * Mehrfachstart erlauben (Standard: aus) – hebt die Sperre gegen einen zweiten Start auf, solange für ein Template schon ein
   Lauf wartet oder läuft (siehe [Template-Gerät](#template-gerät-eins-pro-template))

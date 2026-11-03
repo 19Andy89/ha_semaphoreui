@@ -1,5 +1,10 @@
 # Changelog
 
+## Unveröffentlicht – Live-Updates per WebSocket (Issue #4)
+- Neue Option **Live-Updates** (Standard: an): Läuft ein Task, öffnet die Integration `GET /api/ws` (Token per Bearer-Header; Verbindung nur solange etwas läuft, Abfrage bleibt als Rückfall). Statuswechsel stoßen sofort eine Abfrage an.
+- **Aktueller Schritt:** aus den Log-Zeilen (`TASK [...]`) – Attribute `current_step`/`step_number` am Status-Sensor, `step` in den Details des Läuft-Sensors, Zeile „Schritt“ in der Template-Karte. Ein vor der Verbindung gestarteter Task wird aus seinem Log nachgelesen.
+- Nachrichtenformat an Semaphore 2.19 geprüft (`update` mit Status, `log` mit Ausgabezeile). Tests: 5 neue pytest.
+
 ## Unveröffentlicht – Dialog für Secrets und Mehrfachauswahl (Issue #5)
 - **Template-Karte:** Hat ein Template Secret- oder Mehrfachauswahl-Variablen, öffnen *Starten* und *Testlauf* einen Dialog (Passwortfeld, Haken, Pflichtfelder, Vorgaben). Die Werte gehen per `semaphore_ui.run_template` an Semaphore, zusammen mit den Werten der normalen Eingabefelder; Secrets landen in keinem Zustand.
 - Start-Schaltfläche: neues Attribut `survey_dialog` (ohne Vorgaben von Secrets).

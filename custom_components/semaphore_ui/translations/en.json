@@ -78,7 +78,8 @@
           "token_days": "Replace / warn when fewer than ... days are left",
           "renew_username": "User name for emergencies (optional)",
           "renew_password": "Password for emergencies (optional)",
-          "clear_login": "Remove the stored user name and password"
+          "clear_login": "Remove the stored user name and password",
+          "live_updates": "Live updates while a task runs (WebSocket)"
         },
         "data_description": {
           "allow_parallel_runs": "Off (default): while a run of a template is queued or running, start and dry run are blocked - card, button and action. On: Home Assistant starts anyway; Semaphore queues the run or starts it in parallel (depending on \"Allow parallel tasks\" of the template). If the template allows parallel tasks in Semaphore, this always applies.",
@@ -87,7 +88,8 @@
           "token_days": "At most half of the lifetime of the token.",
           "renew_username": "Only needed when Semaphore already rejects a token (expired or deleted): the integration then signs in, creates a new token and signs out again. The sign-in is checked when you save. A second factor is not possible.",
           "renew_password": "It is not shown again; leaving it empty keeps the stored password. It is kept - like the token - unencrypted in the configuration of Home Assistant.",
-          "clear_login": "Tick and save: the user name and password are deleted."
+          "clear_login": "Tick and save: the user name and password are deleted.",
+          "live_updates": "On (default): while a task runs, Home Assistant keeps a connection to Semaphore open. Status and the running step show up at once instead of at the next poll. No connection exists while nothing runs. If it does not work, polling simply continues."
         }
       }
     },

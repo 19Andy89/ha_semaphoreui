@@ -37,6 +37,10 @@ class FakeSemaphore:
         # task_id -> (after N get_task calls, status, output text); auto finish helper
         self.auto_finish: dict[int, tuple[int, str, str]] = {}
         self.server: TestServer | None = None
+        # live WebSocket (/api/ws): False answers 404 like an old Semaphore
+        self.ws_enabled = True
+        self.sockets: list[web.WebSocketResponse] = []
+        self.ws_connects = 0
         self.start_status = "waiting"
         self.include_last_task = True
         self.survey_template = {
@@ -491,9 +495,32 @@ class FakeSemaphore:
             self.finish(task_id, "stopped", "stopped by user", seconds=5)
             return web.Response(status=204)
 
+        @routes.get("/api/ws")
+        async def ws(request: web.Request) -> web.StreamResponse:
+            if not self.ws_enabled:
+                return web.Response(status=404, text="Not Found")
+            if (resp := self._check(request)) is not None:
+                return resp
+            sock = web.WebSocketResponse()
+            await sock.prepare(request)
+            self.ws_connects += 1
+            self.sockets.append(sock)
+            try:
+                async for _ in sock:
+                    pass
+            finally:
+                if sock in self.sockets:
+                    self.sockets.remove(sock)
+            return sock
+
         app = web.Application()
         app.add_routes(routes)
         return app
+
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        """Send a message to every open WebSocket."""
+        for sock in list(self.sockets):
+            await sock.send_json(message)
 
     async def start_server(self) -> str:
         self.server = TestServer(self.make_app(), host="127.0.0.1")
@@ -501,5 +528,7 @@ class FakeSemaphore:
         return str(self.server.make_url("")).rstrip("/")
 
     async def close(self) -> None:
+        for sock in list(self.sockets):
+            await sock.close()
         if self.server:
             await self.server.close()

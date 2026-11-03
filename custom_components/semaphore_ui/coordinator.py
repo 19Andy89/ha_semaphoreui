@@ -37,6 +37,7 @@ from .api import (
 from .const import (
     ACTIVE_SCAN_INTERVAL,
     CONF_ALLOW_PARALLEL,
+    CONF_LIVE,
     CONF_CHECK_UPDATES,
     CONF_EXCLUDED_TEMPLATES,
     CONF_PROJECT_ID,
@@ -55,6 +56,7 @@ from .const import (
     STATUS_FINISHED,
     VERSION_SCAN_INTERVAL,
 )
+from .live import LiveStream
 from .report import (
     build_report,
     failure_info,
@@ -155,6 +157,8 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         # why the last poll failed: {"reason": token_rejected | unreachable | project_missing, "detail": text}
         self.problem: dict[str, str] | None = None
         self._first_done = False
+        self.live_enabled: bool = entry.options.get(CONF_LIVE, True)
+        self.live = LiveStream(self)
 
     # ------------------------------------------------------------------ #
     # Convenience
@@ -176,6 +180,15 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
             ids.add(last["id"])
         return sorted(ids)
 
+    def current_step(self, template_id: int) -> tuple[int, str] | None:
+        """(number, name) of the Ansible step that runs right now (needs live updates)."""
+        return self.live.step_for(template_id)
+
+    async def async_shutdown(self) -> None:
+        """Close the live connection together with the coordinator."""
+        self.live.stop()
+        await super().async_shutdown()
+
     def running_items(self) -> list[dict[str, Any]]:
         """Templates with a queued or running task, sorted by name (for the project entities)."""
         items: list[dict[str, Any]] = []
@@ -186,6 +199,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
             last = template.get("last_task") or {}
             current = last if last.get("id") in ids else {}
             started = task_started(current) if current else None
+            step = self.current_step(tid)
             items.append(
                 {
                     "template": template.get("name") or f"#{tid}",
@@ -194,6 +208,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                     "status": task_status(current) if current else "running",
                     "dry_run": is_dry_run(current) if current else False,
                     "started": started.isoformat() if started else None,
+                    "step": step[1] if step else None,
                 }
             )
         return sorted(items, key=lambda item: str(item["template"]).lower())
@@ -785,6 +800,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
             if self._active
             else self._base_interval
         )
+        self.live.sync(bool(self._active))
         await self._async_update_last_success(templates)
         schedules = await self._async_read_schedules()
         self._remove_stale_devices(templates)
@@ -1025,6 +1041,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
             task_id = task["id"]
             self._active[task_id] = template_id
         self.update_interval = timedelta(seconds=ACTIVE_SCAN_INTERVAL)
+        self.live.sync(True)
         self._emit(True, self._report(template, task))
 
         timed_out = False

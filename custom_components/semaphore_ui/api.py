@@ -357,6 +357,15 @@ class SemaphoreClient:
         """Delete a schedule."""
         await self._request("DELETE", f"/project/{project_id}/schedules/{schedule_id}")
 
+    def ws_connect(self) -> Any:
+        """Open the live WebSocket (``/api/ws``); use as ``async with``."""
+        parts = urlsplit(self.base_url)
+        scheme = "wss" if parts.scheme == "https" else "ws"
+        url = urlunsplit((scheme, parts.netloc, f"{parts.path}/api/ws", "", ""))
+        return self._session.ws_connect(
+            url, headers={"Authorization": f"Bearer {self._token}"}, heartbeat=30
+        )
+
     async def get_task(self, project_id: int, task_id: int) -> dict[str, Any]:
         """Return one task."""
         return await self._request("GET", f"/project/{project_id}/tasks/{task_id}")

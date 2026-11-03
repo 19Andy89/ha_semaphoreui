@@ -502,6 +502,16 @@ class SemaphoreTemplateSensor(SemaphoreTemplateEntity, SensorEntity):
         """Value of the sensor."""
         return self.entity_description.value_fn(self.last_task)
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """While a task runs and live updates are on: the Ansible step it is in."""
+        if self.entity_description.key != "status":
+            return None
+        step = self.coordinator.current_step(self.template_id)
+        if step is None:
+            return None
+        return {"current_step": step[1], "step_number": step[0]}
+
 
 class SemaphoreSummarySensor(SemaphoreTemplateEntity, SensorEntity):
     """One-line summary; the attributes hold the complete report (JSON)."""

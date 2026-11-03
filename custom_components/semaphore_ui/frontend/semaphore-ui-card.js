@@ -23,6 +23,7 @@ const TEXTS = {
     duration: "Dauer",
     never: "Noch nie ausgeführt",
     running_since: "Gestartet",
+    step: "Schritt",
     error: "Fehler",
     task: "Task",
     host: "Host",
@@ -148,6 +149,7 @@ const TEXTS = {
     duration: "Duration",
     never: "Never run",
     running_since: "Started",
+    step: "Step",
     error: "Error",
     task: "Task",
     host: "Host",
@@ -1095,6 +1097,11 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
         rows.push(
           row(running ? T.running_since : T.last_run, `<span class="v" title="${esc(fmtDate(startedIso, hass))}">${esc(fmtDate(startedIso, hass))} · ${esc(fmtRelative(startedIso, hass))}</span>`, byKey["sensor:last_started"])
         );
+      }
+      const stepAttr = (this._state(byKey["sensor:status"]) || {}).attributes || {};
+      if (running && stepAttr.current_step) {
+        const no = stepAttr.step_number ? `${stepAttr.step_number}. ` : "";
+        rows.push(row(T.step, `<span class="v" title="${esc(stepAttr.current_step)}">${esc(no + stepAttr.current_step)}</span>`, byKey["sensor:status"]));
       }
       if (running && startedIso) {
         rows.push(row(T.duration, `<span class="v elapsed" data-since="${esc(startedIso)}"></span>`, byKey["sensor:last_duration"]));
