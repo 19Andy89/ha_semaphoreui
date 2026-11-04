@@ -3,9 +3,9 @@
     "step": {
       "user": {
         "title": "Semaphore UI verbinden",
-        "description": "Adresse deiner Semaphore-Instanz und ein API-Token. Das Token legst du in Semaphore unter Benutzername (oben rechts) → „API-Tokens“ → „Neues Token“ an.",
+        "description": "Adresse deiner Semaphore-Instanz und ein API-Token. Das Token legst du in Semaphore unter Benutzername (oben rechts) → „API-Tokens“ → „Neues Token“ an. Beispiel: {url_example}",
         "data": {
-          "url": "URL (z. B. https://semaphore.example.de)",
+          "url": "URL",
           "api_token": "API-Token",
           "verify_ssl": "SSL-Zertifikat prüfen"
         }
@@ -32,9 +32,9 @@
       },
       "reconfigure": {
         "title": "Zugangsdaten ändern",
-        "description": "Neue Adresse, neues API-Token oder SSL-Einstellung für dieses Projekt. Geräte und Einträge bleiben erhalten.",
+        "description": "Neue Adresse, neues API-Token oder SSL-Einstellung für dieses Projekt. Geräte und Einträge bleiben erhalten. Beispiel: {url_example}",
         "data": {
-          "url": "URL (z. B. https://semaphore.example.de)",
+          "url": "URL",
           "api_token": "API-Token",
           "verify_ssl": "SSL-Zertifikat prüfen"
         }
@@ -42,13 +42,13 @@
     },
     "error": {
       "cannot_connect": "Verbindung zu {url} fehlgeschlagen: {detail}",
-      "cannot_resolve": "Der Name „{host}“ konnte nicht aufgelöst werden (DNS: {detail}). Home Assistant kennt diesen Namen nicht. Prüfe die Schreibweise und den DNS-Server von Home Assistant (Einstellungen → System → Netzwerk) oder verwende stattdessen die IP-Adresse, z. B. http://192.168.1.10:3000.",
+      "cannot_resolve": "Der Name „{host}“ konnte nicht aufgelöst werden (DNS: {detail}). Home Assistant kennt diesen Namen nicht. Prüfe die Schreibweise und den DNS-Server von Home Assistant (Einstellungen → System → Netzwerk) oder verwende stattdessen die IP-Adresse, z. B. {ip_example}.",
       "connection_refused": "{detail} lehnt die Verbindung ab: Auf diesem Port läuft kein Dienst. Prüfe den Port (Semaphore: standardmäßig 3000) und ob http oder https stimmt.",
       "timeout": "{host} antwortet nicht innerhalb von {seconds} Sekunden. Prüfe Adresse, Port und Firewall.",
       "ssl_error": "SSL-/Zertifikatsfehler bei {host}: {detail}. Bei selbstsignierten oder internen Zertifikaten „SSL-Zertifikat prüfen“ ausschalten oder http verwenden.",
       "host_unreachable": "{host} ist von Home Assistant aus nicht erreichbar ({detail}). Prüfe Adresse, Netzwerk/VLAN und Firewall.",
       "connection_lost": "Die Verbindung zu {host} wurde unterbrochen ({detail}). Prüfe, ob http/https stimmt, und versuche es erneut.",
-      "invalid_url": "Die Adresse ist ungültig ({detail}). Beispiel: https://semaphore.example.de oder http://192.168.1.10:3000",
+      "invalid_url": "Die Adresse ist ungültig ({detail}). Beispiel: {url_example} / {ip_example}",
       "not_semaphore": "Unter {url} antwortet kein Semaphore UI (HTTP {status}: {detail}). Prüfe Adresse, Port und ggf. den Unterpfad, ohne „/api“ am Ende.",
       "http_error": "Semaphore antwortet mit HTTP {status}: {detail}",
       "project_not_found": "Das Projekt gibt es unter {url} nicht (mehr), oder dieses Token darf es nicht sehen (HTTP 404).",
@@ -337,6 +337,10 @@
         "build_task_id": {
           "name": "Build-Task",
           "description": "Nur Deploy-Templates: Nummer des Build-Tasks, der ausgerollt wird (Alternative zur Version)."
+        },
+        "device_id": {
+          "name": "Template",
+          "description": "Template-Gerät(e), auf die sich der Aufruf bezieht."
         }
       }
     },
@@ -363,6 +367,10 @@
         "delete_after_run": {
           "name": "Nach dem Lauf löschen",
           "description": "Den Zeitplan nach dem Lauf in Semaphore löschen."
+        },
+        "device_id": {
+          "name": "Template",
+          "description": "Template-Gerät(e), auf die sich der Aufruf bezieht."
         }
       }
     },
@@ -405,12 +413,11 @@
   "issues": {
     "token_rejected": {
       "title": "Semaphore: API-Token abgelehnt",
-      "description": "Semaphore ({url}) hat das API-Token für das Projekt „{project}“ abgelehnt (HTTP 401). Solange sind die Geräte dieses Projekts „nicht verfügbar“. Hier lässt sich ein neues Token eintragen.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Neues API-Token",
-            "description": "Lege in Semaphore unter Benutzername (oben rechts) → „API-Tokens“ ein neues Token an und trage es hier ein – oder trage Benutzer und Passwort ein, dann legt die Integration das Token selbst an. Es wird geprüft, bevor es gespeichert wird. Adresse: {url}, Projekt: „{project}“.",
+            "description": "Semaphore ({url}) hat das API-Token für das Projekt „{project}“ abgelehnt (HTTP 401). Solange sind die Geräte dieses Projekts „nicht verfügbar“. Hier lässt sich ein neues Token eintragen.\n\nLege in Semaphore unter Benutzername (oben rechts) → „API-Tokens“ ein neues Token an und trage es hier ein – oder trage Benutzer und Passwort ein, dann legt die Integration das Token selbst an. Es wird geprüft, bevor es gespeichert wird. Adresse: {url}, Projekt: „{project}“.",
             "data": {
               "api_token": "API-Token",
               "username": "Benutzer (statt Token)",
@@ -446,12 +453,11 @@
     },
     "token_expiring": {
       "title": "Semaphore: API-Token läuft bald ab",
-      "description": "Das API-Token der Integration für das Projekt „{project}“ ({url}) läuft am {when} ab (Tage übrig: {days}). Danach lehnt Semaphore es ab und die Geräte sind „nicht verfügbar“. Die automatische Erneuerung ist ausgeschaltet (Optionen der Integration). „Beheben“ legt jetzt ein neues Token an.",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "API-Token jetzt erneuern",
-            "description": "Mit dem aktuellen Token wird ein neues angelegt (gleiche Gültigkeitsdauer), geprüft und übernommen. Das alte Token bleibt in Semaphore bestehen und läuft von selbst ab. Adresse: {url}, Projekt: „{project}“."
+            "description": "Das API-Token der Integration für das Projekt „{project}“ ({url}) läuft am {when} ab (Tage übrig: {days}). Danach lehnt Semaphore es ab und die Geräte sind „nicht verfügbar“. Die automatische Erneuerung ist ausgeschaltet (Optionen der Integration). „Beheben“ legt jetzt ein neues Token an.\n\nMit dem aktuellen Token wird ein neues angelegt (gleiche Gültigkeitsdauer), geprüft und übernommen. Das alte Token bleibt in Semaphore bestehen und läuft von selbst ab. Adresse: {url}, Projekt: „{project}“."
           }
         },
         "error": {
@@ -464,12 +470,11 @@
     },
     "token_renew_failed": {
       "title": "Semaphore: API-Token konnte nicht erneuert werden",
-      "description": "Das API-Token des Projekts „{project}“ ({url}) läuft am {when} ab (Tage übrig: {days}), die automatische Erneuerung ist fehlgeschlagen: {detail}\n\n„Beheben“ versucht es erneut. Klappt das nicht, lege in Semaphore selbst ein neues Token an und trage es unter „Erneut authentifizieren“ ein. Läuft das Token ab, sind die Geräte „nicht verfügbar“.",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "API-Token jetzt erneuern",
-            "description": "Mit dem aktuellen Token wird ein neues angelegt (gleiche Gültigkeitsdauer), geprüft und übernommen. Das alte Token bleibt in Semaphore bestehen und läuft von selbst ab. Adresse: {url}, Projekt: „{project}“."
+            "description": "Das API-Token des Projekts „{project}“ ({url}) läuft am {when} ab (Tage übrig: {days}), die automatische Erneuerung ist fehlgeschlagen: {detail}\n\n„Beheben“ versucht es erneut. Klappt das nicht, lege in Semaphore selbst ein neues Token an und trage es unter „Erneut authentifizieren“ ein. Läuft das Token ab, sind die Geräte „nicht verfügbar“.\n\nMit dem aktuellen Token wird ein neues angelegt (gleiche Gültigkeitsdauer), geprüft und übernommen. Das alte Token bleibt in Semaphore bestehen und läuft von selbst ab. Adresse: {url}, Projekt: „{project}“."
           }
         },
         "error": {

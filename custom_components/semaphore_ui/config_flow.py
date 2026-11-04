@@ -86,6 +86,8 @@ def _placeholders(url: str = "", **extra: str) -> dict[str, str]:
         "detail": "",
         "status": "",
         "seconds": str(REQUEST_TIMEOUT),
+        "url_example": "https://semaphore.example.com",
+        "ip_example": "http://192.168.1.10:3000",
     }
     values.update(extra)
     return values

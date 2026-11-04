@@ -3,9 +3,9 @@
     "step": {
       "user": {
         "title": "Connect Semaphore UI",
-        "description": "Address of your Semaphore instance and an API token. Create the token in Semaphore under your user name (top right) → \"API tokens\" → \"New token\".",
+        "description": "Address of your Semaphore instance and an API token. Create the token in Semaphore under your user name (top right) → \"API tokens\" → \"New token\". Example: {url_example}",
         "data": {
-          "url": "URL (e.g. https://semaphore.example.com)",
+          "url": "URL",
           "api_token": "API token",
           "verify_ssl": "Verify SSL certificate"
         }
@@ -32,9 +32,9 @@
       },
       "reconfigure": {
         "title": "Change connection",
-        "description": "New address, new API token or SSL setting for this project. Devices and entities are kept.",
+        "description": "New address, new API token or SSL setting for this project. Devices and entities are kept. Example: {url_example}",
         "data": {
-          "url": "URL (e.g. https://semaphore.example.com)",
+          "url": "URL",
           "api_token": "API token",
           "verify_ssl": "Verify SSL certificate"
         }
@@ -42,13 +42,13 @@
     },
     "error": {
       "cannot_connect": "Connecting to {url} failed: {detail}",
-      "cannot_resolve": "The name \"{host}\" could not be resolved (DNS: {detail}). Home Assistant does not know this name. Check the spelling and the DNS server of Home Assistant (Settings → System → Network) or use the IP address instead, e.g. http://192.168.1.10:3000.",
+      "cannot_resolve": "The name \"{host}\" could not be resolved (DNS: {detail}). Home Assistant does not know this name. Check the spelling and the DNS server of Home Assistant (Settings → System → Network) or use the IP address instead, e.g. {ip_example}.",
       "connection_refused": "{detail} refuses the connection: nothing is listening on this port. Check the port (Semaphore default: 3000) and whether http or https is right.",
       "timeout": "{host} did not answer within {seconds} seconds. Check address, port and firewall.",
       "ssl_error": "SSL/certificate error at {host}: {detail}. For self-signed or internal certificates turn off \"Verify SSL certificate\" or use http.",
       "host_unreachable": "{host} cannot be reached from Home Assistant ({detail}). Check address, network/VLAN and firewall.",
       "connection_lost": "The connection to {host} was interrupted ({detail}). Check whether http/https is right and try again.",
-      "invalid_url": "The address is invalid ({detail}). Example: https://semaphore.example.com or http://192.168.1.10:3000",
+      "invalid_url": "The address is invalid ({detail}). Example: {url_example} / {ip_example}",
       "not_semaphore": "No Semaphore UI answers at {url} (HTTP {status}: {detail}). Check address, port and sub path, without \"/api\" at the end.",
       "http_error": "Semaphore answers with HTTP {status}: {detail}",
       "project_not_found": "The project does not exist at {url} (any more), or this token may not see it (HTTP 404).",
@@ -337,6 +337,10 @@
         "build_task_id": {
           "name": "Build task",
           "description": "Deploy templates only: id of the build task to deploy (alternative to the version)."
+        },
+        "device_id": {
+          "name": "Template",
+          "description": "Template device(s) to use."
         }
       }
     },
@@ -363,6 +367,10 @@
         "delete_after_run": {
           "name": "Delete after run",
           "description": "Delete the schedule in Semaphore after it ran."
+        },
+        "device_id": {
+          "name": "Template",
+          "description": "Template device(s) to use."
         }
       }
     },
@@ -405,12 +413,11 @@
   "issues": {
     "token_rejected": {
       "title": "Semaphore: API token rejected",
-      "description": "Semaphore ({url}) rejected the API token for the project “{project}” (HTTP 401). Until then the devices of this project are “unavailable”. You can enter a new token here.",
       "fix_flow": {
         "step": {
           "init": {
             "title": "New API token",
-            "description": "In Semaphore create a new token under your user name (top right) → “API tokens” and enter it here - or enter a user name and password and the integration creates the token itself. It is checked before it is saved. Address: {url}, project: “{project}”.",
+            "description": "Semaphore ({url}) rejected the API token for the project “{project}” (HTTP 401). Until then the devices of this project are “unavailable”. You can enter a new token here.\n\nIn Semaphore create a new token under your user name (top right) → “API tokens” and enter it here - or enter a user name and password and the integration creates the token itself. It is checked before it is saved. Address: {url}, project: “{project}”.",
             "data": {
               "api_token": "API token",
               "username": "User name (instead of a token)",
@@ -446,12 +453,11 @@
     },
     "token_expiring": {
       "title": "Semaphore: API token expires soon",
-      "description": "The API token of the integration for the project “{project}” ({url}) expires on {when} (days left: {days}). After that Semaphore rejects it and the devices are “unavailable”. The automatic renewal is switched off (options of the integration). “Fix” creates a new token now.",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Replace the API token now",
-            "description": "A new token is created with the current one (same lifetime), checked and adopted. The old token stays in Semaphore and expires by itself. Address: {url}, project: “{project}”."
+            "description": "The API token of the integration for the project “{project}” ({url}) expires on {when} (days left: {days}). After that Semaphore rejects it and the devices are “unavailable”. The automatic renewal is switched off (options of the integration). “Fix” creates a new token now.\n\nA new token is created with the current one (same lifetime), checked and adopted. The old token stays in Semaphore and expires by itself. Address: {url}, project: “{project}”."
           }
         },
         "error": {
@@ -464,12 +470,11 @@
     },
     "token_renew_failed": {
       "title": "Semaphore: API token could not be replaced",
-      "description": "The API token of the project “{project}” ({url}) expires on {when} (days left: {days}); the automatic renewal failed: {detail}\n\n“Fix” tries again. If that does not work, create a new token in Semaphore yourself and enter it under “Re-authenticate”. When the token expires the devices are “unavailable”.",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Replace the API token now",
-            "description": "A new token is created with the current one (same lifetime), checked and adopted. The old token stays in Semaphore and expires by itself. Address: {url}, project: “{project}”."
+            "description": "The API token of the project “{project}” ({url}) expires on {when} (days left: {days}); the automatic renewal failed: {detail}\n\n“Fix” tries again. If that does not work, create a new token in Semaphore yourself and enter it under “Re-authenticate”. When the token expires the devices are “unavailable”.\n\nA new token is created with the current one (same lifetime), checked and adopted. The old token stays in Semaphore and expires by itself. Address: {url}, project: “{project}”."
           }
         },
         "error": {

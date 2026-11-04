@@ -2,7 +2,11 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
-## Nächste Version – Bilder mit neuem Logo, Texte zur Verschlüsselung
+## Nächste Version – Vorbereitung für public, hassfest
+- **Beta** statt Alpha (README-Titel); `manifest.json` zeigt auf dieses Repository (Dokumentation, Issues, Codeowner).
+- **hassfest-konform**: Die Aktionen `run_template` und `create_schedule` haben das Feld **Template (`device_id`)** mit Geräteauswahl statt eines Ziel-Filters (bestehende Automationen mit `target: device_id` laufen unverändert); Reparatur-Texte stehen im Dialog statt zusätzlich an der Meldung; Beispiel-Adressen in den Texten sind Platzhalter.
+- Neu: `SECURITY.md`, `CONTRIBUTING.md`, Issue-Vorlagen (Deutsch/Englisch), Workflow „Validate“ (hassfest, HACS).
+- Beispiel-Domain in den Tests ersetzt.
 - Die Doku-Bilder **Optionen** (`token-options.png`, zeigt jetzt auch „Live-Updates“) und **Reparatur** (`token-repair.png`) zeigen das neue Logo.
 - Texte der Oberfläche (Optionen, „Benutzer und Passwort speichern“) sagten noch „unverschlüsselt“; jetzt „verschlüsselt“ wie seit 0.15.0.
 - `tests/browser/shots_token.py` erzeugt nur diese beiden Bilder neu.

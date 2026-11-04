@@ -1,9 +1,12 @@
 run_template:
-  target:
-    device:
-      integration: semaphore_ui
-      model: Template
   fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: semaphore_ui
+          model: Template
+          multiple: true
     dry_run:
       required: false
       default: false
@@ -54,11 +57,14 @@ run_template:
           mode: box
 
 create_schedule:
-  target:
-    device:
-      integration: semaphore_ui
-      model: Template
   fields:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: semaphore_ui
+          model: Template
+          multiple: true
     cron:
       required: false
       example: "0 3 * * 1"

@@ -261,8 +261,15 @@ def test_every_repair_has_a_title_and_texts_with_known_placeholders(language: st
     assert set(issues) == {ISSUE_TOKEN, ISSUE_UNREACHABLE, ISSUE_PROJECT, ISSUE_TOKEN_EXPIRING, ISSUE_TEXT_FAILED}
     values = {"project": "P", "url": "U", "detail": "D", "since": "S", "days": "3", "when": "01.01.2027 10:00"}
     for key, item in issues.items():
-        assert item["title"] and item["description"], key
-        item["description"].format(**values)  # KeyError = a placeholder nobody fills in
+        # hassfest: an issue has either a "description" or a "fix_flow" (whose first step carries the text)
+        assert item["title"], key
+        if "fix_flow" in item:
+            assert "description" not in item, key
+            for step in item["fix_flow"]["step"].values():
+                step["description"].format(**values)  # KeyError = a placeholder nobody fills in
+        else:
+            assert item["description"], key
+            item["description"].format(**values)
     flow = issues[ISSUE_TOKEN]["fix_flow"]
     assert flow["step"]["init"]["data"]["api_token"]
     flow["step"]["init"]["description"].format(**values)
