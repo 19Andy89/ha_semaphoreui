@@ -286,6 +286,15 @@
     },
     "cron_or_run_at": {
       "message": "Give either \"Cron expression\" or \"Run once at\"."
+    },
+    "build_not_applicable": {
+      "message": "Template \"{template}\" is not a deploy template; a build version cannot be given."
+    },
+    "build_not_found": {
+      "message": "Template \"{template}\": there is no successful build with version {version}."
+    },
+    "no_build_available": {
+      "message": "Template \"{template}\" is a deploy template, but its build template has no successful build yet."
     }
   },
   "services": {
@@ -320,6 +329,14 @@
         "survey": {
           "name": "Survey variables",
           "description": "Values of the survey variables as name: value, e.g. target: dockerhost. Missing values use the default of the template, required ones without a value raise an error. Enum: value or label, select: list, secret: only possible here."
+        },
+        "build_version": {
+          "name": "Build version",
+          "description": "Deploy templates only: version of a successful build to deploy, e.g. 1.0.12. Empty: the newest successful build."
+        },
+        "build_task_id": {
+          "name": "Build task",
+          "description": "Deploy templates only: id of the build task to deploy (alternative to the version)."
         }
       }
     },

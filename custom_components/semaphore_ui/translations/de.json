@@ -286,6 +286,15 @@
     },
     "cron_or_run_at": {
       "message": "Entweder „Cron-Text“ oder „Einmalig am“ angeben."
+    },
+    "build_not_applicable": {
+      "message": "Template „{template}“ ist kein Deploy-Template; eine Build-Version kann nicht angegeben werden."
+    },
+    "build_not_found": {
+      "message": "Template „{template}“: Es gibt keinen erfolgreichen Build mit der Version {version}."
+    },
+    "no_build_available": {
+      "message": "Template „{template}“ ist ein Deploy-Template, aber sein Build-Template hat noch keinen erfolgreichen Build."
     }
   },
   "services": {
@@ -320,6 +329,14 @@
         "survey": {
           "name": "Survey-Variablen",
           "description": "Werte der Survey-Variablen als Name: Wert, z. B. target: dockerhost. Fehlende Werte werden mit dem Standardwert des Templates gefüllt, Pflichtfelder ohne Wert führen zu einem Fehler. Enum: Wert oder Beschriftung, Select: Liste, Secret: nur hier möglich."
+        },
+        "build_version": {
+          "name": "Build-Version",
+          "description": "Nur Deploy-Templates: Version eines erfolgreichen Builds, z. B. 1.0.12. Leer: der neueste erfolgreiche Build."
+        },
+        "build_task_id": {
+          "name": "Build-Task",
+          "description": "Nur Deploy-Templates: Nummer des Build-Tasks, der ausgerollt wird (Alternative zur Version)."
         }
       }
     },

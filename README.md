@@ -506,6 +506,13 @@ Ziel: das **Template-Gerät** (nicht das Projekt-Gerät).
 | `limit` | – | nur diese Hosts (`--limit`) |
 | `survey` | – | Werte der Survey-Variablen als `name: wert` (siehe unten) |
 | `raise_on_failure` | `false` | bei Fehler Aktion mit Fehler beenden (bricht ein Skript ab) |
+| `build_version` / `build_task_id` | – | nur **Deploy-Templates**: welcher erfolgreiche Build ausgerollt wird (Version wie `1.0.12` oder Task-Nummer; nur eins von beiden) |
+
+**Build- und Deploy-Templates:** Ein *Build*-Template bekommt seine Version von Semaphore selbst und startet wie jedes andere. Ein *Deploy*-Template
+rollt einen fertigen Build aus: ohne Angabe nimmt die Integration den **neuesten erfolgreichen Build** seines Build-Templates
+(Start-Taste, Karte und Aktion), mit `build_version` oder `build_task_id` einen bestimmten. Gibt es noch keinen erfolgreichen Build oder
+keinen mit dieser Version, meldet die Aktion das klar, statt etwas zu starten. Die Felder stammen aus dem Semaphore-Quellcode
+(`build_task_id`, `version`, `build_template_id`); an einer echten Instanz mit Build-/Deploy-Templates ist das noch nicht geprüft.
 
 Survey-Werte: die Aktion nutzt **nur** die Werte aus `survey` plus die Defaults aus Semaphore – nicht die Eingabe-Entitäten
 (damit eine Automation nie versehentlich einen alten Wert aus dem Dashboard verwendet). Enum: Wert **oder** Beschriftung,

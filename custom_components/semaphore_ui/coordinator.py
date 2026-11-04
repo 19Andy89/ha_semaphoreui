@@ -981,6 +981,51 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
     # ------------------------------------------------------------------ #
     # Actions
     # ------------------------------------------------------------------ #
+    async def _async_resolve_build(
+        self,
+        template: dict[str, Any],
+        build_task_id: int | None,
+        build_version: str | None,
+    ) -> int | None:
+        """The build task a deploy template deploys (``None``: not a deploy template)."""
+        name = template.get("name", str(template.get("id")))
+        if template.get("type") != "deploy":
+            if build_task_id is not None or build_version:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="build_not_applicable",
+                    translation_placeholders={"template": name},
+                )
+            return None
+        if build_task_id is not None:
+            return int(build_task_id)
+        source = template.get("build_template_id")
+        builds: list[dict[str, Any]] = []
+        if source is not None:
+            try:
+                builds = await self.client.get_template_tasks(self.project_id, int(source))
+            except SemaphoreAuthError as err:
+                raise self._auth_failed_in_action(err) from err
+            except SemaphoreError as err:
+                _LOGGER.debug("Builds of template %s not readable: %s", source, err)
+        done = [b for b in builds if b.get("status") == "success" and b.get("version")]
+        if build_version:
+            for build in done:  # newest first
+                if str(build.get("version")) == str(build_version):
+                    return int(build["id"])
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="build_not_found",
+                translation_placeholders={"template": name, "version": str(build_version)},
+            )
+        if done:
+            return int(done[0]["id"])
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="no_build_available",
+            translation_placeholders={"template": name},
+        )
+
     async def async_run_template(
         self,
         template_id: int,
@@ -992,8 +1037,14 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         wait: bool = False,
         timeout: float = const.DEFAULT_WAIT_TIMEOUT,
         raise_on_failure: bool = False,
+        build_task_id: int | None = None,
+        build_version: str | None = None,
     ) -> dict[str, Any]:
-        """Start a template, optionally wait for the end, return the report."""
+        """Start a template, optionally wait for the end, return the report.
+
+        A deploy template needs a finished build: ``build_task_id`` / ``build_version`` pick
+        it, without either the newest successful build of its build template is taken.
+        """
         template = self.data.templates.get(template_id)
         if template is None:
             raise HomeAssistantError(
@@ -1014,6 +1065,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                     "details": str(err),
                 },
             ) from err
+        build_id = await self._async_resolve_build(template, build_task_id, build_version)
         # The check and the start are one step: two quick clicks (or an automation and
         # a click) must not both pass the check before the first run is registered.
         async with self._start_locks.setdefault(template_id, asyncio.Lock()):
@@ -1027,6 +1079,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                     limit=limit,
                     environment=environment,
                     secret=secret,
+                    build_task_id=build_id,
                 )
             except SemaphoreAuthError as err:
                 raise self._auth_failed_in_action(err) from err

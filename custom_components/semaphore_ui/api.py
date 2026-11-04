@@ -393,6 +393,7 @@ class SemaphoreClient:
         limit: str | None = None,
         environment: dict[str, Any] | None = None,
         secret: dict[str, Any] | None = None,
+        build_task_id: int | None = None,
     ) -> dict[str, Any]:
         """Start a task of a template and return the created task.
 
@@ -413,6 +414,9 @@ class SemaphoreClient:
             body["environment"] = json.dumps(environment, ensure_ascii=False)
         if secret:
             body["secret"] = json.dumps(secret, ensure_ascii=False)
+        if build_task_id is not None:
+            # deploy template: the finished build task whose version is deployed
+            body["build_task_id"] = build_task_id
         return await self._request(
             "POST", f"/project/{project_id}/tasks", json_body=body
         )

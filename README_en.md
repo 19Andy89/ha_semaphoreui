@@ -507,6 +507,13 @@ Target: the **template device** (not the project device).
 | `limit` | – | only these hosts (`--limit`) |
 | `survey` | – | values of the survey variables as `name: value` (see below) |
 | `raise_on_failure` | `false` | end the action with an error on failure (aborts a script) |
+| `build_version` / `build_task_id` | – | **deploy templates** only: which successful build to deploy (a version such as `1.0.12` or a task number; only one of them) |
+
+**Build and deploy templates:** A *build* template gets its version from Semaphore itself and starts like any other. A *deploy* template
+rolls out a finished build: without a value the integration takes the **newest successful build** of its build template
+(start button, card and action), with `build_version` or `build_task_id` a specific one. If there is no successful build yet or none with
+that version, the action says so instead of starting anything. The fields come from the Semaphore source code
+(`build_task_id`, `version`, `build_template_id`); this has not been tried on a real instance with build/deploy templates yet.
 
 Survey values: the action uses **only** the values from `survey` plus the defaults from Semaphore – not the input entities
 (so that an automation never accidentally uses an old value from the dashboard). Enum: value **or** label,

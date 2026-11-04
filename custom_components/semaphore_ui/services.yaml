@@ -41,6 +41,17 @@ run_template:
       default: false
       selector:
         boolean:
+    build_version:
+      required: false
+      example: "1.0.12"
+      selector:
+        text:
+    build_task_id:
+      required: false
+      selector:
+        number:
+          min: 1
+          mode: box
 
 create_schedule:
   target:

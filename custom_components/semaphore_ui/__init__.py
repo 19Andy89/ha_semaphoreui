@@ -71,6 +71,8 @@ SERVICE_RUN_TEMPLATE_SCHEMA = vol.Schema(
         vol.Optional("limit"): cv.string,
         vol.Optional("survey"): dict,
         vol.Optional("raise_on_failure", default=False): cv.boolean,
+        vol.Exclusive("build_task_id", "build"): vol.Coerce(int),
+        vol.Exclusive("build_version", "build"): cv.string,
     }
 )
 
@@ -161,6 +163,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             message=call.data.get("message"),
             limit=call.data.get("limit"),
             survey=call.data.get("survey"),
+            build_task_id=call.data.get("build_task_id"),
+            build_version=call.data.get("build_version"),
             wait=call.data["wait"],
             timeout=call.data["timeout"],
             raise_on_failure=call.data["raise_on_failure"],
