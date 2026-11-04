@@ -7,12 +7,14 @@
     "lovelace",
     "repairs"
   ],
-  "codeowners": ["@19Andy89"],
+  "codeowners": [
+    "@19Andy89"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/19Andy89/hacs_semphoreui",
   "integration_type": "service",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/19Andy89/hacs_semphoreui/issues",
   "requirements": [],
-  "version": "0.17.0"
+  "version": "0.18.0"
 }
