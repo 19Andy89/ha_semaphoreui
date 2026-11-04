@@ -2,6 +2,9 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
+## Nächste Version – Offizielles Logo
+- Das **Logo von Semaphore UI** ersetzt das selbst gezeichnete Symbol (mit Erlaubnis des Semaphore-UI-Projekts, als inoffizielle Community-Integration mit Link auf semaphoreui.com). `brand/icon.svg/png/@2x`, Lizenzhinweis in `brand/LICENSE.txt`, README angepasst.
+
 ## 0.15.0 – Token verschlüsselt, Docker-Update erst mit Image (Issues #11, #12)
 ### Docker: kein Update, solange das Image fehlt (Issue #12)
 - Bei einer **Docker-Installation** (Version mit Build-Anhang wie `v2.19.17-f8cefe6-1792391878`) wird ein neues GitHub-Release nur dann als Update gezeigt, wenn es auch als Image auf Docker Hub existiert (`semaphoreui/semaphore`, Tag mit und ohne `v`). GitHub ist oft früher da als das Image. Bis dahin steht die Update-Entität auf „aus“ mit dem Attribut `release_not_yet_in_docker`.

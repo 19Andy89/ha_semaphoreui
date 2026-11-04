@@ -14,8 +14,8 @@ Getestet mit Home Assistant 2026.10 (siehe `tests/`). Läuft rein lokal, keine C
 > REST-API einer Semaphore-Instanz. Ändert sich diese API, muss die Integration hier angepasst werden – Fehler bitte
 > in **diesem** Repository melden, nicht beim Semaphore-Projekt.
 > „Semaphore“ und „Semaphore UI“ sind Namen des jeweiligen Projekts und dienen hier nur dazu, zu benennen, womit die Integration spricht.
-> Das Symbol ist eine **eigene Grafik** (siehe [Symbol](#symbol-icon)) und hat mit dem Original nichts zu tun – eine Erlaubnis,
-> das Semaphore-Logo zu verwenden, liegt nicht vor.
+> Das Symbol ist das **Logo von Semaphore UI** (siehe [Symbol](#symbol-icon)); das Semaphore-UI-Projekt hat die Verwendung für diese
+> inoffizielle Community-Integration erlaubt. Es macht sie nicht zu einem offiziellen Produkt.
 > Das eigentliche Projekt: [semaphoreui/semaphore](https://github.com/semaphoreui/semaphore) ·
 > [Webseite](https://semaphoreui.com) · [Dokumentation und API](https://docs.semaphoreui.com).
 
@@ -579,10 +579,11 @@ laufen unabhängig davon weiter). Die Hinweise werden nicht gespeichert: Nach ei
 
 ## Symbol (Icon)
 
-`custom_components/semaphore_ui/brand/` enthält ein **eigenes Symbol** (Signalmast mit Arm und grüner Lampe), gezeichnet
-für diese Integration und freigegeben unter **CC0 1.0 (Public Domain)** – siehe `brand/LICENSE.txt`. Es verwendet kein
-Logo und keine Grafik des Semaphore-UI-Projekts. Quelle: `brand/icon.svg`; Home Assistant 2026.10 lädt `brand/icon.png`
-und `brand/icon@2x.png` direkt aus der Integration.
+`custom_components/semaphore_ui/brand/` enthält das **Logo von Semaphore UI** ([semaphoreui.com](https://semaphoreui.com)). Das
+Semaphore-UI-Projekt hat erlaubt, es in diesem Repository und in der HACS-Liste zu verwenden, solange klar ist, dass dies eine
+**inoffizielle Community-Integration** ist und auf semaphoreui.com verwiesen wird – beides steht oben in dieser Datei. Das Logo gehört
+dem Semaphore-UI-Projekt (siehe `brand/LICENSE.txt`); die Erlaubnis gilt nicht automatisch für Dritte, die dieses Repository kopieren.
+Quelle: `brand/icon.svg`; Home Assistant 2026.10 lädt `brand/icon.png` und `brand/icon@2x.png` direkt aus der Integration.
 
 ## Token-Pflege (Ablauf, erneuern)
 
@@ -750,7 +751,7 @@ custom_components/semaphore_ui/
   survey_entity.py · text.py · number.py · select.py   Eingabe-Entitäten der Survey-Variablen
   sensor.py · binary_sensor.py · button.py · event.py · update.py · switch.py (Zeitpläne)
   cards.py         liefert frontend/ aus, lässt Home Assistant die Karten-Datei laden und trägt sie als Dashboard-Ressource ein
-  brand/           Symbol der Integration (CC0), icon.svg + icon.png + icon@2x.png
+  brand/           Logo von Semaphore UI (mit Erlaubnis), icon.svg + icon.png + icon@2x.png
   frontend/semaphore-ui-card.js   Template-Karte, Projekt-Karte, Karten-Editor (reines JavaScript, kein Build-Schritt)
   diagnostics.py · logbook.py
   services.yaml · icons.json · translations/{de,en}.json

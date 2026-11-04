@@ -1,6 +1,13 @@
-Das Symbol in diesem Ordner (icon.svg, icon.png, icon@2x.png) ist eine eigene Zeichnung für diese Integration
-und steht unter CC0 1.0 (Public Domain): https://creativecommons.org/publicdomain/zero/1.0/
-Es verwendet kein Logo, keine Schrift und keine Grafik des Semaphore-UI-Projekts.
+Das Symbol in diesem Ordner (icon.svg, icon.png, icon@2x.png) ist das Logo von Semaphore UI
+(https://semaphoreui.com). Es gehört dem Semaphore-UI-Projekt und wird hier mit dessen Erlaubnis
+(Mitteilung an den Betreiber dieses Repositorys, November 2026) verwendet: nur für diese
+inoffizielle Community-Integration, mit dem Hinweis "inoffiziell" und dem Link auf semaphoreui.com.
+Diese Integration ist nicht mit Semaphore UI verbunden und wird nicht von dessen Entwicklern betrieben.
+Die Erlaubnis gilt nicht automatisch für Dritte, die dieses Repository kopieren.
 
-The icon in this folder (icon.svg, icon.png, icon@2x.png) is original artwork made for this integration and is
-released under CC0 1.0 (public domain). It does not use any logo, font or artwork of the Semaphore UI project.
+The icon in this folder (icon.svg, icon.png, icon@2x.png) is the logo of Semaphore UI
+(https://semaphoreui.com). It belongs to the Semaphore UI project and is used here with its
+permission (given to the maintainer of this repository, November 2026) for this unofficial
+community integration only, marked as unofficial and linking to semaphoreui.com.
+This integration is not affiliated with Semaphore UI or its developers.
+The permission does not automatically extend to third parties who copy this repository.

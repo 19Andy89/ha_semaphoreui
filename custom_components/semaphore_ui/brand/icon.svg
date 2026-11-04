@@ -1,24 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Semaphore UI Integration">
-  <!-- Original artwork for this integration, released under CC0 1.0 (public domain). -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#17365D"/>
-      <stop offset="1" stop-color="#0D7377"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
-  <!-- foot and mast -->
-  <rect x="168" y="408" width="176" height="40" rx="16" fill="#E6EDF3"/>
-  <rect x="234" y="112" width="44" height="310" rx="12" fill="#E6EDF3"/>
-  <!-- signal arm (raised = "go") -->
-  <g transform="rotate(-34 256 168)">
-    <rect x="240" y="146" width="212" height="46" rx="12" fill="#FFFFFF"/>
-    <rect x="376" y="146" width="40" height="46" fill="#E5484D"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" width="50" height="50">
+  <!-- Semaphore UI logo (c) Semaphore UI, https://semaphoreui.com - used by permission in this
+       unofficial community integration; the integration is not affiliated with Semaphore UI. -->
+  <g transform="matrix(1.1749537,0,0,1.1749537,-9.0335493,-9.3741995)">
+    <circle style="fill:#005c63" cx="28.965864" cy="29.255791" r="21.135355"/>
+    <circle style="fill:#ffffff" cx="28.973768" cy="16.898766" r="4.2353864"/>
+    <circle style="fill:#ffffff" cx="28.973768" cy="29.598763" r="4.2353864"/>
+    <circle style="fill:#ffffff" cx="28.973768" cy="42.298737" r="4.2353864"/>
   </g>
-  <!-- pivot -->
-  <circle cx="256" cy="168" r="26" fill="#17365D" stroke="#FFFFFF" stroke-width="12"/>
-  <!-- lamp -->
-  <circle cx="256" cy="296" r="46" fill="#17365D"/>
-  <circle cx="256" cy="296" r="34" fill="#3DDC84"/>
-  <circle cx="244" cy="284" r="9" fill="#FFFFFF" fill-opacity="0.55"/>
 </svg>
