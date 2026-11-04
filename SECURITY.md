@@ -63,4 +63,4 @@ Vulnerabilities in Semaphore UI itself (report them at <https://github.com/semap
 
 For context: token and password are stored encrypted in Home Assistant's configuration. The key lives in the same `.storage` folder.
 This protects against an accidentally shared config file, not against access to the whole folder or a full backup
-(see the README, section “How safe are token and password?”).
+(see the README, section “How securely are the token and password stored?”).
