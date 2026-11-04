@@ -1186,7 +1186,7 @@ def test_token_care(playwright) -> None:
         text = deep_text(dialog)
         check(
             "Token-Optionen: Erneuern, Tage, Benutzer und Passwort für den Notfall mit Erklärung",
-            all(t in text for t in ("API-Token vor dem Ablauf selbst erneuern", "weniger als … Tage übrig", "Benutzer für den Notfall (optional)", "Passwort für den Notfall (optional)", "unverschlüsselt")),
+            all(t in text for t in ("API-Token vor dem Ablauf selbst erneuern", "weniger als … Tage übrig", "Benutzer für den Notfall (optional)", "Passwort für den Notfall (optional)", "verschlüsselt gespeichert")),
             text[-600:],
         )
         names = dialog.locator("ha-form").first.evaluate("form => form.schema.map((field) => field.name)")

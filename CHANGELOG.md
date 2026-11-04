@@ -2,11 +2,16 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
-## Nächste Version – Build-/Deploy-Templates (Issue #2)
+## Nächste Version – Bilder mit neuem Logo, Texte zur Verschlüsselung
+- Die Doku-Bilder **Optionen** (`token-options.png`, zeigt jetzt auch „Live-Updates“) und **Reparatur** (`token-repair.png`) zeigen das neue Logo.
+- Texte der Oberfläche (Optionen, „Benutzer und Passwort speichern“) sagten noch „unverschlüsselt“; jetzt „verschlüsselt“ wie seit 0.15.0.
+- `tests/browser/shots_token.py` erzeugt nur diese beiden Bilder neu.
+
+## 0.17.0 – Build-/Deploy-Templates (Issue #2)
 - **Deploy-Templates** lassen sich starten: Die Integration nimmt den **neuesten erfolgreichen Build** des zugehörigen Build-Templates (`build_task_id` an Semaphore). Die Aktion `run_template` hat dafür `build_version` (z. B. `1.0.12`) und `build_task_id`; ein fehlender oder unbekannter Build wird klar gemeldet, bei anderen Templates sind die Felder ein Fehler. Build-Templates starten wie bisher (Semaphore vergibt die Version).
 - Felder aus dem Semaphore-Quellcode geprüft; an einer echten Instanz mit Build/Deploy noch nicht. Tests: 5 neue pytest.
 
-## Nächste Version – Offizielles Logo
+## 0.16.0 – Offizielles Logo
 - Das **Logo von Semaphore UI** ersetzt das selbst gezeichnete Symbol (mit Erlaubnis des Semaphore-UI-Projekts, als inoffizielle Community-Integration mit Link auf semaphoreui.com). `brand/icon.svg/png/@2x`, Lizenzhinweis in `brand/LICENSE.txt`, README angepasst.
 
 ## 0.15.0 – Token verschlüsselt, Docker-Update erst mit Image (Issues #11, #12)

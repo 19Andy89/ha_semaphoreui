@@ -27,7 +27,7 @@
           "store_login": "Keep the user name and password to replace a rejected token by itself in future"
         },
         "data_description": {
-          "store_login": "Optional. The password is then kept - like the token - unencrypted in the configuration of Home Assistant. Without the tick only the new token is stored."
+          "store_login": "Optional. The password is then kept - like the token - encrypted in the configuration of Home Assistant. Without the tick only the new token is stored."
         }
       },
       "reconfigure": {
@@ -87,7 +87,7 @@
           "renew_token": "On (default): when the token expires soon, the integration creates a new one with the token itself (same lifetime), checks it and switches over. The old token stays in Semaphore and expires by itself - you may still use it elsewhere. A token without an expiry date is left alone. Off: a notice with “Fix” appears under “Repairs” instead.",
           "token_days": "At most half of the lifetime of the token.",
           "renew_username": "Only needed when Semaphore already rejects a token (expired or deleted): the integration then signs in, creates a new token and signs out again. The sign-in is checked when you save. A second factor is not possible.",
-          "renew_password": "It is not shown again; leaving it empty keeps the stored password. It is kept - like the token - unencrypted in the configuration of Home Assistant.",
+          "renew_password": "It is not shown again; leaving it empty keeps the stored password. It is stored - like the token - encrypted.",
           "clear_login": "Tick and save: the user name and password are deleted.",
           "live_updates": "On (default): while a task runs, Home Assistant keeps a connection to Semaphore open. Status and the running step show up at once instead of at the next poll. No connection exists while nothing runs. If it does not work, polling simply continues."
         }
@@ -418,7 +418,7 @@
               "store_login": "Keep the user name and password to replace a rejected token by itself in future"
             },
             "data_description": {
-              "store_login": "Optional. The password is then kept - like the token - unencrypted in the configuration of Home Assistant. Without the tick only the new token is stored."
+              "store_login": "Optional. The password is then kept - like the token - encrypted in the configuration of Home Assistant. Without the tick only the new token is stored."
             }
           }
         },
