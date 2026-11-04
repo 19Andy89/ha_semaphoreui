@@ -1,5 +1,7 @@
 # Semaphore UI für Home Assistant (alpha)
 
+🇬🇧 [English version](README_en.md)
+
 Steuert [Semaphore UI](https://semaphoreui.com) (Ansible/Terraform/Bash-Templates) aus Home Assistant.
 Pro Semaphore-**Projekt** ein Eintrag, pro **Template** ein Gerät – mit Status, Start/Testlauf/Stopp
 und einem fertigen **Bericht**: was wann gestartet wurde, wie lange es lief, Ergebnis und – bei Fehlern – warum.

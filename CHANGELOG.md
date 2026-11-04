@@ -1,53 +1,59 @@
 # Changelog
 
-## Unveröffentlicht – Docker: kein Update, solange das Image fehlt (Issue #12)
+Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
+
+## 0.15.0 – Token verschlüsselt, Docker-Update erst mit Image (Issues #11, #12)
+### Docker: kein Update, solange das Image fehlt (Issue #12)
 - Bei einer **Docker-Installation** (Version mit Build-Anhang wie `v2.19.17-f8cefe6-1792391878`) wird ein neues GitHub-Release nur dann als Update gezeigt, wenn es auch als Image auf Docker Hub existiert (`semaphoreui/semaphore`, Tag mit und ohne `v`). GitHub ist oft früher da als das Image. Bis dahin steht die Update-Entität auf „aus“ mit dem Attribut `release_not_yet_in_docker`.
 - Ist Docker Hub nicht erreichbar oder antwortet unklar (Limit, kein Internet), wird das Update wie bisher angezeigt. Andere Installationsarten werden nicht gegen Docker Hub geprüft. Das Semaphore-Token geht nie an Docker Hub.
 - Tests: 5 neue pytest.
 
-## Unveröffentlicht – Token und Passwort verschlüsselt (Issue #11)
+### Token und Passwort verschlüsselt (Issue #11)
 - **Token und Notfall-Passwort** liegen nicht mehr im Klartext in `core.config_entries`, sondern verschlüsselt (Fernet) mit einem Schlüssel in `.storage/semaphore_ui.key`. Bestehende Einrichtungen werden beim Start automatisch umgestellt; ein nicht lesbarer Eintrag (Schlüssel fehlt) löst „Erneut authentifizieren“ aus.
 - Grenzen sind in der README beschrieben: Der Schlüssel muss für Home Assistant lesbar sein, ein komplettes Backup mit Schlüssel schützt das also nicht (dafür verschlüsselte Backups).
 - **Neu konfigurieren** zeigt das gespeicherte Token nicht mehr an; leer lassen behält es.
 - Tests: 3 neue pytest.
 
-## Unveröffentlicht – Live-Updates per WebSocket (Issue #4)
+## 0.13.0 / 0.14.0 – Live-Updates per WebSocket (Issue #4)
 - Neue Option **Live-Updates** (Standard: an): Läuft ein Task, öffnet die Integration `GET /api/ws` (Token per Bearer-Header; Verbindung nur solange etwas läuft, Abfrage bleibt als Rückfall). Statuswechsel stoßen sofort eine Abfrage an.
 - **Aktueller Schritt:** aus den Log-Zeilen (`TASK [...]`) – Attribute `current_step`/`step_number` am Status-Sensor, `step` in den Details des Läuft-Sensors, Zeile „Schritt“ in der Template-Karte. Ein vor der Verbindung gestarteter Task wird aus seinem Log nachgelesen.
 - **Anzeige:** Ist die Verbindung offen, pulsiert in der Zeile „Schritt“ der Template-Karte ein grüner Punkt (Tooltip „Live-Verbindung aktiv“); Attribut `live` am Status-Sensor.
 - Nachrichtenformat an Semaphore 2.19 geprüft (`update` mit Status, `log` mit Ausgabezeile). Tests: 5 neue pytest.
 
-## Unveröffentlicht – Dialog für Secrets und Mehrfachauswahl (Issue #5)
+## 0.12.0 – Dialog für Secrets und Mehrfachauswahl (Issue #5)
 - **Template-Karte:** Hat ein Template Secret- oder Mehrfachauswahl-Variablen, öffnen *Starten* und *Testlauf* einen Dialog (Passwortfeld, Haken, Pflichtfelder, Vorgaben). Die Werte gehen per `semaphore_ui.run_template` an Semaphore, zusammen mit den Werten der normalen Eingabefelder; Secrets landen in keinem Zustand.
 - Start-Schaltfläche: neues Attribut `survey_dialog` (ohne Vorgaben von Secrets).
 - Tests: 280 pytest, 229 Browser-Prüfungen.
 
-## Unveröffentlicht – Grund bei Verbindungsproblemen, Token-Hinweis, Karten-Feinschliff
+## 0.11.1 – Cron-Erklärung für „* 2 * * *“
+- Die Erklärung des Cron-Textes versteht jetzt auch Ausdrücke mit Minute `*` und festen Stunden („Jede Minute zwischen 02:00 und 02:59 Uhr“).
+
+## 0.11.0 – Grund bei Verbindungsproblemen, Token-Hinweis, Karten-Feinschliff
 - **Projekt-Karte:** Das Banner „Semaphore nicht erreichbar“ nennt jetzt den **Grund** (Token abgelehnt / Server nicht erreichbar mit Meldung / Projekt nicht gefunden) und hat einen Link „Integration öffnen“ (ohne Neuladen). Neue Attribute `reason`, `detail`, `config_entry_id` am Sensor „Verbindung“.
 - **Projekt-Karte:** Läuft das Token bald ab, zeigt ein Hinweis „Token läuft ab in … · wird automatisch erneuert / Erneuerung ist aus / fehlgeschlagen“ (Klick öffnet den Sensor).
 - **Template-Karte:** Platte in **einer Zeile** mit höherem Balken, Prozent im Balken und „4,2 / 11,2 GiB frei“ (Belegung und Bedarf der Updates im Tooltip); beim Zeitplan-Formular steht die Cron-Erklärung **neben** dem Feld; das Symbol oben links ist bei einem Testlauf gestrichelt und heller wie in der Projekt-Karte.
 - Browser-Test: 222 Prüfungen, pytest: 279.
 
-## Unveröffentlicht – Cron in Worten, einmalige Zeitpläne
+## 0.10.0 – Cron in Worten, einmalige Zeitpläne
 - **Template-Karte:** Unter dem Cron-Text im Formular steht, was er bedeutet (Deutsch/Englisch, aktualisiert sich beim Tippen). Beim Anlegen lässt sich auf **Einmalig** umschalten (Datum/Uhrzeit, „Nach dem Lauf löschen“); einmalige Zeitpläne sind auch bearbeitbar.
 - **Aktionen:** `create_schedule` nimmt `cron` **oder** `run_at` (plus `delete_after_run`), `update_schedule` ebenso. Zeitpunkte gehen als UTC an Semaphore.
-- Browser-Test: 214 Prüfungen; pytest: 278. Einmalige Zeitpläne sind noch nicht an einer echten Instanz geprüft (Issue #1).
+- Browser-Test: 214 Prüfungen; pytest: 278. Einmalige Zeitpläne wurden danach an einer echten Instanz geprüft (Issue #1).
 
-## Unveröffentlicht – Zeitpläne per Aktion anlegen, ändern, löschen
+## 0.8.0 / 0.9.0 – Zeitpläne per Aktion und in der Karte anlegen, ändern, löschen
 - Neue Aktionen `semaphore_ui.create_schedule` (Ziel: Template-Gerät), `update_schedule` und `delete_schedule` (Ziel: Zeitplan-Schalter).
   Cron-Text wird vorab geprüft (klare Meldung statt „bad request“); beim Ändern wird der ganze Zeitplan an Semaphore geschickt.
   Die Schalter erscheinen/verschwinden mit dem nächsten Abruf. Tests: 274 pytest.
 - **Template-Karte:** „+“ an der Überschrift „Zeitpläne“ und Stift je Zeitplan öffnen ein Formular (Cron-Text, Name; Löschen mit Rückfrage). Option `edit_schedules` (Standard: an) blendet es aus; die Projekt-Karte zeigt nur an. Browser-Test: 206 Prüfungen.
-- Noch **nicht an einer echten Instanz geprüft** (Aufbau der Anfragen aus dem Semaphore-Quellcode abgeleitet) – siehe Issue #1.
+- Auf einer echten Instanz geprüft (Anlegen, Ändern, Löschen, auch einmalig) – siehe Issue #1.
 - README: Hinweis für Repo-Betreiber zu Bildpfaden entfernt.
 
-## Unveröffentlicht – Vorprüfung meldet sich immer
+## 0.7.0 – Vorprüfung meldet sich immer
 - **Playbook `update-linux.yml`:** Die Vorprüfungen (Platz, Paketlisten, Platzbedarf) laufen in einem `block`. Schlägt eine fehl (z. B. zu wenig Platz),
   gibt `rescue` trotzdem ein `HA_RESULT` mit `needed: true`, Hinweis („Update nicht gestartet: …“) und – soweit bekannt – Plattenwerten aus
   und beendet den Lauf danach wie bisher als fehlgeschlagen. So entsteht der Handlungsbedarf-Sensor des Hosts auch dann.
 - **README:** Hinweis, dass das Projekt inoffiziell ist (keine Verbindung zu Semaphore UI, nur dessen API, eigenes Symbol, Link zum Original).
 
-## Unveröffentlicht – Updates je Host, Playbook-Fix
+## 0.6.0 (mit 0.5.2 und 0.6.1) – Updates je Host, Playbook-Fix
 - **Template-Karte:** Bei mehreren Hosts zeigt die Box „Offene Updates“ je Host einen eigenen Block, getrennt durch eine dünne Linie:
   Name, Status („8 Updates, Neustart“ / „aktuell“ / „Handlungsbedarf“), Platte, eigene Paketliste und Hinweise. Mit einem Host bleibt das Layout wie bisher.
 - **Parser:** Die Paketliste steht jetzt auch je Host (`hosts[host].packages`, max. 200); bei mehr Paketen `packages_omitted`. Das Limit stieg von 50 auf 200, die Karte nennt den Rest („n weitere Pakete nicht aufgelistet“).
