@@ -1,4 +1,4 @@
-# Semaphore UI für Home Assistant (alpha)
+# Semaphore UI für Home Assistant (beta)
 
 🇬🇧 [English version](README_en.md)
 
@@ -652,7 +652,7 @@ URL, Token oder die SSL-Prüfung später ändern: *Einstellungen → Geräte & D
 * **Geräte aufräumen**: Das Gerät eines in Semaphore gelöschten Templates kann in Home Assistant über
   *Gerät → ⋮ → Gerät löschen* entfernt werden (Geräte vorhandener Templates und das Projekt-Gerät nicht).
 
-## Bekannte Grenzen (alpha)
+## Bekannte Grenzen (beta)
 
 * Templates vom Typ *build/deploy* (mit Build-Version) lassen sich noch nicht sinnvoll starten.
 * Doppelstart-Schutz: Dass „Parallele Tasks“ am Template im Feld `allow_parallel_tasks` der Semaphore-API steht, ist eine

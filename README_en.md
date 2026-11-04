@@ -1,4 +1,4 @@
-# Semaphore UI for Home Assistant (alpha)
+# Semaphore UI for Home Assistant (beta)
 
 🇩🇪 [Deutsche Version](README.md)
 
@@ -653,7 +653,7 @@ To change the URL, token or SSL check later: *Settings → Devices & services �
 * **Clean up devices**: The device of a template deleted in Semaphore can be removed in Home Assistant via
   *Device → ⋮ → Delete device* (not the devices of existing templates and not the project device).
 
-## Known limitations (alpha)
+## Known limitations (beta)
 
 * Templates of type *build/deploy* (with build version) cannot yet be started in a meaningful way.
 * Double-start protection: That “Allow parallel tasks” on the template is in the field `allow_parallel_tasks` of the Semaphore API is an

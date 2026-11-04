@@ -1,0 +1,39 @@
+name: Fehler melden / Bug report
+description: Etwas funktioniert nicht wie erwartet / Something does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Bitte **keine Token, Passwörter oder interne Adressen** posten – vorher unkenntlich machen.
+        Please do **not** post tokens, passwords or internal addresses – redact them first.
+  - type: input
+    id: version
+    attributes:
+      label: Version der Integration / Integration version
+      placeholder: "0.17.0"
+    validations:
+      required: true
+  - type: input
+    id: ha
+    attributes:
+      label: Home-Assistant- und Semaphore-Version / Home Assistant and Semaphore version
+      placeholder: "HA 2026.10.4, Semaphore 2.19.17"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Was ist passiert, was hast du erwartet? / What happened, what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zum Nachstellen / Steps to reproduce
+  - type: textarea
+    id: logs
+    attributes:
+      label: Protokoll / Logs
+      description: "Einstellungen → System → Protokolle (Filter: semaphore_ui) – oder die Diagnose-Datei des Eintrags / Settings → System → Logs (filter: semaphore_ui) – or the entry's diagnostics file"
+      render: text

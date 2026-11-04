@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke / Security vulnerability
+    url: https://github.com/19Andy89/hacs_semphoreui/security/advisories/new
+    about: Bitte privat melden, nicht als Issue / Please report privately, not as an issue

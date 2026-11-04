@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Berechnet die nächste Version aus den Commit-Meldungen (Conventional Commits) und veröffentlicht sie.
 
-Regeln (solange die Hauptversion 0 ist, also in der Alpha):
+Regeln (solange die Hauptversion 0 ist, also in der Beta):
   * ``feat!:`` / ``fix!:`` / ``BREAKING CHANGE`` im Text -> Minor-Sprung (0.3.x -> 0.4.0; ab 1.0 ein Major-Sprung)
   * ``feat:``                                            -> Minor-Sprung (0.3.x -> 0.4.0)
   * ``fix:`` / ``perf:``                                 -> Patch-Sprung (0.3.0 -> 0.3.1)
