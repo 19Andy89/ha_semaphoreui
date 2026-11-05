@@ -41,7 +41,7 @@
       block:
         - name: Freien und gesamten Platz auf / ermitteln
           ansible.builtin.command:
-            argv: [df, --output=avail,size, -k, /]
+            argv: [df, "--output=avail,size", -k, /]
           changed_when: false
           check_mode: false
           register: root_space
