@@ -1,0 +1,57 @@
+name: Release (dev)
+
+# Bei jedem Push auf dev: Entwicklungsstand zum Testen auf der eigenen Home-Assistant-Instanz.
+# Die Version wird wie bei main aus den Commit-Meldungen bestimmt, bekommt aber ein Suffix: 0.19.0-dev.1, 0.19.0-dev.2, ...
+# Es gibt keinen Release-Commit; die Version steckt nur im ZIP. Tag und Vorabversion (prerelease) zeigen auf den gepushten Commit.
+# In HACS: Integration -> ⋮ -> "Erneut herunterladen" -> Version wählen (Vorabversionen erscheinen, wenn
+# "Beta-Versionen anzeigen" für diese Integration eingeschaltet ist).
+# Wenn der Stand gut ist: Pull Request dev -> main; der Workflow "Release" macht daraus die stabile Version.
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-dev
+  cancel-in-progress: false
+
+jobs:
+  release-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Nächste Dev-Version bestimmen
+        id: version
+        run: python3 .github/scripts/release.py --dev
+
+      - name: Tests (pytest)
+        if: steps.version.outputs.released == 'true'
+        run: |
+          python3 -m pip install -q -r requirements_test.txt
+          python3 -m pytest -q -p no:cacheprovider
+
+      - name: ZIP bauen (nur custom_components/semaphore_ui)
+        if: steps.version.outputs.released == 'true'
+        run: |
+          cd custom_components/semaphore_ui
+          zip -r -q ../../semaphore_ui.zip . -x "__pycache__/*" "*.pyc"
+          unzip -l ../../semaphore_ui.zip | tail -n 3
+
+      - name: Tag und Vorabversion
+        if: steps.version.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION" "$GITHUB_SHA"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" semaphore_ui.zip --title "v$VERSION (dev)" \
+            --notes-file release_notes.md --prerelease --target "$GITHUB_SHA"

@@ -9,7 +9,10 @@ Regeln (solange die Hauptversion 0 ist, also in der Beta):
 
 Steht in ``manifest.json`` schon eine **höhere** Version als im letzten Tag, wird genau diese veröffentlicht (von Hand gesetzt).
 
-Aufruf: ``release.py [--dry-run]``. Setzt die Ausgaben ``version`` und ``released`` für GitHub Actions.
+Aufruf: ``release.py [--dry-run] [--dev]``. Setzt die Ausgaben ``version`` und ``released`` für GitHub Actions.
+
+``--dev`` (Branch ``dev``): gleiche Regeln, aber die Version bekommt ein Suffix ``-dev.N`` (0.19.0-dev.1, 0.19.0-dev.2, ...).
+Es gibt keinen Release-Commit: Die Version wird nur im Arbeitsverzeichnis gesetzt (also nur im ZIP), das Repository bleibt unverändert.
 """
 
 from __future__ import annotations
@@ -33,7 +36,7 @@ def git(*args: str) -> str:
 
 
 def parse(version: str) -> tuple[int, int, int]:
-    major, minor, patch = (int(x) for x in version.split("."))
+    major, minor, patch = (int(x) for x in version.split("-")[0].split("."))
     return major, minor, patch
 
 
@@ -130,6 +133,7 @@ def output(**values: str) -> None:
 
 def main() -> int:
     dry = "--dry-run" in sys.argv
+    dev = "--dev" in sys.argv
     tag = latest_tag()
     base = tag[1:] if tag else "0.0.0"
     current = json.loads(MANIFEST.read_text(encoding="utf-8"))["version"]
@@ -147,16 +151,27 @@ def main() -> int:
         output(released="false", version=base)
         return 0
 
+    plain = version
+    if dev:
+        number = len(git("tag", "--list", f"v{plain}-dev.*").splitlines()) + 1
+        version = f"{plain}-dev.{number}"
     print(f"Neue Version {version} ({reason})")
     body = release_notes(notes)
     if parse(current) > parse(base):
-        body = (changelog_section(version) or body) + "\n\n" + body.splitlines()[-1]
+        body = (changelog_section(plain) or body) + "\n\n" + body.splitlines()[-1]
+    if dev:
+        body = (
+            f"**Entwicklungsstand zum Testen** (Vorabversion, noch nicht in `main`). Vorgesehen für {plain}.\n\n"
+            + body.replace("Installation: `semaphore_ui.zip` enthält", "`semaphore_ui.zip` enthält")
+        )
     Path(ROOT / "release_notes.md").write_text(body, encoding="utf-8")
     if dry:
         print(body[:400])
         output(released="false", version=version)
         return 0
-    if version != current:
+    if dev:
+        write_version(version)  # nur im Arbeitsverzeichnis, wird nicht committet
+    elif version != current:
         write_version(version)
         git("add", str(MANIFEST), str(CARD))
         git("-c", "user.name=github-actions[bot]", "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
