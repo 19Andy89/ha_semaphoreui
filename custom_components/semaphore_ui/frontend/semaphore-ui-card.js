@@ -730,12 +730,40 @@ class SemaphoreBaseCard extends HTMLElement {
     this._sig = sig;
     this._renderPending = false;
     if (active && active.getAttribute && active.getAttribute("data-action") === "pkgs") this._focusPkgs = active.dataset.key || "";
+    // A redraw must not move the page: keep the card as high as it was until the new content is laid out,
+    // and put the scroll position of the page / scrolling parents back if the browser changed it anyway.
+    const keep = this._scrollState();
+    const height = this.offsetHeight;
+    if (height) this.style.minHeight = `${height}px`;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${this._html()}`;
     for (const el of this.shadowRoot.querySelectorAll('[data-action="more-info"], [data-action="filter"]')) {
       el.setAttribute("role", "button");
       el.setAttribute("tabindex", "0");
     }
     this._afterRender();
+    this._restoreScroll(keep);
+    requestAnimationFrame(() => {
+      this._restoreScroll(keep);
+      requestAnimationFrame(() => {
+        this.style.minHeight = "";
+        this._restoreScroll(keep);
+      });
+    });
+  }
+  /** Scroll position of the window and of every scrolling parent (also across shadow roots). */
+  _scrollState() {
+    const parents = [];
+    let node = this;
+    while (node) {
+      node = node.assignedSlot || node.parentElement || (node.getRootNode && node.getRootNode().host) || null;
+      if (node && node.scrollTop > 0) parents.push([node, node.scrollTop]);
+    }
+    return { x: window.scrollX, y: window.scrollY, parents };
+  }
+  _restoreScroll(state) {
+    if (!state) return;
+    for (const [el, top] of state.parents) if (el.scrollTop !== top) el.scrollTop = top;
+    if (state.y > 0 && Math.abs(window.scrollY - state.y) > 1) window.scrollTo(state.x, state.y);
   }
   _afterRender() {}
 
@@ -1212,8 +1240,9 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const allHosts = Object.entries(a.hosts || {}).filter(([, h]) => h && typeof h === "object");
     const multi = allHosts.length > 1;
     const lang = langOf(hass);
-    const num = (n, digits = 1) => new Intl.NumberFormat(hass.locale?.language || lang, { maximumFractionDigits: digits }).format(n);
-    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024)} GiB` : `${num(mib, 0)} MiB`);
+    const num = (n, digits = 1, min = 0) => new Intl.NumberFormat(hass.locale?.language || lang, { minimumFractionDigits: min, maximumFractionDigits: digits }).format(n);
+    // GiB always with one decimal ("1,0 / 1,7"), so the numbers do not jump between "1" and "1,7"
+    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024, 1, 1)} GiB` : `${num(mib, 0)} MiB`);
 
     // hint lines ("Debian 13 is out"), shown whether or not something is to do
     const noteLines = (items) =>
@@ -1234,7 +1263,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       let text = "";
       if (free !== null && total !== null) {
         const gib = total >= 1024;
-        const f = (mib) => num(gib ? mib / 1024 : mib, gib ? 1 : 0);
+        const f = (mib) => (gib ? num(mib / 1024, 1, 1) : num(mib, 0));
         text = `${f(free)} / ${f(total)} ${gib ? "GiB" : "MiB"} ${T.disk_free}`;
       } else if (free !== null) text = `${size(free)} ${T.disk_free}`;
       const need = h.disk_required_mib > 0 ? `${T.disk_need} ${size(h.disk_required_mib)}` : "";
@@ -1330,7 +1359,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const key = this._focusPkgs;
     this._focusPkgs = false;
     const button = [...this.shadowRoot.querySelectorAll('[data-action="pkgs"]')].find((b) => (b.dataset.key || "") === key);
-    if (button && !button.hidden) button.focus();
+    if (button && !button.hidden) button.focus({ preventScroll: true });
   }
 
   /** Re-fit the package line when the card gets wider/narrower (and once the fonts are there). */
