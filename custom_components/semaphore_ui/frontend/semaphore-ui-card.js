@@ -468,7 +468,8 @@ const STYLE = `
                background: color-mix(in srgb, var(--primary-color) 14%, transparent); flex: none; }
   button.pkg:hover { background: color-mix(in srgb, var(--primary-color) 24%, transparent); }
   button.pkg:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  .item .need { --mdc-icon-size: 16px; margin-left: 6px; vertical-align: text-bottom; color: var(--warning-color, #ffa600); }
+  .item .needline { display: flex; align-items: flex-start; gap: 4px; margin-top: 2px; font-size: 0.85em; color: var(--warning-color, #ffa600); white-space: normal; overflow-wrap: anywhere; }
+  .item .needline ha-icon { --mdc-icon-size: 16px; flex: none; }
   .params { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   .param { font-size: 0.8em; padding: 1px 8px; border-radius: 10px; background: var(--secondary-background-color); }
   .survey { margin-top: 14px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
@@ -1791,9 +1792,9 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
       if (!active && t.duration && !isNaN(Number(t.duration))) bits.push(fmtDuration(Number(t.duration), hass));
     }
     if (t.status === "error" && t.rep.error && t.rep.error.reason) bits.push(t.rep.error.reason);
-    else if (t.needs === "on" && t.needText) bits.push(t.needText);
     const dryItem = !!(t.rep && t.rep.dry_run) && !active && t.status !== "never_run"; // a dry run: lighter, dashed icon
-    const needIcon = t.needs === "on" ? `<ha-icon class="need" icon="mdi:package-up" title="${esc(t.needText)}"></ha-icon>` : "";
+    // open updates / reboot: an own, wrapping line (it was cut off in the one-line status)
+    const needLine = t.needs === "on" && t.needText ? `<div class="needline"><ha-icon icon="mdi:package-up"></ha-icon><span>${esc(t.needText)}</span></div>` : "";
     const startId = t.byKey["button:start"];
     const stopId = t.byKey["button:stop"];
     const unavailable = this._val(t.byKey["sensor:status"]) === "unavailable";
@@ -1807,6 +1808,10 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
            <button class="icon" data-action="confirm-no" aria-label="${esc(T.no)}"><ha-icon icon="mdi:close"></ha-icon></button>`
         : `<button class="icon${this._busy.has(startId) ? " busy" : ""}" data-action="start" data-entity="${startId}"${this._busyAttrs(startId)} ${unavailable ? "disabled" : ""} aria-label="${esc(T.start)} ${esc(t.name)}" title="${esc(T.start)}">${this._ico(startId, "mdi:play")}</button>`;
     }
+    const dryId = t.byKey["button:dry_run"];
+    if (!active && this._config.show_start && dryId) {
+      action = `<button class="icon${this._busy.has(dryId) ? " busy" : ""}" data-action="press" data-entity="${dryId}"${this._busyAttrs(dryId)} ${unavailable ? "disabled" : ""} aria-label="${esc(T.dry_run)} ${esc(t.name)}" title="${esc(T.dry_run)}">${this._ico(dryId, "mdi:flask-outline")}</button>` + action;
+    }
     const dismissId = t.byKey["button:dismiss"];
     if (t.recent && dismissId) {
       action += `<button class="icon${this._busy.has(dismissId) ? " busy" : ""}" data-action="press" data-entity="${dismissId}"${this._busyAttrs(dismissId)} aria-label="${esc(T.dismiss)}: ${esc(t.name)}" title="${esc(T.dismiss)}">${this._ico(dismissId, "mdi:eye-off-outline")}</button>`;
@@ -1814,7 +1819,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     return `<div class="item">
       <ha-icon class="ic ${st.pulse ? "pulse" : ""}${dryItem ? " dry" : ""}" icon="${st.icon}" style="color:${st.color}"${dryItem ? ` title="${esc(T.dry_run_hint)}"` : ""}></ha-icon>
       <div class="main" data-action="more-info" data-entity="${t.byKey["sensor:status"]}">
-        <div class="name">${esc(t.name)}${needIcon}</div><div class="sub" title="${esc(bits.join(" · "))}">${esc(bits.join(" · "))}</div>
+        <div class="name">${esc(t.name)}</div><div class="sub" title="${esc(bits.join(" · "))}">${esc(bits.join(" · "))}</div>${needLine}
       </div>${action}</div>`;
   }
 

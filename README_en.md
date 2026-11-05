@@ -2,6 +2,8 @@
 
 🇩🇪 [Deutsche Version](README.md)
 
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=19Andy89&repository=hacs_semaphoreui&category=integration)
+
 Controls [Semaphore UI](https://semaphoreui.com) (Ansible/Terraform/Bash templates) from Home Assistant.
 One entry per Semaphore **project**, one device per **template** – with status, start/dry run/stop
 and a ready-made **report**: what was started when, how long it ran, the result and – for failures – why.
