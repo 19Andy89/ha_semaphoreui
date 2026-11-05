@@ -210,6 +210,9 @@
       },
       "stop": {
         "name": "Stoppen"
+      },
+      "dismiss": {
+        "name": "Als erledigt markieren"
       }
     },
     "event": {

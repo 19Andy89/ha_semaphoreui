@@ -263,6 +263,7 @@ für den Host. Das mitgelieferte Playbook fasst die Vorprüfungen deshalb in ein
 **Dashboard:** In der Karte unter **Sichtbarkeit** eine Bedingung „Entität → Zustand“ auf den Sensor *Handlungsbedarf*
 setzen (Zustand `Ein`) – die Karte erscheint nur, wenn etwas zu tun ist. Die Projekt-Karte kann alles in einer Liste
 zeigen: Option `only_needed: true` blendet Templates ohne Handlungsbedarf, ohne Fehler und ohne laufenden Task aus.
+Mit zusätzlich `show_recent: true` bleibt ein Template **24 Stunden nach seinem Lauf** sichtbar, auch wenn sonst nichts zu tun ist; ein Knopf (Auge) „Als erledigt ausblenden“ blendet es früher aus (Button-Entität *Als erledigt markieren*, gilt für alle Geräte; ein neuer Lauf blendet es wieder ein).
 Für Updates, die Home Assistant selbst kennt (Core, OS, Supervisor, Container), genügt dieselbe Sichtbarkeits-Bedingung auf
 die jeweilige `update`-Entität – dafür braucht es kein `HA_RESULT`.
 
@@ -404,6 +405,7 @@ name: Homelab                                  # optional
 sort: status                                   # status | name | last_run
 show_never_run: true                           # Templates ohne Lauf zeigen
 only_needed: false                             # true = nur Templates mit Handlungsbedarf, Fehler oder laufendem Task
+show_recent: false                             # true (mit only_needed) = zusätzlich Templates der letzten 24 h, mit Ausblenden-Knopf
 show_start: true                               # Start-Knopf je Zeile
 confirm_start: false                           # Rückfrage vor dem Start
 show_version: true                             # Semaphore-Version in der Kopfzeile

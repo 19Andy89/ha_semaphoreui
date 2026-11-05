@@ -264,6 +264,7 @@ for the host without a report. The bundled playbook therefore wraps the pre-chec
 **Dashboard:** In the card, under **Visibility**, set a condition “Entity → State” on the *Needs action* sensor
 (state `On`) – the card appears only when something needs doing. The project card can show everything in one list:
 the option `only_needed: true` hides templates without action needed, without errors and without a running task.
+With `show_recent: true` in addition, a template stays visible for **24 hours after its run**, even if nothing else needs doing; a button (eye) “Mark as done and hide” hides it earlier (button entity *Mark as done*, valid for all devices; a new run shows it again).
 For updates that Home Assistant knows itself (Core, OS, Supervisor, containers), the same visibility condition on
 the respective `update` entity is enough – no `HA_RESULT` is needed for that.
 
@@ -405,6 +406,7 @@ name: Homelab                                  # optional
 sort: status                                   # status | name | last_run
 show_never_run: true                           # show templates without a run
 only_needed: false                             # true = only templates with action needed, error or running task
+show_recent: false                             # true (with only_needed) = also templates of the last 24 h, with a hide button
 show_start: true                               # start button per row
 confirm_start: false                           # confirmation before starting
 show_version: true                             # Semaphore version in the header

@@ -17,6 +17,7 @@ PARALLEL_UPDATES = 1
 START = ButtonEntityDescription(key="start", translation_key="start")
 DRY_RUN = ButtonEntityDescription(key="dry_run", translation_key="dry_run")
 STOP = ButtonEntityDescription(key="stop", translation_key="stop")
+DISMISS = ButtonEntityDescription(key="dismiss", translation_key="dismiss")
 
 
 async def async_setup_entry(
@@ -42,6 +43,7 @@ async def async_setup_entry(
                     SemaphoreStartButton(coordinator, template_id, dry_run=True)
                 )
             entities.append(SemaphoreStopButton(coordinator, template_id))
+            entities.append(SemaphoreDismissButton(coordinator, template_id))
         async_add_entities(entities)
 
     _add_new_templates()
@@ -105,3 +107,21 @@ class SemaphoreStopButton(SemaphoreTemplateEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Stop the task."""
         await self.coordinator.async_stop_template(self.template_id)
+
+
+class SemaphoreDismissButton(SemaphoreTemplateEntity, ButtonEntity):
+    """Marks the last finished run as done: the project card hides the template (if it shows recent runs)."""
+
+    entity_description = DISMISS
+
+    def __init__(self, coordinator: SemaphoreCoordinator, template_id: int) -> None:
+        super().__init__(coordinator, template_id, DISMISS.key)
+
+    @property
+    def available(self) -> bool:
+        """Not while a task is active: only a finished run can be marked as done."""
+        return super().available and not self.coordinator.active_task_ids(self.template_id)
+
+    async def async_press(self) -> None:
+        """Hide the template until its next run."""
+        await self.coordinator.async_dismiss_template(self.template_id)

@@ -85,6 +85,9 @@
       },
       "stop": {
         "default": "mdi:stop"
+      },
+      "dismiss": {
+        "default": "mdi:eye-off-outline"
       }
     },
     "event": {

@@ -19,6 +19,7 @@ const TEXTS = {
     dry_run: "Testlauf",
     dry_run_hint: "Der letzte Lauf war ein Testlauf (es wurde nichts verändert)",
     stop: "Stoppen",
+    dismiss: "Als erledigt ausblenden",
     last_run: "Letzter Lauf",
     duration: "Dauer",
     never: "Noch nie ausgeführt",
@@ -134,6 +135,7 @@ const TEXTS = {
       show_never_run: "Templates ohne Lauf zeigen",
       show_start: "Start-Knopf in der Liste zeigen",
       only_needed: "Nur Templates mit Handlungsbedarf, Fehler oder laufendem Lauf zeigen",
+      show_recent: "Dazu Templates zeigen, die in den letzten 24 Stunden gelaufen sind (mit Ausblenden-Knopf; nur zusammen mit „Nur Templates mit Handlungsbedarf …“)",
       show_version: "Semaphore-Version anzeigen",
       show_integration_version: "Version der Integration anzeigen",
       hacs_update_entity: "Update-Entität der Integration (HACS), optional",
@@ -146,6 +148,7 @@ const TEXTS = {
     dry_run: "Dry run",
     dry_run_hint: "The last run was a dry run (nothing was changed)",
     stop: "Stop",
+    dismiss: "Mark as done and hide",
     last_run: "Last run",
     duration: "Duration",
     never: "Never run",
@@ -261,6 +264,7 @@ const TEXTS = {
       show_never_run: "Show templates that never ran",
       show_start: "Show start button in the list",
       only_needed: "Show only templates that need action, failed or are running",
+      show_recent: "Also show templates that ran in the last 24 hours (with a hide button; only together with “Show only templates that need action …”)",
       show_version: "Show the Semaphore version",
       show_integration_version: "Show the version of the integration",
       hacs_update_entity: "Update entity of the integration (HACS), optional",
@@ -1487,7 +1491,7 @@ SemaphoreTemplateCard.prototype.getGridOptions = function () {
 /* ========================================================== project card */
 class SemaphoreProjectCard extends SemaphoreBaseCard {
   static get defaults() {
-    return { sort: "status", show_never_run: true, show_start: true, confirm_start: false, only_needed: false, show_version: true, show_integration_version: false, show_schedules: true };
+    return { sort: "status", show_never_run: true, show_start: true, confirm_start: false, only_needed: false, show_recent: false, show_version: true, show_integration_version: false, show_schedules: true };
   }
   static getConfigElement() {
     return document.createElement("semaphore-ui-card-editor");
@@ -1516,13 +1520,22 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
         started: this._val(byKey["sensor:last_started"]),
         duration: this._val(byKey["sensor:last_duration"]),
         rep: (sum && sum.attributes) || {},
+        ended: this._val(byKey["sensor:last_ended"]),
+        dismissedAt: ((this._state(byKey["sensor:status"]) || {}).attributes || {}).dismissed_at || "",
         needs: this._val(byKey["binary_sensor:needs_action"]),
         needText: ((this._state(byKey["binary_sensor:needs_action"]) || {}).attributes || {}).explanation || "",
       });
     }
     const cfg = this._config;
     let list = out.filter((t) => cfg.show_never_run || t.status !== "never_run");
-    if (cfg.only_needed) list = list.filter((t) => t.needs === "on" || t.status === "error" || ACTIVE.has(t.status));
+    // "ran in the last 24 h and not marked as done": a newer run ends after the mark, so it shows again
+    const recent = (t) => {
+      if (!cfg.show_recent || ACTIVE.has(t.status) || !t.ended || isNaN(Date.parse(t.ended))) return false;
+      const end = Date.parse(t.ended);
+      return Date.now() - end < 24 * 3600 * 1000 && !(t.dismissedAt && Date.parse(t.dismissedAt) >= end);
+    };
+    for (const t of out) t.recent = recent(t) && t.needs !== "on" && t.status !== "error"; // shown only for this reason: gets the hide button
+    if (cfg.only_needed) list = list.filter((t) => t.needs === "on" || t.status === "error" || ACTIVE.has(t.status) || recent(t));
     if (Array.isArray(cfg.templates) && cfg.templates.length) list = list.filter((t) => cfg.templates.includes(t.device.id));
     // tapped tile: only the running / failed / "needs action" templates
     if (this._filter === "running") list = list.filter((t) => ACTIVE.has(t.status));
@@ -1553,7 +1566,8 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     add(byKey["sensor:token_expires"], "renew_error");
     for (const dev of templateDevicesOf(hass, c.device_id)) {
       const k = entitiesOfDevice(hass, dev.id).byKey;
-      for (const key of ["sensor:status", "sensor:last_started", "sensor:last_duration", "button:start", "button:stop"]) add(k[key]);
+      for (const key of ["sensor:status", "sensor:last_started", "sensor:last_ended", "sensor:last_duration", "button:start", "button:stop", "button:dismiss"]) add(k[key]);
+      add(k["sensor:status"], "dismissed_at");
       add(k["sensor:summary"], "short");
       add(k["binary_sensor:needs_action"], "explanation");
     }
@@ -1723,6 +1737,10 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
            <button class="icon" data-action="confirm-no" aria-label="${esc(T.no)}"><ha-icon icon="mdi:close"></ha-icon></button>`
         : `<button class="icon${this._busy.has(startId) ? " busy" : ""}" data-action="start" data-entity="${startId}"${this._busyAttrs(startId)} ${unavailable ? "disabled" : ""} aria-label="${esc(T.start)} ${esc(t.name)}" title="${esc(T.start)}">${this._ico(startId, "mdi:play")}</button>`;
     }
+    const dismissId = t.byKey["button:dismiss"];
+    if (t.recent && dismissId) {
+      action += `<button class="icon${this._busy.has(dismissId) ? " busy" : ""}" data-action="press" data-entity="${dismissId}"${this._busyAttrs(dismissId)} aria-label="${esc(T.dismiss)}: ${esc(t.name)}" title="${esc(T.dismiss)}">${this._ico(dismissId, "mdi:eye-off-outline")}</button>`;
+    }
     return `<div class="item">
       <ha-icon class="ic ${st.pulse ? "pulse" : ""}${dryItem ? " dry" : ""}" icon="${st.icon}" style="color:${st.color}"${dryItem ? ` title="${esc(T.dry_run_hint)}"` : ""}></ha-icon>
       <div class="main" data-action="more-info" data-entity="${t.byKey["sensor:status"]}">
@@ -1821,6 +1839,7 @@ class SemaphoreCardEditor extends HTMLElement {
         },
         { name: "show_never_run", selector: { boolean: {} } },
         { name: "only_needed", selector: { boolean: {} } },
+        { name: "show_recent", selector: { boolean: {} } },
         { name: "show_start", selector: { boolean: {} } },
         { name: "confirm_start", selector: { boolean: {} } },
         { name: "show_version", selector: { boolean: {} } },

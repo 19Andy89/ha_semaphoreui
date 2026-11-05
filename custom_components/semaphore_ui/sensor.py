@@ -504,12 +504,16 @@ class SemaphoreTemplateSensor(SemaphoreTemplateEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """While a task runs: whether the live connection is open and the Ansible step."""
+        """While a task runs: whether the live connection is open and the Ansible step; plus the time the run was marked as done."""
         if self.entity_description.key != "status":
             return None
+        attrs: dict[str, Any] = {}
+        dismissed = self.coordinator.dismissed.get(self.template_id)
+        if dismissed:
+            attrs["dismissed_at"] = dismissed  # marked as done; the card hides older runs
         if not self.coordinator.active_task_ids(self.template_id):
-            return None
-        attrs: dict[str, Any] = {"live": self.coordinator.live.open}
+            return attrs or None
+        attrs["live"] = self.coordinator.live.open
         step = self.coordinator.current_step(self.template_id)
         if step is not None:
             attrs.update(current_step=step[1], step_number=step[0])

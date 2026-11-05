@@ -22,6 +22,7 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -103,6 +104,11 @@ def template_identifier(entry_id: str, template_id: int) -> tuple[str, str]:
     return (DOMAIN, f"{entry_id}_template_{template_id}")
 
 
+def dismiss_store_name(entry_id: str) -> str:
+    """Name of the file in ``.storage`` that keeps the "done" marks of a project."""
+    return f"semaphore_ui.dismissed_{entry_id}"
+
+
 class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
     """Polls the templates of one Semaphore project and fires task events."""
 
@@ -161,6 +167,31 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self._first_done = False
         self.live_enabled: bool = entry.options.get(CONF_LIVE, True)
         self.live = LiveStream(self)
+        # template_id -> ISO time at which the finished run was marked "done" (hidden in the project card)
+        self.dismissed: dict[int, str] = {}
+        self._dismiss_store: Store[dict[str, str]] = Store(
+            hass, 1, dismiss_store_name(entry.entry_id), private=False
+        )
+
+    # ------------------------------------------------------------------ #
+    # "Done" marks: a finished run can be hidden in the project card
+    # ------------------------------------------------------------------ #
+    async def async_load_dismissed(self) -> None:
+        """Read the marks saved earlier (a missing or damaged file means: nothing hidden)."""
+        data = await self._dismiss_store.async_load()
+        if not isinstance(data, dict):
+            return
+        self.dismissed = {
+            int(key): value
+            for key, value in data.items()
+            if str(key).isdigit() and isinstance(value, str)
+        }
+
+    async def async_dismiss_template(self, template_id: int) -> None:
+        """Mark the last finished run of a template as done; a newer run shows it again."""
+        self.dismissed[template_id] = dt_util.utcnow().isoformat()
+        await self._dismiss_store.async_save({str(key): value for key, value in self.dismissed.items()})
+        self.async_update_listeners()
 
     # ------------------------------------------------------------------ #
     # Convenience

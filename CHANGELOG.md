@@ -2,7 +2,10 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
-## Nächste Version – Vorbereitung für public, hassfest
+## Nächste Version – 24 h sichtbar lassen (Issue #13), Vorbereitung für public, hassfest
+- **Projekt-Karte:** Neue Option `show_recent` (Haken im Karten-Editor, zusammen mit „nur Templates mit Handlungsbedarf …“): Ein Template bleibt 24 h nach seinem Lauf in der Liste. Der Knopf **Als erledigt ausblenden** (Auge) blendet es früher aus; ein neuer Lauf blendet es wieder ein.
+- Der Zustand liegt in Home Assistant, nicht im Browser: neue Button-Entität *Als erledigt markieren* je Template, Attribut `dismissed_at` am Status-Sensor, gespeichert in `.storage` und beim Entfernen des Projekts gelöscht. Dadurch gilt „ausgeblendet“ auf allen Geräten.
+- Die einzelne Template-Karte bleibt unverändert (sie zeigt das Template ohnehin immer).
 - **Beta** statt Alpha (README-Titel); `manifest.json` zeigt auf dieses Repository (Dokumentation, Issues, Codeowner).
 - **hassfest-konform**: Die Aktionen `run_template` und `create_schedule` haben das Feld **Template (`device_id`)** mit Geräteauswahl statt eines Ziel-Filters (bestehende Automationen mit `target: device_id` laufen unverändert); Reparatur-Texte stehen im Dialog statt zusätzlich an der Meldung; Beispiel-Adressen in den Texten sind Platzhalter.
 - Neu: `SECURITY.md`, `CONTRIBUTING.md`, Issue-Vorlagen (Deutsch/Englisch), Workflow „Validate“ (hassfest, HACS).
