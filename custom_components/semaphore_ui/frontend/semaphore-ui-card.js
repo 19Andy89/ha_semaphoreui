@@ -127,6 +127,7 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Eingabefelder (Survey-Variablen) zeigen",
       show_details: "Fehlergrund und Parameter zeigen",
+      hide_when_idle: "Karte ausblenden, wenn nichts zu zeigen ist (läuft, Fehler, Handlungsbedarf oder – falls in den Optionen eingeschaltet – 24 Stunden nach dem Lauf)",
       confirm_start: "Start bestätigen lassen",
       sort: "Sortierung der Templates",
       sort_name: "Name",
@@ -256,6 +257,7 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Show input fields (survey variables)",
       show_details: "Show failure reason and parameters",
+      hide_when_idle: "Hide the card when there is nothing to show (running, failed, action needed or - if switched on in the options - 24 hours after the run)",
       confirm_start: "Ask for confirmation before starting",
       sort: "Sort templates by",
       sort_name: "Name",
@@ -1066,7 +1068,7 @@ function describeCron(expr, lang) {
 /* ======================================================== template card */
 class SemaphoreTemplateCard extends SemaphoreBaseCard {
   static get defaults() {
-    return { show_survey: true, show_details: true, confirm_start: false, show_schedules: true, edit_schedules: true };
+    return { show_survey: true, show_details: true, confirm_start: false, show_schedules: true, edit_schedules: true, hide_when_idle: false };
   }
   static getConfigElement() {
     return document.createElement("semaphore-ui-card-editor");
@@ -1211,6 +1213,9 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     }
     const dryBtn = dryId && !confirming ? `<button class="btn${this._busy.has(dryId) ? " busy" : ""}" data-action="press" data-entity="${dryId}"${this._busyAttrs(dryId)} ${can(dryId) && !locked ? "" : "disabled"}${lockTitle}>${this._ico(dryId, "mdi:flask-outline")}${esc(T.dry_run)}</button>` : "";
     const stopBtn = stopId && running && !confirming ? `<button class="btn danger${this._busy.has(stopId) ? " busy" : ""}" data-action="press" data-entity="${stopId}"${this._busyAttrs(stopId)} ${can(stopId) ? "" : "disabled"}>${this._ico(stopId, "mdi:stop")}${esc(T.stop)}</button>` : "";
+    const dismissId = byKey["button:dismiss"];
+    const recent = (this._state(byKey["binary_sensor:show_card"]) || { attributes: {} }).attributes.reason === "recent";
+    const dismissBtn = dismissId && recent && !running && !confirming ? `<button class="btn${this._busy.has(dismissId) ? " busy" : ""}" data-action="press" data-entity="${dismissId}"${this._busyAttrs(dismissId)}>${this._ico(dismissId, "mdi:eye-off-outline")}${esc(T.dismiss)}</button>` : "";
     const link = rep.url ? `<a class="link" href="${esc(rep.url)}" target="_blank" rel="noopener"><ha-icon icon="mdi:open-in-new"></ha-icon>${esc(T.open)}</a>` : "";
 
     return `<ha-card>
@@ -1224,7 +1229,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       ${details}
       ${schedHtml}
       ${surveyHtml}
-      ${this._dlg ? this._dialogHtml(T) : `<div class="actions">${startBtn}${dryBtn}${stopBtn}${link}</div>`}
+      ${this._dlg ? this._dialogHtml(T) : `<div class="actions">${startBtn}${dryBtn}${stopBtn}${dismissBtn}${link}</div>`}
       ${this._message ? `<div class="msg" role="alert">${esc(this._message)}</div>` : ""}
     </ha-card>`;
   }
@@ -1338,7 +1343,26 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     return `<label${title}><span>${esc(label)}${required}</span>${control}</label>`;
   }
 
+  /** "Hide the card when idle": tell Home Assistant (like a visibility condition) - but never while the dashboard is being edited. */
+  _applyVisibility() {
+    const show = this._ents().byKey["binary_sensor:show_card"];
+    const state = show ? this._state(show) : null;
+    let hide = !!this._config.hide_when_idle && !!state && state.state === "off";
+    if (hide) {
+      let node = this;
+      while (node) {
+        node = node.assignedSlot || node.parentElement || (node.getRootNode && node.getRootNode().host) || null;
+        if (node && node.lovelace && node.lovelace.editMode) hide = false;
+      }
+    }
+    if (this._hiddenByUs === hide) return;
+    this._hiddenByUs = hide;
+    this.style.display = hide ? "none" : "";
+    this.dispatchEvent(new CustomEvent("card-visibility-changed", { detail: { value: !hide }, bubbles: true, composed: true }));
+  }
+
   _afterRender() {
+    this._applyVisibility();
     this._tick();
     this._fitPackages();
     this._observeSize();
@@ -1877,7 +1901,7 @@ class SemaphoreCardEditor extends HTMLElement {
         { name: "show_schedules", selector: { boolean: {} } }
       );
     } else {
-      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } }, { name: "edit_schedules", selector: { boolean: {} } });
+      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "hide_when_idle", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } }, { name: "edit_schedules", selector: { boolean: {} } });
     }
     return base;
   }

@@ -82,6 +82,8 @@ ISSUE_ALL: Final = (*ISSUE_KINDS, ISSUE_TOKEN_EXPIRING)
 # Token care (0.3.0): show when the API token expires, replace it before that and, with a
 # stored login, replace a token that was rejected.
 CONF_LIVE: Final = "live_updates"  # option: follow running tasks over the WebSocket
+CONF_KEEP_RECENT: Final = "keep_recent"  # option: keep a template "visible" for 24 h after its run
+RECENT_HOURS: Final = 24
 CONF_RENEW_TOKEN: Final = "renew_token"  # option: replace the token before it expires
 CONF_TOKEN_DAYS: Final = "token_days"  # option: warn / replace when fewer days are left
 CONF_RENEW_USER: Final = "renew_username"  # option: stored login (optional)

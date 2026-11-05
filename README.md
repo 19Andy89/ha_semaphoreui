@@ -263,6 +263,11 @@ für den Host. Das mitgelieferte Playbook fasst die Vorprüfungen deshalb in ein
 **Dashboard:** In der Karte unter **Sichtbarkeit** eine Bedingung „Entität → Zustand“ auf den Sensor *Handlungsbedarf*
 setzen (Zustand `Ein`) – die Karte erscheint nur, wenn etwas zu tun ist. Die Projekt-Karte kann alles in einer Liste
 zeigen: Option `only_needed: true` blendet Templates ohne Handlungsbedarf, ohne Fehler und ohne laufenden Task aus.
+**Template-Karte nach dem Lauf noch 24 Stunden zeigen:** In den **Optionen** der Integration „Templates nach einem Lauf 24 Stunden sichtbar lassen“ einschalten.
+Jedes Template hat dann den Diagnose-Sensor **Karte sichtbar** (`binary_sensor`, Attribute `reason` = `running` / `error` / `needs_action` / `recent`, `until`):
+an, solange es läuft, fehlgeschlagen ist, Handlungsbedarf meldet oder – nur mit der Option – weniger als 24 Stunden her ist und nicht „Als erledigt markiert“ wurde.
+Als Sichtbarkeitsbedingung der Karte „Entität → Zustand → Ein“ verwenden, oder in der Template-Karte den Haken **„Karte ausblenden, wenn nichts zu zeigen ist“** setzen
+(`hide_when_idle: true`; im Bearbeitungsmodus bleibt die Karte sichtbar). Der Knopf **Als erledigt ausblenden** in der Karte (oder die Button-Entität *Als erledigt markieren*) beendet die Sichtbarkeit früher; ein neuer Lauf zeigt die Karte wieder.
 Mit zusätzlich `show_recent: true` bleibt ein Template **24 Stunden nach seinem Lauf** sichtbar, auch wenn sonst nichts zu tun ist; ein Knopf (Auge) „Als erledigt ausblenden“ blendet es früher aus (Button-Entität *Als erledigt markieren*, gilt für alle Geräte; ein neuer Lauf blendet es wieder ein).
 Für Updates, die Home Assistant selbst kennt (Core, OS, Supervisor, Container), genügt dieselbe Sichtbarkeits-Bedingung auf
 die jeweilige `update`-Entität – dafür braucht es kein `HA_RESULT`.

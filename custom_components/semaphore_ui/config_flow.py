@@ -37,6 +37,7 @@ from .api import (
 )
 from .const import (
     CONF_ALLOW_PARALLEL,
+    CONF_KEEP_RECENT,
     CONF_LIVE,
     CONF_API_TOKEN,
     CONF_CHECK_UPDATES,
@@ -413,6 +414,7 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
                 CONF_CHECK_UPDATES: user_input[CONF_CHECK_UPDATES],
                 CONF_ALLOW_PARALLEL: user_input[CONF_ALLOW_PARALLEL],
                 CONF_LIVE: user_input[CONF_LIVE],
+                CONF_KEEP_RECENT: user_input[CONF_KEEP_RECENT],
                 CONF_RENEW_TOKEN: user_input[CONF_RENEW_TOKEN],
                 CONF_TOKEN_DAYS: int(user_input[CONF_TOKEN_DAYS]),
             }
@@ -457,6 +459,9 @@ class SemaphoreOptionsFlow(OptionsFlowWithReload):
             ): selector.BooleanSelector(),
             vol.Required(
                 CONF_LIVE, default=options.get(CONF_LIVE, True)
+            ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_KEEP_RECENT, default=options.get(CONF_KEEP_RECENT, False)
             ): selector.BooleanSelector(),
             vol.Required(
                 CONF_RENEW_TOKEN, default=options.get(CONF_RENEW_TOKEN, True)

@@ -39,6 +39,7 @@ from .api import (
 from .const import (
     ACTIVE_SCAN_INTERVAL,
     CONF_ALLOW_PARALLEL,
+    CONF_KEEP_RECENT,
     CONF_LIVE,
     CONF_CHECK_UPDATES,
     CONF_EXCLUDED_TEMPLATES,
@@ -66,6 +67,7 @@ from .report import (
     failure_text,
     ha_result_text,
     is_dry_run,
+    task_ended,
     task_started,
     task_status,
 )
@@ -166,6 +168,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self.problem: dict[str, str] | None = None
         self._first_done = False
         self.live_enabled: bool = entry.options.get(CONF_LIVE, True)
+        self.keep_recent: bool = entry.options.get(CONF_KEEP_RECENT, False)
         self.live = LiveStream(self)
         # template_id -> ISO time at which the finished run was marked "done" (hidden in the project card)
         self.dismissed: dict[int, str] = {}
@@ -192,6 +195,19 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self.dismissed[template_id] = dt_util.utcnow().isoformat()
         await self._dismiss_store.async_save({str(key): value for key, value in self.dismissed.items()})
         self.async_update_listeners()
+
+    def recent_run(self, template_id: int) -> datetime | None:
+        """End of the last run if it is less than 24 h ago and not marked as done (option "keep visible")."""
+        if not self.keep_recent:
+            return None
+        template = self.data.templates.get(template_id)
+        ended = task_ended(template.get("last_task")) if template else None
+        if ended is None or dt_util.utcnow() - ended >= timedelta(hours=const.RECENT_HOURS):
+            return None
+        marked = dt_util.parse_datetime(self.dismissed.get(template_id, ""))
+        if marked is not None and marked >= ended:
+            return None
+        return ended
 
     # ------------------------------------------------------------------ #
     # Convenience
