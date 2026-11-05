@@ -124,6 +124,7 @@
           args:
             stdin: "{{ upgrade_size.stdout | default('') }}"
           changed_when: false
+          check_mode: false   # sonst überspringt Ansible den Schritt im Testlauf (--check) und der Bedarf steht auf 0 MiB
           register: required_space_kib
 
         - name: Benötigten Speicherplatz anzeigen
