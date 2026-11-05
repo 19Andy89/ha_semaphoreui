@@ -254,7 +254,7 @@ query of `deb.debian.org/debian/dists/stable/Release`) and then goes into `notes
 ```
 
 A complete, tested playbook (disk space check, update, reboot check, Debian check, `HA_RESULT` with
-note) is available at [`playbooks/update-linux.yml`](playbooks/update-linux.yml); the output in `yaml` and `json` format is
+note) is available at [`playbooks/update-linux.yml`](playbooks/update-linux.yml); for **Proxmox hosts** (dist-upgrade, restart needed also when a newer kernel is installed) there is [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); the output in `yaml` and `json` format is
 stored as a test case.
 
 **Report on failures, too:** If a pre-check aborts (not enough space, apt error), no action-needed sensor would ever be created

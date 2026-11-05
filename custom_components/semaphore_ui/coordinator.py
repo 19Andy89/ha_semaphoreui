@@ -60,7 +60,7 @@ from .const import (
     STATUS_FINISHED,
     VERSION_SCAN_INTERVAL,
 )
-from .live import LiveStream
+from .live import LiveStream, parse_step
 from .report import (
     build_report,
     failure_info,
@@ -172,6 +172,8 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self.live = LiveStream(self)
         # template_id -> ISO time at which the finished run was marked "done" (hidden in the project card)
         self.dismissed: dict[int, str] = {}
+        # template_id -> number of Ansible steps in its last successful run (estimate of the total while a run is going)
+        self.step_totals: dict[int, int] = {}
         self._dismiss_store: Store[dict[str, str]] = Store(
             hass, 1, dismiss_store_name(entry.entry_id), private=False
         )
@@ -228,6 +230,14 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         if last.get("status") in STATUS_ACTIVE and "id" in last:
             ids.add(last["id"])
         return sorted(ids)
+
+    def _note_steps(self, template_id: int, task: dict[str, Any], output: list[dict[str, Any]]) -> None:
+        """Remember how many steps a successful run had: the total for the progress bar of the next run."""
+        if task_status(task) != "success":
+            return
+        count = sum(1 for row in output if parse_step(str(row.get("output", ""))))
+        if count:
+            self.step_totals[template_id] = count
 
     def current_step(self, template_id: int) -> tuple[int, str] | None:
         """(number, name) of the Ansible step that runs right now (needs live updates)."""
@@ -744,6 +754,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                 self._log_failed[task["id"]] = self._log_failed.get(task["id"], 0) + 1
             else:
                 self._log_failed.pop(task["id"], None)
+                self._note_steps(template["id"], task, output)
         return self._report(template, task, output)
 
     async def _async_retry_unread_logs(

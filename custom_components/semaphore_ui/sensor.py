@@ -517,6 +517,9 @@ class SemaphoreTemplateSensor(SemaphoreTemplateEntity, SensorEntity):
         step = self.coordinator.current_step(self.template_id)
         if step is not None:
             attrs.update(current_step=step[1], step_number=step[0])
+            total = self.coordinator.step_totals.get(self.template_id)
+            if total:
+                attrs["step_total"] = max(total, step[0])  # an estimate: the steps of the last successful run
         return attrs
 
 

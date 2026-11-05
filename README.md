@@ -253,7 +253,7 @@ Abfrage von `deb.debian.org/debian/dists/stable/Release`) und wandert dann in `n
 ```
 
 Ein vollständiges, getestetes Playbook (Speicherplatz-Prüfung, Update, Neustart-Prüfung, Debian-Prüfung, `HA_RESULT` mit
-Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); die Ausgabe im Format `yaml` und `json` ist
+Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); für **Proxmox-Hosts** (dist-upgrade, Neustartbedarf auch bei neuerem Kernel) gibt es [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); die Ausgabe im Format `yaml` und `json` ist
 als Testfall hinterlegt.
 
 **Auch bei Fehlern melden:** Bricht eine Vorprüfung ab (zu wenig Platz, apt-Fehler), entstünde ohne Meldung nie ein Handlungsbedarf-Sensor

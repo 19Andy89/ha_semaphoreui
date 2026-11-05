@@ -25,6 +25,9 @@ const TEXTS = {
     never: "Noch nie ausgeführt",
     running_since: "Gestartet",
     step: "Schritt",
+    step_of: "Schritt {n} / {total}",
+    step_n: "Schritt {n}",
+    step_est: "Gesamtzahl geschätzt nach dem letzten erfolgreichen Lauf",
     live: "Live-Verbindung aktiv",
     error: "Fehler",
     task: "Task",
@@ -127,7 +130,7 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Eingabefelder (Survey-Variablen) zeigen",
       show_details: "Fehlergrund und Parameter zeigen",
-      hide_when_idle: "Karte ausblenden, wenn nichts zu zeigen ist (läuft, Fehler, Handlungsbedarf oder – falls in den Optionen eingeschaltet – 24 Stunden nach dem Lauf)",
+      hide_when_idle: "Karte ausblenden, wenn nichts zu zeigen ist (läuft, Fehler, Handlungsbedarf oder – falls in den Optionen eingeschaltet – 24 Stunden nach dem Lauf; ohne HA_RESULT im Playbook und ohne die 24-Stunden-Option ist die Karte nach dem Lauf weg)",
       confirm_start: "Start bestätigen lassen",
       sort: "Sortierung der Templates",
       sort_name: "Name",
@@ -155,6 +158,9 @@ const TEXTS = {
     never: "Never run",
     running_since: "Started",
     step: "Step",
+    step_of: "Step {n} / {total}",
+    step_n: "Step {n}",
+    step_est: "Total estimated from the last successful run",
     live: "Live connection active",
     error: "Error",
     task: "Task",
@@ -257,7 +263,7 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Show input fields (survey variables)",
       show_details: "Show failure reason and parameters",
-      hide_when_idle: "Hide the card when there is nothing to show (running, failed, action needed or - if switched on in the options - 24 hours after the run)",
+      hide_when_idle: "Hide the card when there is nothing to show (running, failed, action needed or - if switched on in the options - 24 hours after the run; without HA_RESULT in the playbook and without the 24-hour option the card is gone after the run)",
       confirm_start: "Ask for confirmation before starting",
       sort: "Sort templates by",
       sort_name: "Name",
@@ -430,10 +436,14 @@ const STYLE = `
   .disks { margin-top: 6px; display: grid; gap: 4px; }
   .disk { display: flex; align-items: center; gap: 8px; font-size: 0.85em; color: var(--secondary-text-color); }
   .needbox .disk ha-icon { --mdc-icon-size: 16px; flex: none; color: var(--secondary-text-color); }
-  .disk .dtext { flex: none; white-space: nowrap; }
+  .disk { flex-wrap: wrap; }
+  .disk .dtext, .disk .dneed { flex: none; white-space: nowrap; }
   .disk .bar { position: relative; flex: 1; min-width: 70px; height: 18px; border-radius: 9px; background: var(--divider-color, #e0e0e0); overflow: hidden; }
   .disk .bar i { position: absolute; inset: 0 auto 0 0; background: var(--success-color, #43a047); opacity: 0.6; }
   .disk .bar b { position: relative; display: block; text-align: center; line-height: 18px; font-size: 0.9em; font-weight: 600; color: var(--primary-text-color); }
+  .stepbar { position: relative; height: 18px; margin: 2px 0 4px; border-radius: 9px; background: var(--divider-color, #e0e0e0); overflow: hidden; }
+  .stepbar i { position: absolute; inset: 0 auto 0 0; background: var(--primary-color, #03a9f4); opacity: 0.55; transition: width 0.4s ease; }
+  .stepbar b { position: relative; display: block; text-align: center; line-height: 18px; font-size: 0.85em; font-weight: 600; color: var(--primary-text-color); }
   .disk .bar.warn i { background: var(--warning-color, #ffa600); }
   .disk .bar.crit i { background: var(--error-color, #db4437); }
   .errbox { margin-top: 12px; padding: 8px 12px; border-radius: 8px; font-size: 0.9em; overflow-wrap: anywhere;
@@ -1137,10 +1147,17 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       }
       const stepAttr = (this._state(byKey["sensor:status"]) || {}).attributes || {};
       if (running && (stepAttr.live || stepAttr.current_step)) {
-        const no = stepAttr.step_number ? `${stepAttr.step_number}. ` : "";
+        const no = "";
         const dot = stepAttr.live ? `<span class="live-dot" title="${esc(T.live)}" aria-label="${esc(T.live)}"></span>` : "";
         const text = stepAttr.current_step ? no + stepAttr.current_step : "…";
         rows.push(row(T.step, `<span class="v" title="${esc(stepAttr.current_step || "")}">${dot}${esc(text)}</span>`, byKey["sensor:status"]));
+        if (stepAttr.step_number) {
+          const n = stepAttr.step_number;
+          const total = stepAttr.step_total;
+          const label = (total ? T.step_of.replace("{total}", total) : T.step_n).replace("{n}", n);
+          const pct = total ? Math.min(100, Math.round((n / total) * 100)) : 0;
+          rows.push(`<div class="stepbar" role="progressbar" aria-valuemin="0" aria-valuemax="${total || n}" aria-valuenow="${n}" aria-label="${esc(label)}" title="${esc(total ? `${label} (${T.step_est})` : label)}"><i style="width:${pct}%"></i><b>${esc(label)}</b></div>`);
+        }
       }
       if (running && startedIso) {
         rows.push(row(T.duration, `<span class="v elapsed" data-since="${esc(startedIso)}"></span>`, byKey["sensor:last_duration"]));
@@ -1247,7 +1264,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const lang = langOf(hass);
     const num = (n, digits = 1, min = 0) => new Intl.NumberFormat(hass.locale?.language || lang, { minimumFractionDigits: min, maximumFractionDigits: digits }).format(n);
     // GiB always with one decimal ("1,0 / 1,7"), so the numbers do not jump between "1" and "1,7"
-    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024, 1, 1)} GiB` : `${num(mib, 0)} MiB`);
+    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024, 1, 1)} GiB` : `${num(mib, mib < 10 ? 1 : 0)} MiB`);
 
     // hint lines ("Debian 13 is out"), shown whether or not something is to do
     const noteLines = (items) =>
@@ -1275,7 +1292,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
       const full = [name, text, pct !== null ? `${num(pct)} % ${T.disk_used}` : "", need].filter(Boolean).join(" · ");
       const bar = pct === null ? "" : `<span class="bar ${level}"><i style="width:${pct}%"></i><b>${num(pct, 0)} %</b></span>`;
-      return `<div class="disk" role="img" aria-label="${esc(full)}" title="${esc(full)}"><ha-icon icon="mdi:harddisk"></ha-icon>${bar}<span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(text)}</span></div>`;
+      return `<div class="disk" role="img" aria-label="${esc(full)}" title="${esc(full)}"><ha-icon icon="mdi:harddisk"></ha-icon>${bar}<span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(text)}</span>${need ? `<span class="dneed">· ${esc(need)}</span>` : ""}</div>`;
     };
 
     // package chips; all are rendered, _fitPackages() folds them into one line and writes "+n more" into the button

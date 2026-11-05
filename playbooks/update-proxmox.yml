@@ -1,0 +1,249 @@
+# playbooks/update-proxmox.yml – Proxmox-Hosts aktualisieren und das Ergebnis an Home Assistant melden (HA_RESULT)
+#
+# Wie update-linux.yml, aber für Proxmox VE:
+#   * apt "dist-upgrade" (Proxmox braucht das, "upgrade" hält Pakete zurück)
+#   * Neustartbedarf auch dann, wenn ein neuerer Kernel installiert ist als der laufende
+#     (Proxmox legt oft keine Datei /var/run/reboot-required an)
+#   * Testlauf (--check) liefert dieselben Werte wie ein echter Lauf: die Vorprüfung läuft immer, installiert wird nur im echten Lauf
+#
+# Inventar: Gruppe "proxmox_nodes" (anpassbar, siehe hosts). Keine Zugangsdaten im Playbook.
+---
+- name: Proxmox-Hosts aktualisieren
+  hosts: proxmox_nodes
+  become: true
+  serial: 1
+
+  # Anpassbare Schwellenwerte (extra-vars oder host_vars):
+  #   min_free_space_kib      – Mindestreserve auf / in KiB nach dem Update (Standard: 2 GiB)
+  #   update_space_buffer_kib – Puffer über dem errechneten Bedarf in KiB (Standard: 256 MiB)
+  vars:
+    min_free_space_kib: 2097152
+    update_space_buffer_kib: 262144
+
+  tasks:
+    - name: Proxmox-Version vor dem Update ermitteln
+      ansible.builtin.command: pveversion
+      changed_when: false
+      check_mode: false
+      register: pve_version_before
+
+    - name: Installierte Paketversionen vor dem Update erfassen
+      ansible.builtin.command:
+        argv:
+          - dpkg-query
+          - -W
+          - '-f=${binary:Package}=${Version}\n'
+      changed_when: false
+      check_mode: false
+      register: package_versions_before
+
+    - name: Vorprüfungen (Platz, Paketlisten, offene Updates)
+      block:
+        - name: Freien und gesamten Platz auf / ermitteln
+          ansible.builtin.command:
+            argv: [df, --output=avail,size, -k, /]
+          changed_when: false
+          check_mode: false
+          register: root_space
+
+        - name: Platzwerte berechnen
+          ansible.builtin.set_fact:
+            root_available_kib: "{{ root_space.stdout_lines[-1].split()[0] | int }}"
+            root_total_kib: "{{ root_space.stdout_lines[-1].split()[1] | int }}"
+
+        - name: Paketlisten aktualisieren
+          ansible.builtin.apt:
+            update_cache: true
+            cache_valid_time: 3600
+            update_cache_retries: 3
+            update_cache_retry_max_delay: 12
+            lock_timeout: 300
+            force_apt_get: true
+          check_mode: false
+
+        - name: Offene Updates ermitteln (Simulation)
+          ansible.builtin.command:
+            cmd: timeout 120s apt-get -s dist-upgrade
+          environment:
+            LC_ALL: C
+          changed_when: false
+          check_mode: false
+          register: upgrade_simulation
+
+        # "apt-get -s" gibt "Need to get ..." / "After this operation ..." nicht aus; "--assume-no" schon
+        # und bricht danach ab (es wird nichts geladen oder installiert).
+        - name: Platzbedarf der Updates bei apt erfragen
+          ansible.builtin.command:
+            cmd: timeout 120s apt-get dist-upgrade --assume-no
+          environment:
+            LC_ALL: C
+          changed_when: false
+          failed_when: false
+          check_mode: false
+          register: upgrade_size
+
+        - name: Benötigten Platz berechnen
+          ansible.builtin.shell: |
+            python3 -c '
+            import sys, re
+            text = sys.stdin.read()
+            units = {"B": 1.0 / 1024.0, "kB": 1.0, "MB": 1024.0, "GB": 1048576.0}
+            def conv(num, unit):
+                return float(num.replace(",", "")) * units.get(unit, 1.0)
+            download = 0.0
+            additional = 0.0
+            for line in text.splitlines():
+                m = re.search(r"Need to get ([\d.,]+)\s*(B|kB|MB|GB)(?:/[\d.,]+\s*(?:B|kB|MB|GB))?\s+of archives", line)
+                if m:
+                    download = conv(m.group(1), m.group(2))
+                m = re.search(r"After this operation, ([\d.,]+)\s*(B|kB|MB|GB) of additional disk space will be (used|freed)\.", line)
+                if m:
+                    v = conv(m.group(1), m.group(2))
+                    additional = v if m.group(3) == "used" else -v
+            print(int(download + (additional if additional > 0 else 0.0)))
+            '
+          args:
+            stdin: "{{ upgrade_size.stdout | default('') }}"
+          changed_when: false
+          check_mode: false   # sonst überspringt Ansible den Schritt im Testlauf und der Bedarf steht auf 0 MiB
+          register: required_space_kib
+
+        - name: Vorprüfung anzeigen
+          ansible.builtin.debug:
+            msg: >-
+              Offene Updates: {{ upgrade_simulation.stdout_lines | select('match', '^Inst ') | list | length }},
+              geplante Entfernungen: {{ upgrade_simulation.stdout_lines | select('match', '^Remv ') | list | length }},
+              Platzbedarf ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB,
+              frei: {{ (root_available_kib | int / 1024) | round(0) }} MiB.
+
+        - name: Update bei zu wenig freiem Speicher verhindern
+          ansible.builtin.assert:
+            that:
+              - (root_available_kib | int) >= (required_space_kib.stdout | default('0') | trim | int) + (update_space_buffer_kib | int)
+              - (root_available_kib | int) >= (min_free_space_kib | int)
+            fail_msg: >-
+              Update abgebrochen: Auf / sind nur {{ ((root_available_kib | int) / 1048576) | round(2) }} GiB frei,
+              benötigt werden ca. {{ (required_space_kib.stdout | default('0') | trim | int / 1024) | round(1) }} MiB
+              plus {{ (update_space_buffer_kib | int / 1024) | round(0) }} MiB Puffer
+              (Mindestreserve {{ (min_free_space_kib | int / 1024) | round(0) }} MiB).
+
+      rescue:
+        # Schlägt eine Vorprüfung fehl, muss Home Assistant das trotzdem erfahren (sonst entsteht der Handlungsbedarf-Sensor nie).
+        - name: Fehlgeschlagene Vorprüfung an Home Assistant melden
+          ansible.builtin.debug:
+            msg: >-
+              HA_RESULT {{ {
+                'needed': true,
+                'notes': ['Update nicht gestartet: ' ~ (ansible_failed_result.msg | default('Vorprüfung fehlgeschlagen') | string | replace('\n', ' ') | truncate(180))]
+              } | to_json }}
+
+        - name: Lauf als fehlgeschlagen beenden
+          ansible.builtin.fail:
+            msg: "{{ ansible_failed_result.msg | default('Vorprüfung fehlgeschlagen') }}"
+
+    - name: Proxmox und Debian aktualisieren
+      ansible.builtin.apt:
+        upgrade: dist
+        force_apt_get: true
+        lock_timeout: 300
+      register: pve_upgrade
+
+    - name: Installierte Paketversionen nach dem Update erfassen
+      ansible.builtin.command:
+        argv:
+          - dpkg-query
+          - -W
+          - '-f=${binary:Package}=${Version}\n'
+      changed_when: false
+      check_mode: false
+      register: package_versions_after
+
+    - name: Tatsächlich geänderte Pakete ermitteln
+      ansible.builtin.set_fact:
+        pve_packages_changed: >-
+          {{ package_versions_after.stdout_lines | difference(package_versions_before.stdout_lines) | sort }}
+
+    - name: Geänderte Pakete anzeigen
+      ansible.builtin.debug:
+        msg: |
+          {% if ansible_check_mode %}
+          DRY RUN: Es wurden keine Paketänderungen vorgenommen.
+          {% elif pve_packages_changed | length > 0 %}
+          Installierte oder aktualisierte Pakete:
+          {{ pve_packages_changed | join('\n') }}
+          {% else %}
+          Keine Paketänderungen festgestellt.
+          {% endif %}
+
+    - name: Offene Updates nach dem Lauf ermitteln
+      ansible.builtin.command:
+        cmd: timeout 120s apt-get -s dist-upgrade
+      environment:
+        LC_ALL: C
+      changed_when: false
+      check_mode: false
+      register: upgrade_final
+
+    - name: Neustartmarker prüfen
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_marker
+
+    - name: Laufenden Kernel ermitteln
+      ansible.builtin.command: uname -r
+      changed_when: false
+      check_mode: false
+      register: running_kernel
+
+    - name: Neueste installierte Kernel-Version ermitteln
+      ansible.builtin.shell: |
+        set -o pipefail
+        for kernel in /boot/vmlinuz-*; do
+          [ -e "$kernel" ] || continue
+          printf '%s\n' "${kernel##*/vmlinuz-}"
+        done | sort -V | tail -n 1
+      args:
+        executable: /bin/bash
+      changed_when: false
+      check_mode: false
+      register: latest_kernel
+
+    - name: Neustartbedarf bewerten
+      ansible.builtin.set_fact:
+        pve_reboot_required: >-
+          {{
+            reboot_marker.stat.exists
+            or ((latest_kernel.stdout | trim | length > 0) and ((latest_kernel.stdout | trim) != (running_kernel.stdout | trim)))
+          }}
+
+    - name: Proxmox-Version nach dem Update ermitteln
+      ansible.builtin.command: pveversion
+      changed_when: false
+      check_mode: false
+      register: pve_version_after
+
+    - name: Ergebnis anzeigen
+      ansible.builtin.debug:
+        msg:
+          - "Vorher: {{ pve_version_before.stdout }}"
+          - "Nachher: {{ pve_version_after.stdout }}"
+          - "Neustart erforderlich: {{ pve_reboot_required }} (Marker: {{ reboot_marker.stat.exists }})"
+          - "Laufender Kernel: {{ running_kernel.stdout }}"
+          - "Neuester installierter Kernel: {{ latest_kernel.stdout | trim | default('nicht ermittelt', true) }}"
+
+    - name: Ergebnis für Home Assistant melden
+      ansible.builtin.debug:
+        msg: >-
+          HA_RESULT {{ {
+            'updates': (upgrade_final.stdout_lines | select('match', '^Inst ') | list | length),
+            'reboot_required': pve_reboot_required | bool,
+            'packages': (upgrade_final.stdout_lines | select('match', '^Inst ') | map('regex_replace', '^Inst (\S+).*$', '\1') | list),
+            'disk_free_mib': ((root_available_kib | int) / 1024) | round(1),
+            'disk_required_mib': ((required_space_kib.stdout | default('0') | trim | int) / 1024) | round(1),
+            'disk_used_percent': ((1 - ((root_available_kib | int) / (root_total_kib | int))) * 100) | round(1),
+            'notes': (
+              ['Neustart nötig: laufender Kernel ' ~ (running_kernel.stdout | trim) ~ ', installiert ' ~ (latest_kernel.stdout | trim)]
+              if ((latest_kernel.stdout | trim | length > 0) and ((latest_kernel.stdout | trim) != (running_kernel.stdout | trim)))
+              else []
+            )
+          } | to_json }}

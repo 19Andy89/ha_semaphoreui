@@ -7,6 +7,9 @@
     "lovelace",
     "repairs"
   ],
+  "categories": [
+    "computers_network.cloud_developer_tools"
+  ],
   "codeowners": [
     "@19Andy89"
   ],
