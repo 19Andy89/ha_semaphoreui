@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"   # Home Assistant 2026.10+ braucht Python 3.14 (ubuntu-24.04 bringt 3.12 mit)
       - run: |
           python3 -m pip install -q -r requirements_test.txt
           python3 -m pytest -q -p no:cacheprovider
