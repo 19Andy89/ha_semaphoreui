@@ -19,5 +19,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/19Andy89/hacs_semaphoreui/issues",
   "requirements": [],
-  "version": "0.18.1"
+  "version": "0.19.0"
 }
