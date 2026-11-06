@@ -29,7 +29,7 @@ jobs:
         id: version
         run: python3 .github/scripts/release.py
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: steps.version.outputs.released == 'true'
         with:
           python-version: "3.14"   # Home Assistant 2026.10+ braucht Python 3.14 (ubuntu-24.04 bringt 3.12 mit)
