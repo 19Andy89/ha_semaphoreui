@@ -9,7 +9,7 @@ One entry per Semaphore **project**, one device per **template** – with status
 and a ready-made **report**: what was started when, how long it ran, the result and – for failures – why.
 Two **dashboard cards** (template and project) are included and loaded by the integration itself.
 
-Tested with Home Assistant 2026.10 (browser test) and the current version (CI, see `tests/`); minimum version 2026.10.0, older versions are not tested. Runs entirely locally, no cloud.
+Tested with Home Assistant 2026.10 (browser test) and 2026.11 (in daily use), plus the current version in CI (see `tests/`); minimum version 2026.10.0, older versions are not tested. Runs entirely locally, no cloud.
 
 > **Unofficial:** This project is an independent community project and has **no affiliation** with Semaphore UI
 > or its developers; it is neither supported nor endorsed by them. It uses only the public

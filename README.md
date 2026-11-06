@@ -9,7 +9,7 @@ Pro Semaphore-**Projekt** ein Eintrag, pro **Template** ein Gerät – mit Statu
 und einem fertigen **Bericht**: was wann gestartet wurde, wie lange es lief, Ergebnis und – bei Fehlern – warum.
 Zwei **Dashboard-Karten** (Template und Projekt) werden mitgeliefert und von der Integration selbst geladen.
 
-Getestet mit Home Assistant 2026.10 (Browser-Test) und der jeweils aktuellen Version (CI, siehe `tests/`); Mindestversion 2026.10.0, ältere Versionen sind nicht getestet. Läuft rein lokal, keine Cloud.
+Getestet mit Home Assistant 2026.10 (Browser-Test) und 2026.11 (im Alltagsbetrieb), dazu die jeweils aktuelle Version in der CI (siehe `tests/`); Mindestversion 2026.10.0, ältere Versionen sind nicht getestet. Läuft rein lokal, keine Cloud.
 
 > **Inoffiziell:** Dieses Projekt ist ein unabhängiges Community-Projekt und steht in **keiner Verbindung** zu Semaphore UI
 > und seinen Entwicklern; es wird weder von ihnen unterstützt noch empfohlen. Es nutzt ausschließlich die öffentliche
