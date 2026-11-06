@@ -7,7 +7,7 @@
 Bitte melde Sicherheitslücken **nicht** als öffentliches Issue.
 
 Nutze stattdessen die private Meldung von GitHub: im Repository unter **Security → Report a vulnerability**
-(<https://github.com/19Andy89/hacs_semaphoreui/security/advisories/new>).
+(<https://github.com/19Andy89/ha_semaphoreui/security/advisories/new>).
 
 Bitte nenne dabei:
 
@@ -40,7 +40,7 @@ Das schützt vor einer versehentlich weitergegebenen Konfigurationsdatei, nicht 
 Please do **not** open a public issue for security problems.
 
 Use GitHub's private reporting instead: in the repository under **Security → Report a vulnerability**
-(<https://github.com/19Andy89/hacs_semaphoreui/security/advisories/new>).
+(<https://github.com/19Andy89/ha_semaphoreui/security/advisories/new>).
 
 Please include:
 

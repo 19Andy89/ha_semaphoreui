@@ -2,7 +2,10 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
-## Nächste Version – Einträge der Projekt-Karte aufklappen (Issue #14)
+## Nächste Version – Repository-Name ohne „HACS“
+- Das Repository heißt jetzt `ha_semaphoreui` (der HACS-Katalog erlaubt „HACS“ nicht im Namen). Links in Manifest, README (Marketplace-Badge), SECURITY, CONTRIBUTING und Issue-Vorlagen angepasst; die Domain `semaphore_ui` und alle Entitäten bleiben unverändert. Alte Links werden von GitHub weitergeleitet.
+
+## 0.20.0 – Einträge der Projekt-Karte aufklappen (Issue #14)
 - **Projekt-Karte:** Ein Klick auf ein Template klappt es auf (statt More-Info): Start, Ende, Dauer, Fehlergrund, je Host das Ergebnis aus `HA_RESULT` (Updates, Neustart, Platzbedarf, freier Platz, Hinweise) und der Link „In Semaphore öffnen“. More-Info ist weiter über das **Info-Symbol** rechts in der Zeile erreichbar. Per Tastatur mit Enter/Leertaste bedienbar (`aria-expanded`). Die Paketliste bleibt der Template-Karte vorbehalten.
 
 - **Handlungsbedarf ohne „Offene Updates: 0“:** Wenn nur ein Neustart nötig ist, steht dort nur „Neustart nötig“; die Updates werden nur genannt, wenn welche offen sind.

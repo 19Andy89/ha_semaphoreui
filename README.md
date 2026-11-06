@@ -2,7 +2,7 @@
 
 🇬🇧 [English version](README_en.md)
 
-[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=19Andy89&repository=hacs_semaphoreui&category=integration)
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=19Andy89&repository=ha_semaphoreui&category=integration)
 
 Steuert [Semaphore UI](https://semaphoreui.com) (Ansible/Terraform/Bash-Templates) aus Home Assistant.
 Pro Semaphore-**Projekt** ein Eintrag, pro **Template** ein Gerät – mit Status, Start/Testlauf/Stopp
@@ -52,7 +52,7 @@ Die Bilder entstehen im Browser-Test aus Beispieldaten (siehe [Tests](#tests)); 
 
 ## Installation
 
-**Über den Marketplace / HACS (empfohlen):** Den Badge oben anklicken („Open your Home Assistant instance …“) oder das Repository `19Andy89/hacs_semaphoreui` als benutzerdefiniertes Repository (Kategorie *Integration*) hinzufügen, installieren und Home Assistant neu starten. Updates erscheinen dann wie bei anderen Integrationen; Vorabversionen (`-dev.N`) gibt es nur mit „Beta-Versionen anzeigen“.
+**Über den Marketplace / HACS (empfohlen):** Den Badge oben anklicken („Open your Home Assistant instance …“) oder das Repository `19Andy89/ha_semaphoreui` als benutzerdefiniertes Repository (Kategorie *Integration*) hinzufügen, installieren und Home Assistant neu starten. Updates erscheinen dann wie bei anderen Integrationen; Vorabversionen (`-dev.N`) gibt es nur mit „Beta-Versionen anzeigen“.
 
 **Von Hand:**
 
