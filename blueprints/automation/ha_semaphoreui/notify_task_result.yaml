@@ -1,0 +1,89 @@
+blueprint:
+  name: Semaphore UI – Benachrichtigung bei Taskende
+  author: 19Andy89
+  domain: automation
+  min_version: 2024.10.0
+  source_url: https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/notify_task_result.yaml
+  description: >-
+    Schickt eine Benachrichtigung, wenn ein Semaphore-Task endet (auch bei Tasks, die in Semaphore oder per Zeitplan
+    gestartet wurden). Der Text kommt fertig aus der Integration (Ergebnis, Dauer, Fehlergrund, Handlungsbedarf).
+    Voraussetzung: die Integration „Semaphore UI“ (ha_semaphoreui).
+  input:
+    notify_entities:
+      name: Benachrichtigen
+      description: Eine oder mehrere Benachrichtigungs-Entitäten (z. B. dein Handy aus der Companion-App).
+      selector:
+        entity:
+          domain: notify
+          multiple: true
+    when:
+      name: Wann benachrichtigen?
+      description: >-
+        „Fehler und Handlungsbedarf“ meldet auch erfolgreiche Läufe, bei denen das Playbook `HA_RESULT` mit
+        `needed: true` ausgibt. Ein nächtlicher Testlauf meldet offene Updates dann jede Nacht, bis sie installiert sind.
+      default: problems
+      selector:
+        select:
+          mode: list
+          options:
+            - label: Nur bei Fehlern
+              value: failed
+            - label: Bei Fehlern und bei Handlungsbedarf
+              value: problems
+            - label: Bei jedem Ergebnis
+              value: all
+    include_dry_runs:
+      name: Testläufe einbeziehen
+      description: "Aus = Testläufe (Dry-Run) lösen keine Benachrichtigung aus."
+      default: true
+      selector:
+        boolean: {}
+    only_templates:
+      name: Nur diese Templates (optional)
+      description: Namen der Semaphore-Templates, genau wie in Semaphore geschrieben. Leer = alle Templates.
+      default: []
+      selector:
+        text:
+          multiple: true
+    extra_actions:
+      name: Zusätzliche Aktionen (optional)
+      description: >-
+        Läuft nach der Benachrichtigung. Der Bericht steht in `trigger.event.data` (z. B. `title`, `text`, `url`,
+        `result`, `template`, `ha_result`).
+      default: []
+      selector:
+        action: {}
+
+mode: queued
+max: 10
+
+variables:
+  when: !input when
+  include_dry_runs: !input include_dry_runs
+  only_templates: !input only_templates
+
+triggers:
+  - trigger: event
+    event_type: semaphore_ui_task_finished
+
+conditions:
+  - condition: template
+    value_template: >-
+      {% set d = trigger.event.data %}
+      {% set failed = d.result == 'failed' %}
+      {% set action = (d.ha_result is mapping) and (d.ha_result.get('needed', false) | bool(false)) %}
+      {% set by_result = (d.result != 'stopped' or when == 'all') and
+         (when == 'all' or failed or (when == 'problems' and action)) %}
+      {% set by_dry_run = include_dry_runs or not d.dry_run %}
+      {% set by_template = (only_templates | length == 0) or (d.template in only_templates) %}
+      {{ by_result and by_dry_run and by_template }}
+
+actions:
+  - action: notify.send_message
+    target:
+      entity_id: !input notify_entities
+    data:
+      title: "{{ trigger.event.data.title }}"
+      message: "{{ trigger.event.data.text }}"
+  - choose: []
+    default: !input extra_actions
