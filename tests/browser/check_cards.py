@@ -518,6 +518,12 @@ def test_docs_screenshots(playwright) -> None:
                 time.sleep(0.4)
             dashboard_shot(page, f"dashboard{suffix}")
             taken.append(f"dashboard{suffix}")
+            if not suffix:
+                # Eintrag der Projekt-Karte aufgeklappt (Details, Platte je Host)
+                project = page.locator("semaphore-ui-project-card").first
+                project.locator(".entry", has_text="docker-system").locator(".main").click()
+                time.sleep(0.5)
+                take(project, "project-card-expanded")
         finally:
             browser.close()
     browser, page = open_page(playwright, width=1400, height=1700, path="/dashboard-sem-test/1")

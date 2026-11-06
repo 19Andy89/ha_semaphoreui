@@ -46,6 +46,10 @@ The screenshots show the German interface; the cards and entities follow your Ho
 |---|---|---|---|---|
 | ![Running](docs/screenshots/template-card-running.png) | ![Survey](docs/screenshots/template-card-survey.png) | ![Versions](docs/screenshots/project-card-versions.png) | ![Only what is needed](docs/screenshots/project-card-only-needed.png) | ![Packages expanded](docs/screenshots/template-card-updates-open.png) |
 
+| Project card: entry unfolded (click on the name) |
+|---|
+| ![Entry unfolded](docs/screenshots/project-card-expanded.png) |
+
 </details>
 
 ## Installation

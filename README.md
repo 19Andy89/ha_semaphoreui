@@ -44,6 +44,10 @@ Die Bilder entstehen im Browser-Test aus Beispieldaten (siehe [Tests](#tests)); 
 |---|---|---|---|---|
 | ![Läuft](docs/screenshots/template-card-running.png) | ![Survey](docs/screenshots/template-card-survey.png) | ![Versionen](docs/screenshots/project-card-versions.png) | ![Nur Benötigtes](docs/screenshots/project-card-only-needed.png) | ![Pakete aufgeklappt](docs/screenshots/template-card-updates-open.png) |
 
+| Projekt-Karte: Eintrag aufgeklappt (Klick auf den Namen) |
+|---|
+| ![Eintrag aufgeklappt](docs/screenshots/project-card-expanded.png) |
+
 </details>
 
 ## Installation
