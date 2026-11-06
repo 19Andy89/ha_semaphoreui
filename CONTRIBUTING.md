@@ -2,7 +2,7 @@
 
 ## Deutsch
 
-Fehler und Wünsche gerne als [Issue](https://github.com/19Andy89/hacs_semaphoreui/issues) (Vorlagen vorhanden). Bitte keine Token, Passwörter oder interne Adressen posten.
+Fehler und Wünsche gerne als [Issue](https://github.com/19Andy89/ha_semaphoreui/issues) (Vorlagen vorhanden). Bitte keine Token, Passwörter oder interne Adressen posten.
 
 Pull Requests sind willkommen. Kurz die Spielregeln:
 
@@ -22,7 +22,7 @@ Pull Requests sind willkommen. Kurz die Spielregeln:
 ## English
 
 
-Bugs and ideas are welcome as [issues](https://github.com/19Andy89/hacs_semaphoreui/issues) (templates provided). Please do not post tokens, passwords or internal addresses.
+Bugs and ideas are welcome as [issues](https://github.com/19Andy89/ha_semaphoreui/issues) (templates provided). Please do not post tokens, passwords or internal addresses.
 
 Pull requests are welcome. The ground rules:
 

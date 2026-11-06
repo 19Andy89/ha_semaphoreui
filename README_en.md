@@ -2,7 +2,7 @@
 
 🇩🇪 [Deutsche Version](README.md)
 
-[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=19Andy89&repository=hacs_semaphoreui&category=integration)
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=19Andy89&repository=ha_semaphoreui&category=integration)
 
 Controls [Semaphore UI](https://semaphoreui.com) (Ansible/Terraform/Bash templates) from Home Assistant.
 One entry per Semaphore **project**, one device per **template** – with status, start/dry run/stop
@@ -54,7 +54,7 @@ The screenshots show the German interface; the cards and entities follow your Ho
 
 ## Installation
 
-**Via the Marketplace / HACS (recommended):** click the badge above (“Open your Home Assistant instance …”) or add the repository `19Andy89/hacs_semaphoreui` as a custom repository (category *Integration*), install it and restart Home Assistant. Updates then show up like those of any other integration; pre-releases (`-dev.N`) appear only with “Show beta versions”.
+**Via the Marketplace / HACS (recommended):** click the badge above (“Open your Home Assistant instance …”) or add the repository `19Andy89/ha_semaphoreui` as a custom repository (category *Integration*), install it and restart Home Assistant. Updates then show up like those of any other integration; pre-releases (`-dev.N`) appear only with “Show beta versions”.
 
 **Manually:**
 

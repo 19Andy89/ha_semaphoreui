@@ -14,10 +14,10 @@
     "@19Andy89"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/19Andy89/hacs_semaphoreui",
+  "documentation": "https://github.com/19Andy89/ha_semaphoreui",
   "integration_type": "service",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/19Andy89/hacs_semaphoreui/issues",
+  "issue_tracker": "https://github.com/19Andy89/ha_semaphoreui/issues",
   "requirements": [],
   "version": "0.20.0"
 }
