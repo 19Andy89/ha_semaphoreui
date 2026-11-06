@@ -9,7 +9,7 @@ Pro Semaphore-**Projekt** ein Eintrag, pro **Template** ein Gerät – mit Statu
 und einem fertigen **Bericht**: was wann gestartet wurde, wie lange es lief, Ergebnis und – bei Fehlern – warum.
 Zwei **Dashboard-Karten** (Template und Projekt) werden mitgeliefert und von der Integration selbst geladen.
 
-Getestet mit Home Assistant 2026.10 (siehe `tests/`). Läuft rein lokal, keine Cloud, kein HACS nötig.
+Getestet mit Home Assistant 2026.10 (Browser-Test) und der jeweils aktuellen Version (CI, siehe `tests/`); Mindestversion 2026.10.0, ältere Versionen sind nicht getestet. Läuft rein lokal, keine Cloud.
 
 > **Inoffiziell:** Dieses Projekt ist ein unabhängiges Community-Projekt und steht in **keiner Verbindung** zu Semaphore UI
 > und seinen Entwicklern; es wird weder von ihnen unterstützt noch empfohlen. Es nutzt ausschließlich die öffentliche
@@ -52,8 +52,15 @@ Die Bilder entstehen im Browser-Test aus Beispieldaten (siehe [Tests](#tests)); 
 
 ## Installation
 
+**Über den Marketplace / HACS (empfohlen):** Den Badge oben anklicken („Open your Home Assistant instance …“) oder das Repository `19Andy89/hacs_semaphoreui` als benutzerdefiniertes Repository (Kategorie *Integration*) hinzufügen, installieren und Home Assistant neu starten. Updates erscheinen dann wie bei anderen Integrationen; Vorabversionen (`-dev.N`) gibt es nur mit „Beta-Versionen anzeigen“.
+
+**Von Hand:**
+
 1. Ordner `custom_components/semaphore_ui` nach `/config/custom_components/semaphore_ui` kopieren.
 2. Home Assistant neu starten.
+
+Danach (beide Wege):
+
 3. In Semaphore ein API-Token anlegen: Benutzername (oben rechts) → **API-Tokens** → **Neues Token**.
 4. *Einstellungen → Geräte & Dienste → Integration hinzufügen → „Semaphore UI“*:
    URL (z. B. `https://semaphore.example.de`) + Token → danach das **Projekt** aus der Liste wählen.
@@ -257,6 +264,8 @@ Abfrage von `deb.debian.org/debian/dists/stable/Release`) und wandert dann in `n
             'notes': ([debian_hinweis] if debian_hinweis is defined else [])
           } | to_json }}
 ```
+
+> **Die Playbooks im Ordner [`playbooks/`](playbooks/) sind Beispiele.** Sie enthalten keine Hosts, Zugangsdaten oder Adressen und zeigen, wie ein Playbook `HA_RESULT` meldet. Passe `hosts:` (Gruppe in deinem Inventar) und die Schwellenwerte an, und probiere sie zuerst als **Testlauf** (`--check`) aus. Für andere Aufgaben (Docker, Deploy, …) brauchst du ein eigenes Playbook mit einer `HA_RESULT`-Zeile; die Integration funktioniert auch ganz ohne (dann gibt es nur Status und Bericht, keinen Handlungsbedarf).
 
 Ein vollständiges, getestetes Playbook (Speicherplatz-Prüfung, Update, Neustart-Prüfung, Debian-Prüfung, `HA_RESULT` mit
 Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); für **Proxmox-Hosts** (dist-upgrade, Neustartbedarf auch bei neuerem Kernel) gibt es [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); die Ausgabe im Format `yaml` und `json` ist

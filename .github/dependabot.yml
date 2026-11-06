@@ -1,0 +1,11 @@
+# Hält die GitHub Actions aktuell (z. B. actions/checkout, actions/setup-python): ein PR pro Woche, falls es etwas gibt.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies

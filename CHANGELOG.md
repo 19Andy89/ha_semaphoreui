@@ -10,6 +10,9 @@ Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträ
 - **Platzbedarf nur bei offenen Updates:** Nach einem Update (0 offen) steht kein alter „benötigt …“-Wert mehr da.
 - **MB/GB statt MiB/GiB:** Die Karten rechnen die Werte der Playbooks (`*_mib`) um und zeigen „GB“/„MB“ ohne „i“. Die Attribute der Sensoren behalten ihre Namen und MiB.
 
+- **README:** Installation über Marketplace/HACS, getestete Home-Assistant-Versionen (Mindestversion 2026.10.0, auch in `hacs.json`), Hinweis, dass die Playbooks Beispiele sind.
+- **Dependabot** hält die GitHub Actions aktuell (wöchentlich, Präfix `ci:`).
+
 ## 0.19.0 – 24 h sichtbar lassen (Issue #13), Vorbereitung für public, hassfest
 - **Projekt-Karte:** Neue Option `show_recent` (Haken im Karten-Editor, zusammen mit „nur Templates mit Handlungsbedarf …“): Ein Template bleibt 24 h nach seinem Lauf in der Liste. Der Knopf **Als erledigt ausblenden** (Auge) blendet es früher aus; ein neuer Lauf blendet es wieder ein.
 - Der Zustand liegt in Home Assistant, nicht im Browser: neue Button-Entität *Als erledigt markieren* je Template, Attribut `dismissed_at` am Status-Sensor, gespeichert in `.storage` und beim Entfernen des Projekts gelöscht. Dadurch gilt „ausgeblendet“ auf allen Geräten.
