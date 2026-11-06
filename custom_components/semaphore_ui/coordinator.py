@@ -83,6 +83,8 @@ TEMPLATE_IDENTIFIER_RE = re.compile(r"^(?P<entry>[^_]+)_template_(?P<tid>\d+)$")
 # How often the log of a finished task is read again after reading it failed
 # (Semaphore sometimes answers slowly; the log carries the failure reason and HA_RESULT).
 MAX_LOG_ATTEMPTS = 5
+# Re-reads of the log of a just finished task (one per poll) to catch lines that arrived late
+LOG_RECHECKS = 2
 
 # Newer Home Assistant versions replace ``via_device`` by ``via_device_id``.
 _HAS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__annotations__
@@ -158,6 +160,10 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self._reports: dict[int, dict[str, Any]] = {}
         # task_id -> number of failed attempts to read its log
         self._log_failed: dict[int, int] = {}
+        # task_id -> number of log lines at the last read / re-reads still to do: Semaphore can
+        # report "finished" before the last log lines are stored (a host was missing in the report)
+        self._log_rows: dict[int, int] = {}
+        self._log_recheck: dict[int, int] = {}
         # template_id -> newest successful task (None: none found in the history)
         self._last_success: dict[int, dict[str, Any] | None] = {}
         # template_id -> id of the last task for which the history was read
@@ -754,8 +760,36 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                 self._log_failed[task["id"]] = self._log_failed.get(task["id"], 0) + 1
             else:
                 self._log_failed.pop(task["id"], None)
+                self._log_rows[task["id"]] = len(output)
+                self._log_recheck.setdefault(task["id"], LOG_RECHECKS)
                 self._note_steps(template["id"], task, output)
         return self._report(template, task, output)
+
+    async def _async_recheck_logs(
+        self, templates: dict[int, dict[str, Any]], skip: set[int]
+    ) -> None:
+        """Read the log of a just finished task again: late lines change the report."""
+        for template in templates.values():
+            last = template.get("last_task") or {}
+            task_id = last.get("id")
+            if (
+                task_id is None
+                or task_id in skip
+                or self._log_recheck.get(task_id, 0) <= 0
+                or last.get("status") not in STATUS_FINISHED
+            ):
+                continue
+            self._log_recheck[task_id] -= 1
+            try:
+                rows = await self.client.get_task_output(self.project_id, task_id)
+            except SemaphoreError:
+                continue
+            if len(rows) == self._log_rows.get(task_id):
+                continue
+            report = await self._async_make_report(template, last)
+            self._reports[template["id"]] = report
+            self._log_recheck[task_id] = LOG_RECHECKS  # still growing: look again
+            self.async_update_listeners()
 
     async def _async_retry_unread_logs(
         self, templates: dict[int, dict[str, Any]], skip: set[int]
@@ -775,6 +809,9 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         # forget tasks that are no longer the last task of a template
         current = {(tpl.get("last_task") or {}).get("id") for tpl in templates.values()}
         self._log_failed = {k: v for k, v in self._log_failed.items() if k in current}
+        self._log_rows = {k: v for k, v in self._log_rows.items() if k in current}
+        self._log_recheck = {k: v for k, v in self._log_recheck.items() if k in current}
+        await self._async_recheck_logs(templates, skip)
         if not retry:
             return
         semaphore = asyncio.Semaphore(5)

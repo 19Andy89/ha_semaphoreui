@@ -106,6 +106,19 @@ async def test_total_steps_come_from_the_last_successful_run(hass: HomeAssistant
     assert hass.states.get(status).attributes["step_number"] == 1
 
 
+async def test_log_lines_that_arrive_late_are_picked_up(hass: HomeAssistant, fake, make_entry) -> None:
+    """Semaphore can say "finished" before the last log lines exist: the report is read again."""
+    server, _ = fake
+    task = server.add_finished_task(1, output="TASK [Gathering Facts] ***\nok")
+    await setup(hass, make_entry)
+    coordinator = hass.config_entries.async_entries(DOMAIN)[0].runtime_data
+    task_id = task["id"]
+    assert coordinator._log_rows[task_id] == len(server.outputs[task_id])  # noqa: SLF001
+    server.outputs[task_id].append({"id": 99, "task_id": task_id, "output": "TASK [Late] ***"})
+    await tick(hass)
+    assert coordinator._log_rows[task_id] == len(server.outputs[task_id])  # noqa: SLF001
+
+
 async def test_no_websocket_when_live_updates_are_off(hass: HomeAssistant, fake, make_entry) -> None:
     server, _ = fake
     server.start_status = "running"

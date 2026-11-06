@@ -6,6 +6,8 @@ Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträ
 - **Projekt-Karte:** Neue Option `show_recent` (Haken im Karten-Editor, zusammen mit „nur Templates mit Handlungsbedarf …“): Ein Template bleibt 24 h nach seinem Lauf in der Liste. Der Knopf **Als erledigt ausblenden** (Auge) blendet es früher aus; ein neuer Lauf blendet es wieder ein.
 - Der Zustand liegt in Home Assistant, nicht im Browser: neue Button-Entität *Als erledigt markieren* je Template, Attribut `dismissed_at` am Status-Sensor, gespeichert in `.storage` und beim Entfernen des Projekts gelöscht. Dadurch gilt „ausgeblendet“ auf allen Geräten.
 - **Projekt-Karte:** Je Template jetzt auch ein **Testlauf**-Knopf (Kolben) neben Start. Offene Updates/Neustart stehen in einer **eigenen, umbrechenden Zeile** statt abgeschnitten im Status.
+- **Fix:** Der Bericht eines gerade beendeten Laufs wird bis zu zweimal (je Abruf) neu aus dem Log gelesen. Semaphore meldet „fertig“ teils, bevor die letzten Log-Zeilen gespeichert sind; dann fehlten z. B. Hosts im Bericht und der HA_RESULT-Handlungsbedarf, bis HA neu gestartet wurde.
+- Tests: CodeQL-Hinweis „Clear-text logging“ in `tests/browser/check_cards.py` behoben (nur noch der Testname wird ausgegeben).
 - README: Marketplace-/HACS-Badge („Open your Home Assistant instance …“, `marketplace_repository`) für den Katalog.
 - Playbook `update-proxmox.yml`: `df`-Argument gequotet (Komma teilte es in zwei Argumente).
 - Die einzelne Template-Karte bleibt unverändert (sie zeigt das Template ohnehin immer).
