@@ -281,6 +281,10 @@ def test_result_text() -> None:
     assert ha_result_text({"needed": True, "updates": 1, "reboot_required": False}, "en") == (
         "Pending updates: 1"
     )
+    # no "Offene Updates: 0" next to a reboot: only open updates are named
+    assert ha_result_text({"needed": True, "updates": 0, "reboot_required": True}, "de") == (
+        "Neustart nötig"
+    )
 
 
 @pytest.mark.parametrize(

@@ -102,7 +102,22 @@ def test_rendering(page: Page) -> None:
         "list => [list.getBoundingClientRect().width, ...[...list.querySelectorAll('.item')].map(i => i.getBoundingClientRect().width)]"
     )
     check("Projekt-Karte: Zeilen passen in die Karte", all(w <= widths[0] + 1 for w in widths[1:]), widths)
-    check("Projekt-Karte: jede Zeile hat einen Knopf", project.locator(".item button").count() == 5, project.locator(".item button").count())
+    check("Projekt-Karte: jede Zeile hat mindestens einen Knopf", all(project.locator(".item").nth(i).locator("button").count() >= 1 for i in range(5)))
+
+    # Eintrag aufklappen (Issue #14): Klick auf den Namen zeigt Details, nochmal Klick klappt zu
+    entry = project.locator(".entry", has_text="docker-system")
+    check("Projekt-Karte: Details sind zunächst zu", entry.locator(".detail").count() == 0 and entry.locator(".main").get_attribute("aria-expanded") == "false")
+    entry.locator(".main").click()
+    page.wait_for_timeout(300)
+    detail = project.locator(".entry", has_text="docker-system").locator(".detail")
+    check("Projekt-Karte: Klick klappt die Details auf (Host, Updates)", detail.count() == 1 and "Updates" in detail.inner_text(), detail.inner_text() if detail.count() else "")
+    disks = detail.locator(".disk")
+    check("Projekt-Karte: Details zeigen die Platte je Host wie die Template-Karte (Balken, „… GB frei“)", disks.count() >= 1 and "GB frei" in disks.first.inner_text() and detail.locator(".disk .bar").count() >= 1, disks.all_inner_texts())
+    check("Projekt-Karte: Details nennen keine Einheit mit „i“ (MiB/GiB)", "MiB" not in detail.inner_text() and "GiB" not in detail.inner_text())
+    project.locator(".entry", has_text="docker-system").locator(".main").click()
+    page.wait_for_timeout(300)
+    check("Projekt-Karte: zweiter Klick klappt wieder zu", project.locator(".entry", has_text="docker-system").locator(".detail").count() == 0)
+    check("Projekt-Karte: More-Info bleibt über das Info-Symbol erreichbar", project.locator('.item button[data-action="more-info"]').count() == 5)
 
     host = tcard(page, "Host-Update")
     check("Fehler-Karte: Status „Fehler“", "Fehler" in host.locator(".chip").first.inner_text())
@@ -129,7 +144,7 @@ def test_rendering(page: Page) -> None:
     check("Handlungsbedarf: Template ohne Meldung zeigt keine Box", tcard(page, "Deploy").locator(".needbox").count() == 0)
     rows = project.locator(".item .name").all_inner_texts()
     check("Projekt-Karte: Reihenfolge laufend, Fehler, Handlungsbedarf, Rest", [r.strip() for r in rows[:3]] == ["Proxmox Snapshot HAOS", "Host-Update", "docker-system aktualisieren"], rows)
-    check("Projekt-Karte: Symbol und Text bei Handlungsbedarf", project.locator(".item", has_text="docker-system").locator("ha-icon.need").count() == 1 and "Offene Updates: 10" in project.locator(".item", has_text="docker-system").locator(".sub").inner_text())
+    check("Projekt-Karte: Handlungsbedarf steht in einer eigenen Zeile", project.locator(".item", has_text="docker-system").locator(".needline").count() == 1 and "Offene Updates: 10" in project.locator(".item", has_text="docker-system").locator(".needline").inner_text())
 
     deploy = tcard(page, "Deploy")
     labels = deploy.locator(".survey label").all_inner_texts()
@@ -503,6 +518,12 @@ def test_docs_screenshots(playwright) -> None:
                 time.sleep(0.4)
             dashboard_shot(page, f"dashboard{suffix}")
             taken.append(f"dashboard{suffix}")
+            if not suffix:
+                # Eintrag der Projekt-Karte aufgeklappt (Details, Platte je Host)
+                project = page.locator("semaphore-ui-project-card").first
+                project.locator(".entry", has_text="docker-system").locator(".main").click()
+                time.sleep(0.5)
+                take(project, "project-card-expanded")
         finally:
             browser.close()
     browser, page = open_page(playwright, width=1400, height=1700, path="/dashboard-sem-test/1")
@@ -629,13 +650,14 @@ def test_disk_figures(page: Page) -> None:
     labels = [(d.get_attribute("aria-label") or "") for d in disks.all()]
     check("Platte: zwei von drei Hosts melden Werte (adguard nicht)", hosts_with_disk == ["dockerhost", "pialert"] and len(texts) == 2, (hosts_with_disk, texts))
     first = labels[0] if labels else ""
-    check("Platte: dockerhost – eine Zeile „4,2 / 11,2 GiB frei“ mit Prozent im Balken", "4,2 / 11,2 GiB frei" in texts[0] and "62 %" in texts[0], texts)
-    check("Platte: Tooltip/Screenreader nennt Belegung und Bedarf der Updates (deutsche Zahlen)", "62,4 % belegt" in first and "Updates brauchen 310 MiB" in first, first)
+    check("Platte: dockerhost – eine Zeile „4,5 / 12,0 GB frei“ mit Prozent im Balken", "4,5 / 12,0 GB frei" in texts[0] and "62 %" in texts[0], texts)
+    check("Platte: Tooltip/Screenreader nennt Belegung und Bedarf der Updates (deutsche Zahlen)", "62,4 % belegt" in first and "Updates brauchen 325 MB" in first, first)
     second = labels[1] if len(labels) > 1 else ""
-    check("Platte: pialert – 1,4 / 15,7 GiB frei, 91,3 % belegt", "91,3 % belegt" in second and "1,4 / 15,7 GiB frei" in second, second)
+    check("Platte: pialert – 1,5 / 16,9 GB frei, 91,3 % belegt", "91,3 % belegt" in second and "1,5 / 16,9 GB frei" in second, second)
     heights = [d.locator(".bar").bounding_box()["height"] for d in disks.all()]
     rows = [d.bounding_box()["height"] for d in disks.all()]
-    check("Platte: Balken ist höher (18 px) und die Zeile bleibt einzeilig", all(h >= 16 for h in heights) and all(r < 30 for r in rows), (heights, rows))
+    # der Platzbedarf („· Updates brauchen …“) darf in eine zweite Zeile umbrechen: höchstens zwei Zeilen
+    check("Platte: Balken ist höher (18 px) und die Zeile umbricht höchstens einmal", all(h >= 16 for h in heights) and all(r < 56 for r in rows), (heights, rows))
     bars = card.locator(".disk .bar")
     classes = [(b.get_attribute("class") or "").replace("bar", "").strip() for b in bars.all()]
     check("Platte: Balken – dockerhost normal, pialert (über 90 %) rot", classes == ["", "crit"], classes)

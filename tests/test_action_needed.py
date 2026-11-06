@@ -105,7 +105,7 @@ async def test_reboot_alone_needs_action(hass: HomeAssistant, fake, make_entry) 
     await setup(hass, make_entry)
     needs = hass.states.get(eid(hass, "binary_sensor", HOST_UPDATE, "needs_action"))
     assert needs.state == "on"
-    assert needs.attributes["explanation"] == "Pending updates: 0 · Reboot required"
+    assert needs.attributes["explanation"] == "Reboot required"
     assert project_sensor(hass).attributes["details"][0]["reboot_required"] is True
 
 

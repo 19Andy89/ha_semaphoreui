@@ -9,7 +9,7 @@ Pro Semaphore-**Projekt** ein Eintrag, pro **Template** ein Gerät – mit Statu
 und einem fertigen **Bericht**: was wann gestartet wurde, wie lange es lief, Ergebnis und – bei Fehlern – warum.
 Zwei **Dashboard-Karten** (Template und Projekt) werden mitgeliefert und von der Integration selbst geladen.
 
-Getestet mit Home Assistant 2026.10 (siehe `tests/`). Läuft rein lokal, keine Cloud, kein HACS nötig.
+Getestet mit Home Assistant 2026.10 (Browser-Test) und der jeweils aktuellen Version (CI, siehe `tests/`); Mindestversion 2026.10.0, ältere Versionen sind nicht getestet. Läuft rein lokal, keine Cloud.
 
 > **Inoffiziell:** Dieses Projekt ist ein unabhängiges Community-Projekt und steht in **keiner Verbindung** zu Semaphore UI
 > und seinen Entwicklern; es wird weder von ihnen unterstützt noch empfohlen. Es nutzt ausschließlich die öffentliche
@@ -44,12 +44,23 @@ Die Bilder entstehen im Browser-Test aus Beispieldaten (siehe [Tests](#tests)); 
 |---|---|---|---|---|
 | ![Läuft](docs/screenshots/template-card-running.png) | ![Survey](docs/screenshots/template-card-survey.png) | ![Versionen](docs/screenshots/project-card-versions.png) | ![Nur Benötigtes](docs/screenshots/project-card-only-needed.png) | ![Pakete aufgeklappt](docs/screenshots/template-card-updates-open.png) |
 
+| Projekt-Karte: Eintrag aufgeklappt (Klick auf den Namen) |
+|---|
+| ![Eintrag aufgeklappt](docs/screenshots/project-card-expanded.png) |
+
 </details>
 
 ## Installation
 
+**Über den Marketplace / HACS (empfohlen):** Den Badge oben anklicken („Open your Home Assistant instance …“) oder das Repository `19Andy89/hacs_semaphoreui` als benutzerdefiniertes Repository (Kategorie *Integration*) hinzufügen, installieren und Home Assistant neu starten. Updates erscheinen dann wie bei anderen Integrationen; Vorabversionen (`-dev.N`) gibt es nur mit „Beta-Versionen anzeigen“.
+
+**Von Hand:**
+
 1. Ordner `custom_components/semaphore_ui` nach `/config/custom_components/semaphore_ui` kopieren.
 2. Home Assistant neu starten.
+
+Danach (beide Wege):
+
 3. In Semaphore ein API-Token anlegen: Benutzername (oben rechts) → **API-Tokens** → **Neues Token**.
 4. *Einstellungen → Geräte & Dienste → Integration hinzufügen → „Semaphore UI“*:
    URL (z. B. `https://semaphore.example.de`) + Token → danach das **Projekt** aus der Liste wählen.
@@ -174,7 +185,7 @@ eine Zeile „Offene Updates: 3 · Neustart nötig“.
 nur Anzeige, max. 50; die Karte zeigt sie in einer Zeile mit „+n weitere“), `host` (sonst der Host aus der Ansible-Ausgabe), `needed` (true/false – überschreibt die Regel),
 `notes` (Text oder Liste von Texten, siehe unten; auch `note` wird gelesen).
 **Platte des Hosts** (optional, nur Anzeige): `disk_free_mib` (freier Platz auf `/` in MiB), `disk_required_mib` (Platzbedarf der Updates in MiB)
-und `disk_used_percent` (belegt, 0–100). Die Template-Karte zeigt sie je Host als „4,2 GiB frei · 62,4 % belegt · Updates brauchen 310 MiB“
+und `disk_used_percent` (belegt, 0–100). Die Karten rechnen in MB/GB um (1 MiB = 1,048576 MB) und zeigen sie je Host als „4,5 / 12,0 GB frei · 62,4 % belegt · Updates brauchen 325 MB“ (der Bedarf nur, solange Updates offen sind)
 mit einem Balken (ab 80 % orange, ab 90 % rot); Hosts ohne diese Werte bekommen keine Zeile. Sie ändern nichts am Handlungsbedarf.
 Ungültige Werte (negativ, kein Zahlenwert, Prozent über 100) werden einzeln ignoriert. Das mitgelieferte `playbooks/update-linux.yml` meldet sie.
 Unbekannte Schlüssel werden ignoriert. Ohne `needed` gilt: **Handlungsbedarf, wenn `updates` > 0 oder `reboot_required` wahr ist.** Bei mehreren Hosts zählt die
@@ -254,6 +265,8 @@ Abfrage von `deb.debian.org/debian/dists/stable/Release`) und wandert dann in `n
           } | to_json }}
 ```
 
+> **Die Playbooks im Ordner [`playbooks/`](playbooks/) sind Beispiele.** Sie enthalten keine Hosts, Zugangsdaten oder Adressen und zeigen, wie ein Playbook `HA_RESULT` meldet. Passe `hosts:` (Gruppe in deinem Inventar) und die Schwellenwerte an, und probiere sie zuerst als **Testlauf** (`--check`) aus. Für andere Aufgaben (Docker, Deploy, …) brauchst du ein eigenes Playbook mit einer `HA_RESULT`-Zeile; die Integration funktioniert auch ganz ohne (dann gibt es nur Status und Bericht, keinen Handlungsbedarf).
+
 Ein vollständiges, getestetes Playbook (Speicherplatz-Prüfung, Update, Neustart-Prüfung, Debian-Prüfung, `HA_RESULT` mit
 Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); für **Proxmox-Hosts** (dist-upgrade, Neustartbedarf auch bei neuerem Kernel) gibt es [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); die Ausgabe im Format `yaml` und `json` ist
 als Testfall hinterlegt.
@@ -265,6 +278,7 @@ für den Host. Das mitgelieferte Playbook fasst die Vorprüfungen deshalb in ein
 **Dashboard:** In der Karte unter **Sichtbarkeit** eine Bedingung „Entität → Zustand“ auf den Sensor *Handlungsbedarf*
 setzen (Zustand `Ein`) – die Karte erscheint nur, wenn etwas zu tun ist. Die Projekt-Karte kann alles in einer Liste
 zeigen: Option `only_needed: true` blendet Templates ohne Handlungsbedarf, ohne Fehler und ohne laufenden Task aus.
+In der Projekt-Karte klappt ein Klick auf ein Template dessen Details auf (Zeiten, Fehlergrund, Ergebnis je Host, Link zu Semaphore); More-Info öffnet das Info-Symbol rechts in der Zeile.
 **Template-Karte nach dem Lauf noch 24 Stunden zeigen:** In den **Optionen** der Integration „Templates nach einem Lauf 24 Stunden sichtbar lassen“ einschalten.
 Jedes Template hat dann den Diagnose-Sensor **Karte sichtbar** (`binary_sensor`, Attribute `reason` = `running` / `error` / `needs_action` / `recent`, `until`):
 an, solange es läuft, fehlgeschlagen ist, Handlungsbedarf meldet oder – nur mit der Option – weniger als 24 Stunden her ist und nicht „Als erledigt markiert“ wurde.
