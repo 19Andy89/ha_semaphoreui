@@ -348,6 +348,43 @@ function fmtRelative(iso, hass) {
 }
 
 /** Entities of one device, indexed as "domain:translation_key" (+ the survey inputs). */
+// Sizes: the playbooks report MiB; the cards show plain MB / GB (1 MiB = 1.048576 MB), no "i" units.
+const MB_PER_MIB = 1.048576;
+function fmtNum(hass, n, digits = 1, min = 0) {
+  return new Intl.NumberFormat(hass.locale?.language || langOf(hass), { minimumFractionDigits: min, maximumFractionDigits: digits }).format(n);
+}
+/** "4,5 GB" from 4300 MiB; below 1 GB in MB ("15,7 MB", "310 MB"). */
+function fmtSize(hass, mib) {
+  const mb = mib * MB_PER_MIB;
+  return mb >= 1000 ? `${fmtNum(hass, mb / 1000, 1, 1)} GB` : `${fmtNum(hass, mb, mb < 10 ? 1 : 0)} MB`;
+}
+
+/**
+ * Disk of one host (root file system) as a bar with "5,6 / 20 GB frei" and, if updates are open,
+ * "· benötigt …". The same row is used by the template card and the unfolded project card.
+ */
+const hasDisk = (h) => ["disk_free_mib", "disk_used_percent", "disk_required_mib"].some((k) => typeof h[k] === "number");
+function diskRow(hass, T, name, h) {
+  const num = (n, digits = 1, min = 0) => fmtNum(hass, n, digits, min);
+  const free = typeof h.disk_free_mib === "number" ? h.disk_free_mib : null;
+  const pct = typeof h.disk_used_percent === "number" ? Math.min(100, h.disk_used_percent) : null;
+  const total = free !== null && pct !== null && pct < 100 ? free / (1 - pct / 100) : null;
+  // both numbers of "5,6 / 20 GB frei" in the unit of the total
+  let text = "";
+  if (free !== null && total !== null) {
+    const gb = total * MB_PER_MIB >= 1000;
+    const f = (mib) => (gb ? num((mib * MB_PER_MIB) / 1000, 1, 1) : num(mib * MB_PER_MIB, 0));
+    text = `${f(free)} / ${f(total)} ${gb ? "GB" : "MB"} ${T.disk_free}`;
+  } else if (free !== null) text = `${fmtSize(hass, free)} ${T.disk_free}`;
+  // the need belongs to open updates: after an update (0 open) an old value must not be shown
+  const open = typeof h.updates === "number" ? h.updates > 0 : true;
+  const need = open && h.disk_required_mib > 0 ? `${T.disk_need} ${fmtSize(hass, h.disk_required_mib)}` : "";
+  const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
+  const full = [name, text, pct !== null ? `${num(pct)} % ${T.disk_used}` : "", need].filter(Boolean).join(" · ");
+  const bar = pct === null ? "" : `<span class="bar ${level}"><i style="width:${pct}%"></i><b>${num(pct, 0)} %</b></span>`;
+  return `<div class="disk" role="img" aria-label="${esc(full)}" title="${esc(full)}"><ha-icon icon="mdi:harddisk"></ha-icon>${bar}<span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(text)}</span>${need ? `<span class="dneed">· ${esc(need)}</span>` : ""}</div>`;
+}
+
 function entitiesOfDevice(hass, deviceId) {
   const byKey = {};
   const survey = [];
@@ -1282,8 +1319,6 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const multi = allHosts.length > 1;
     const lang = langOf(hass);
     const num = (n, digits = 1, min = 0) => new Intl.NumberFormat(hass.locale?.language || lang, { minimumFractionDigits: min, maximumFractionDigits: digits }).format(n);
-    // GiB always with one decimal ("1,0 / 1,7"), so the numbers do not jump between "1" and "1,7"
-    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024, 1, 1)} GiB` : `${num(mib, mib < 10 ? 1 : 0)} MiB`);
 
     // hint lines ("Debian 13 is out"), shown whether or not something is to do
     const noteLines = (items) =>
@@ -1294,25 +1329,8 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
             .join("")}${items.length > 3 ? `<div class="note"><span>${esc(T.more_n.replace("{n}", items.length - 3))}</span></div>` : ""}</div>`
         : "";
 
-    // disk of one host (root file system), if the playbook reports it
-    const hasDisk = (h) => ["disk_free_mib", "disk_used_percent", "disk_required_mib"].some((k) => typeof h[k] === "number");
-    const diskRow = (name, h) => {
-      const free = typeof h.disk_free_mib === "number" ? h.disk_free_mib : null;
-      const pct = typeof h.disk_used_percent === "number" ? Math.min(100, h.disk_used_percent) : null;
-      const total = free !== null && pct !== null && pct < 100 ? free / (1 - pct / 100) : null;
-      // "5,6 / 20 GiB frei": both numbers in the unit of the total
-      let text = "";
-      if (free !== null && total !== null) {
-        const gib = total >= 1024;
-        const f = (mib) => (gib ? num(mib / 1024, 1, 1) : num(mib, 0));
-        text = `${f(free)} / ${f(total)} ${gib ? "GiB" : "MiB"} ${T.disk_free}`;
-      } else if (free !== null) text = `${size(free)} ${T.disk_free}`;
-      const need = h.disk_required_mib > 0 ? `${T.disk_need} ${size(h.disk_required_mib)}` : "";
-      const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
-      const full = [name, text, pct !== null ? `${num(pct)} % ${T.disk_used}` : "", need].filter(Boolean).join(" · ");
-      const bar = pct === null ? "" : `<span class="bar ${level}"><i style="width:${pct}%"></i><b>${num(pct, 0)} %</b></span>`;
-      return `<div class="disk" role="img" aria-label="${esc(full)}" title="${esc(full)}"><ha-icon icon="mdi:harddisk"></ha-icon>${bar}<span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(text)}</span>${need ? `<span class="dneed">· ${esc(need)}</span>` : ""}</div>`;
-    };
+    // disk of one host: shared diskRow() above
+    const diskHtmlOf = (name, h) => diskRow(hass, T, name, h);
 
     // package chips; all are rendered, _fitPackages() folds them into one line and writes "+n more" into the button
     const pkgBox = (names, key, omitted = 0) => {
@@ -1330,7 +1348,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     if (!multi) {
       // one host (or none): as before
       const notes = (Array.isArray(a.notes) ? a.notes : []).filter((n) => n && typeof n === "object" && n.text).map((n) => ({ text: n.text }));
-      const diskHtml = allHosts.length && hasDisk(allHosts[0][1]) ? `<div class="disks">${diskRow("", allHosts[0][1])}</div>` : "";
+      const diskHtml = allHosts.length && hasDisk(allHosts[0][1]) ? `<div class="disks">${diskHtmlOf("", allHosts[0][1])}</div>` : "";
       const names = on && Array.isArray(a.packages) ? a.packages : [];
       inner = `${diskHtml}${pkgBox(names, "", allHosts.length ? allHosts[0][1].packages_omitted || 0 : 0)}${noteLines(notes)}`;
     } else {
@@ -1344,7 +1362,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
         const text = status.length ? status.join(", ") : need ? T.host_action : T.host_ok;
         const own = Array.isArray(h.notes) ? h.notes.filter(Boolean).map((t) => ({ text: String(t) })) : [];
         const names = Array.isArray(h.packages) ? h.packages : [];
-        return `<div class="host"><div class="hh"><span class="hn">${esc(name)}</span><span class="hs${need ? " need" : ""}">${esc(text)}</span></div>${hasDisk(h) ? `<div class="disks">${diskRow("", h)}</div>` : ""}${pkgBox(names, name, h.packages_omitted || 0)}${noteLines(own)}</div>`;
+        return `<div class="host"><div class="hh"><span class="hn">${esc(name)}</span><span class="hs${need ? " need" : ""}">${esc(text)}</span></div>${hasDisk(h) ? `<div class="disks">${diskHtmlOf("", h)}</div>` : ""}${pkgBox(names, name, h.packages_omitted || 0)}${noteLines(own)}</div>`;
       });
       if (allHosts.length > shown.length) blocks.push(`<div class="host"><span class="hs">${esc(T.more_n.replace("{n}", allHosts.length - shown.length))}</span></div>`);
       inner = `<div class="hosts">${blocks.join("")}</div>`;
@@ -1848,9 +1866,6 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
   /** The unfolded part of an entry: times, failure, per host what the playbook reported (HA_RESULT), link. */
   _detail(t, T, hass) {
     const rep = t.rep || {};
-    const lang = hass.locale?.language || langOf(hass);
-    const num = (n) => new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(n);
-    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024)} GiB` : `${num(mib)} MiB`);
     const rows = [];
     const row = (k, v) => rows.push(`<div class="drow"><span class="dk">${esc(k)}</span><span class="dv">${v}</span></div>`);
     if (t.started && t.started !== "unknown") row(T.running_since, `${esc(fmtDate(t.started, hass))} · ${esc(fmtRelative(t.started, hass))}`);
@@ -1867,12 +1882,11 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
         .map(([name, h]) => {
           const bits = [];
           if (!h.needed && !h.updates && !h.reboot_required) bits.push(T.host_ok);
-          if (typeof h.updates === "number" && h.updates > 0) bits.push(T.updates_n.replace("{n}", h.updates));
+          if (typeof h.updates === "number" && h.updates > 0) bits.push(h.updates === 1 ? T.update_1 : T.updates_n.replace("{n}", h.updates));
           if (h.reboot_required) bits.push(T.reboot_short);
-          if (typeof h.disk_required_mib === "number" && h.disk_required_mib > 0) bits.push(`${T.disk_need} ${size(h.disk_required_mib)}`);
-          if (typeof h.disk_free_mib === "number") bits.push(`${size(h.disk_free_mib)} ${T.disk_free}`);
+          const disk = hasDisk(h) ? `<div class="disks">${diskRow(hass, T, "", h)}</div>` : "";
           const notes = (Array.isArray(h.notes) ? h.notes : []).filter(Boolean).map((n) => `<div class="meta">${esc(typeof n === "object" ? n.text : n)}</div>`).join("");
-          return `<div class="dhost"><div><strong>${esc(name)}</strong>${bits.length ? " · " + esc(bits.join(" · ")) : ""}</div>${notes}</div>`;
+          return `<div class="dhost"><div><strong>${esc(name)}</strong>${bits.length ? " · " + esc(bits.join(" · ")) : ""}</div>${disk}${notes}</div>`;
         })
         .join("")}</div>`;
     }

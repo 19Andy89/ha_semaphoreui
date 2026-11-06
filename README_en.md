@@ -175,7 +175,7 @@ a line “Pending updates: 3 · Reboot required”.
 display only, max. 50; the card shows them in one line with “+n more”), `host` (otherwise the host from the Ansible output), `needed` (true/false – overrides the rule),
 `notes` (text or list of texts, see below; `note` is read as well).
 **Host disk** (optional, display only): `disk_free_mib` (free space on `/` in MiB), `disk_required_mib` (space the updates need, in MiB)
-and `disk_used_percent` (used, 0–100). The template card shows them per host as “4.2 GiB free · 62.4 % used · updates need 310 MiB”
+and `disk_used_percent` (used, 0–100). The cards convert to MB/GB (1 MiB = 1.048576 MB) and show them per host as “4.5 / 12.0 GB free · 62.4 % used · updates need 325 MB” (the need only while updates are open)
 with a bar (orange from 80 %, red from 90 %); hosts without these values get no line. They do not change the action-needed state.
 Invalid values (negative, not a number, percent above 100) are ignored individually. The bundled `playbooks/update-linux.yml` reports them.
 Unknown keys are ignored. Without `needed` the rule is: **action needed if `updates` > 0 or `reboot_required` is true.** With multiple hosts the

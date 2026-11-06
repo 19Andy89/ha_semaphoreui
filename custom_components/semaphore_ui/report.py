@@ -680,7 +680,8 @@ def ha_result_text(ha_result: dict[str, Any], lang: str | None = "de") -> str:
     """``Offene Updates: 3 · Neustart nötig`` / ``Nichts zu tun``."""
     t = _texts(lang)
     parts: list[str] = []
-    if ha_result.get("updates") is not None:
+    # "Offene Updates: 0" next to "Neustart nötig" says nothing: only name updates that are open
+    if isinstance(ha_result.get("updates"), (int, float)) and ha_result["updates"] > 0:
         parts.append(f"{t['pending_updates']}: {ha_result['updates']}")
     if ha_result.get("reboot_required"):
         parts.append(t["reboot_required"])

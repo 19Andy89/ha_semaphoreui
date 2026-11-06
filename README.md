@@ -174,7 +174,7 @@ eine Zeile „Offene Updates: 3 · Neustart nötig“.
 nur Anzeige, max. 50; die Karte zeigt sie in einer Zeile mit „+n weitere“), `host` (sonst der Host aus der Ansible-Ausgabe), `needed` (true/false – überschreibt die Regel),
 `notes` (Text oder Liste von Texten, siehe unten; auch `note` wird gelesen).
 **Platte des Hosts** (optional, nur Anzeige): `disk_free_mib` (freier Platz auf `/` in MiB), `disk_required_mib` (Platzbedarf der Updates in MiB)
-und `disk_used_percent` (belegt, 0–100). Die Template-Karte zeigt sie je Host als „4,2 GiB frei · 62,4 % belegt · Updates brauchen 310 MiB“
+und `disk_used_percent` (belegt, 0–100). Die Karten rechnen in MB/GB um (1 MiB = 1,048576 MB) und zeigen sie je Host als „4,5 / 12,0 GB frei · 62,4 % belegt · Updates brauchen 325 MB“ (der Bedarf nur, solange Updates offen sind)
 mit einem Balken (ab 80 % orange, ab 90 % rot); Hosts ohne diese Werte bekommen keine Zeile. Sie ändern nichts am Handlungsbedarf.
 Ungültige Werte (negativ, kein Zahlenwert, Prozent über 100) werden einzeln ignoriert. Das mitgelieferte `playbooks/update-linux.yml` meldet sie.
 Unbekannte Schlüssel werden ignoriert. Ohne `needed` gilt: **Handlungsbedarf, wenn `updates` > 0 oder `reboot_required` wahr ist.** Bei mehreren Hosts zählt die

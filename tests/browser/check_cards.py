@@ -111,6 +111,9 @@ def test_rendering(page: Page) -> None:
     page.wait_for_timeout(300)
     detail = project.locator(".entry", has_text="docker-system").locator(".detail")
     check("Projekt-Karte: Klick klappt die Details auf (Host, Updates)", detail.count() == 1 and "Updates" in detail.inner_text(), detail.inner_text() if detail.count() else "")
+    disks = detail.locator(".disk")
+    check("Projekt-Karte: Details zeigen die Platte je Host wie die Template-Karte (Balken, „… GB frei“)", disks.count() >= 1 and "GB frei" in disks.first.inner_text() and detail.locator(".disk .bar").count() >= 1, disks.all_inner_texts())
+    check("Projekt-Karte: Details nennen keine Einheit mit „i“ (MiB/GiB)", "MiB" not in detail.inner_text() and "GiB" not in detail.inner_text())
     project.locator(".entry", has_text="docker-system").locator(".main").click()
     page.wait_for_timeout(300)
     check("Projekt-Karte: zweiter Klick klappt wieder zu", project.locator(".entry", has_text="docker-system").locator(".detail").count() == 0)
@@ -641,10 +644,10 @@ def test_disk_figures(page: Page) -> None:
     labels = [(d.get_attribute("aria-label") or "") for d in disks.all()]
     check("Platte: zwei von drei Hosts melden Werte (adguard nicht)", hosts_with_disk == ["dockerhost", "pialert"] and len(texts) == 2, (hosts_with_disk, texts))
     first = labels[0] if labels else ""
-    check("Platte: dockerhost – eine Zeile „4,2 / 11,2 GiB frei“ mit Prozent im Balken", "4,2 / 11,2 GiB frei" in texts[0] and "62 %" in texts[0], texts)
-    check("Platte: Tooltip/Screenreader nennt Belegung und Bedarf der Updates (deutsche Zahlen)", "62,4 % belegt" in first and "Updates brauchen 310 MiB" in first, first)
+    check("Platte: dockerhost – eine Zeile „4,5 / 12,0 GB frei“ mit Prozent im Balken", "4,5 / 12,0 GB frei" in texts[0] and "62 %" in texts[0], texts)
+    check("Platte: Tooltip/Screenreader nennt Belegung und Bedarf der Updates (deutsche Zahlen)", "62,4 % belegt" in first and "Updates brauchen 325 MB" in first, first)
     second = labels[1] if len(labels) > 1 else ""
-    check("Platte: pialert – 1,4 / 15,7 GiB frei, 91,3 % belegt", "91,3 % belegt" in second and "1,4 / 15,7 GiB frei" in second, second)
+    check("Platte: pialert – 1,5 / 16,9 GB frei, 91,3 % belegt", "91,3 % belegt" in second and "1,5 / 16,9 GB frei" in second, second)
     heights = [d.locator(".bar").bounding_box()["height"] for d in disks.all()]
     rows = [d.bounding_box()["height"] for d in disks.all()]
     # der Platzbedarf („· Updates brauchen …“) darf in eine zweite Zeile umbrechen: höchstens zwei Zeilen
