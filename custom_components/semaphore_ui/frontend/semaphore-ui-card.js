@@ -24,6 +24,10 @@ const TEXTS = {
     duration: "Dauer",
     never: "Noch nie ausgeführt",
     running_since: "Gestartet",
+    ended_at: "Beendet",
+    details: "Details anzeigen",
+    details_hide: "Details ausblenden",
+    more_info: "Weitere Infos in Home Assistant",
     step: "Schritt",
     step_of: "Schritt {n} / {total}",
     step_n: "Schritt {n}",
@@ -158,6 +162,10 @@ const TEXTS = {
     duration: "Duration",
     never: "Never run",
     running_since: "Started",
+    ended_at: "Ended",
+    details: "Show details",
+    details_hide: "Hide details",
+    more_info: "More info in Home Assistant",
     step: "Step",
     step_of: "Step {n} / {total}",
     step_n: "Step {n}",
@@ -508,8 +516,16 @@ const STYLE = `
   .last ha-icon { --mdc-icon-size: 24px; flex: none; }
   .last .t { min-width: 0; }
   .list { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); }
-  .item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--divider-color); }
-  .item:first-child { border-top: none; }
+  .entry { border-top: 1px solid var(--divider-color); }
+  .entry:first-child { border-top: none; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+  .detail { padding: 0 0 10px 34px; display: grid; gap: 6px; font-size: 0.9em; }
+  .detail .drows { display: grid; gap: 2px; }
+  .detail .drow { display: flex; gap: 8px; }
+  .detail .dk { color: var(--secondary-text-color); min-width: 5.5em; }
+  .detail .dhost .meta { color: var(--secondary-text-color); font-size: 0.9em; }
+  .detail .errbox { margin-top: 0; }
+  .item .main:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; border-radius: 6px; }
   .item .ic { --mdc-icon-size: 24px; flex: none; }
   .item .ic.dry { --mdc-icon-size: 20px; padding: 2px; border: 1.5px dashed currentColor; border-radius: 50%; opacity: 0.6; }
   .item .main { flex: 1; min-width: 0; cursor: pointer; }
@@ -605,7 +621,7 @@ class SemaphoreBaseCard extends HTMLElement {
     });
     // the clickable header areas are no <button>s: make them work with Enter / Space, too
     this.shadowRoot.addEventListener("keydown", (ev) => {
-      if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches('[data-action="more-info"], [data-action="filter"]')) {
+      if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches('[data-action="more-info"], [data-action="filter"], [data-action="toggle"]')) {
         ev.preventDefault();
         this._onClick(ev);
       }
@@ -1597,6 +1613,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
         dismissedAt: ((this._state(byKey["sensor:status"]) || {}).attributes || {}).dismissed_at || "",
         needs: this._val(byKey["binary_sensor:needs_action"]),
         needText: ((this._state(byKey["binary_sensor:needs_action"]) || {}).attributes || {}).explanation || "",
+        needAttrs: (this._state(byKey["binary_sensor:needs_action"]) || {}).attributes || {},
       });
     }
     const cfg = this._config;
@@ -1643,6 +1660,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
       add(k["sensor:status"], "dismissed_at");
       add(k["sensor:summary"], "short");
       add(k["binary_sensor:needs_action"], "explanation");
+      add(k["binary_sensor:needs_action"], "hosts");
     }
     const parts = ids.map(([id, attr]) => {
       const s = hass.states[id];
@@ -1652,7 +1670,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     const hacs = c.hacs_update_entity ? hass.states[c.hacs_update_entity] : null;
     const hacsPart = hacs ? `${hacs.state}|${hacs.attributes.installed_version}|${hacs.attributes.latest_version}` : "";
     // the minute counter: relative times need a refresh once a minute
-    return [JSON.stringify(c), this._message, this._confirmFor || "", this._filter || "", hacsPart, langOf(hass), Math.floor(Date.now() / 60000), ...parts].join("\n");
+    return [JSON.stringify(c), this._message, this._confirmFor || "", this._filter || "", [...(this._open || [])].join(","), hacsPart, langOf(hass), Math.floor(Date.now() / 60000), ...parts].join("\n");
   }
 
   /** Why Semaphore is not available (reason from the connectivity sensor) with a link to the integration. */
@@ -1818,11 +1836,48 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     if (t.recent && dismissId) {
       action += `<button class="icon${this._busy.has(dismissId) ? " busy" : ""}" data-action="press" data-entity="${dismissId}"${this._busyAttrs(dismissId)} aria-label="${esc(T.dismiss)}: ${esc(t.name)}" title="${esc(T.dismiss)}">${this._ico(dismissId, "mdi:eye-off-outline")}</button>`;
     }
-    return `<div class="item">
+    const open = !!this._open && this._open.has(t.device.id);
+    const infoBtn = `<button class="icon" data-action="more-info" data-entity="${t.byKey["sensor:status"]}" aria-label="${esc(T.more_info)}: ${esc(t.name)}" title="${esc(T.more_info)}"><ha-icon icon="mdi:information-outline"></ha-icon></button>`;
+    return `<div class="entry${open ? " open" : ""}"><div class="item">
       <ha-icon class="ic ${st.pulse ? "pulse" : ""}${dryItem ? " dry" : ""}" icon="${st.icon}" style="color:${st.color}"${dryItem ? ` title="${esc(T.dry_run_hint)}"` : ""}></ha-icon>
-      <div class="main" data-action="more-info" data-entity="${t.byKey["sensor:status"]}">
+      <div class="main" role="button" tabindex="0" aria-expanded="${open}" data-action="toggle" data-id="${esc(t.device.id)}" title="${esc(open ? T.details_hide : T.details)}">
         <div class="name">${esc(t.name)}</div><div class="sub" title="${esc(bits.join(" · "))}">${esc(bits.join(" · "))}</div>${needLine}
-      </div>${action}</div>`;
+      </div>${action}${infoBtn}</div>${open ? this._detail(t, T, hass) : ""}</div>`;
+  }
+
+  /** The unfolded part of an entry: times, failure, per host what the playbook reported (HA_RESULT), link. */
+  _detail(t, T, hass) {
+    const rep = t.rep || {};
+    const lang = hass.locale?.language || langOf(hass);
+    const num = (n) => new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(n);
+    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024)} GiB` : `${num(mib)} MiB`);
+    const rows = [];
+    const row = (k, v) => rows.push(`<div class="drow"><span class="dk">${esc(k)}</span><span class="dv">${v}</span></div>`);
+    if (t.started && t.started !== "unknown") row(T.running_since, `${esc(fmtDate(t.started, hass))} · ${esc(fmtRelative(t.started, hass))}`);
+    if (t.ended && t.ended !== "unknown" && !ACTIVE.has(t.status)) row(T.ended_at, esc(fmtDate(t.ended, hass)));
+    if (t.duration && !isNaN(Number(t.duration)) && !ACTIVE.has(t.status)) row(T.duration, esc(fmtDuration(Number(t.duration), hass)));
+    let html = rows.length ? `<div class="drows">${rows.join("")}</div>` : "";
+    if (t.status === "error" && rep.error && rep.error.reason) {
+      const meta = [rep.error.failed_task && `${T.task}: ${rep.error.failed_task}`, rep.error.host && `${T.host}: ${rep.error.host}`].filter(Boolean);
+      html += `<div class="errbox"><div>${esc(rep.error.reason)}</div>${meta.length ? `<div class="meta">${meta.map(esc).join(" · ")}</div>` : ""}</div>`;
+    }
+    const hosts = Object.entries((t.needAttrs && t.needAttrs.hosts) || {}).filter(([, h]) => h && typeof h === "object");
+    if (hosts.length) {
+      html += `<div class="dhosts">${hosts
+        .map(([name, h]) => {
+          const bits = [];
+          if (!h.needed && !h.updates && !h.reboot_required) bits.push(T.host_ok);
+          if (typeof h.updates === "number" && h.updates > 0) bits.push(T.updates_n.replace("{n}", h.updates));
+          if (h.reboot_required) bits.push(T.reboot_short);
+          if (typeof h.disk_required_mib === "number" && h.disk_required_mib > 0) bits.push(`${T.disk_need} ${size(h.disk_required_mib)}`);
+          if (typeof h.disk_free_mib === "number") bits.push(`${size(h.disk_free_mib)} ${T.disk_free}`);
+          const notes = (Array.isArray(h.notes) ? h.notes : []).filter(Boolean).map((n) => `<div class="meta">${esc(typeof n === "object" ? n.text : n)}</div>`).join("");
+          return `<div class="dhost"><div><strong>${esc(name)}</strong>${bits.length ? " · " + esc(bits.join(" · ")) : ""}</div>${notes}</div>`;
+        })
+        .join("")}</div>`;
+    }
+    if (rep.url) html += `<a class="link" href="${esc(rep.url)}" target="_blank" rel="noopener"><ha-icon icon="mdi:open-in-new"></ha-icon>${esc(T.open)}</a>`;
+    return `<div class="detail">${html || `<div class="meta">${esc(T.never)}</div>`}</div>`;
   }
 
   async _onClick(ev) {
@@ -1831,6 +1886,14 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     const action = target.dataset.action;
     const entity = target.dataset.entity;
     if (action === "more-info") return this._moreInfo(entity);
+    if (action === "toggle") {
+      this._open = this._open || new Set();
+      const id = target.dataset.id;
+      if (this._open.has(id)) this._open.delete(id);
+      else this._open.add(id);
+      this._sig = "";
+      return this._update();
+    }
     if (action === "schedule") return this._toggleSchedule(entity);
     if (action === "open-integration") {
       // use the router of Home Assistant (no page reload); a plain link would reload the whole UI

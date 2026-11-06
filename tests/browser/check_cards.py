@@ -102,7 +102,19 @@ def test_rendering(page: Page) -> None:
         "list => [list.getBoundingClientRect().width, ...[...list.querySelectorAll('.item')].map(i => i.getBoundingClientRect().width)]"
     )
     check("Projekt-Karte: Zeilen passen in die Karte", all(w <= widths[0] + 1 for w in widths[1:]), widths)
-    check("Projekt-Karte: jede Zeile hat einen Knopf", project.locator(".item button").count() == 5, project.locator(".item button").count())
+    check("Projekt-Karte: jede Zeile hat mindestens einen Knopf", all(project.locator(".item").nth(i).locator("button").count() >= 1 for i in range(5)))
+
+    # Eintrag aufklappen (Issue #14): Klick auf den Namen zeigt Details, nochmal Klick klappt zu
+    entry = project.locator(".entry", has_text="docker-system")
+    check("Projekt-Karte: Details sind zunächst zu", entry.locator(".detail").count() == 0 and entry.locator(".main").get_attribute("aria-expanded") == "false")
+    entry.locator(".main").click()
+    page.wait_for_timeout(300)
+    detail = project.locator(".entry", has_text="docker-system").locator(".detail")
+    check("Projekt-Karte: Klick klappt die Details auf (Host, Updates)", detail.count() == 1 and "Updates" in detail.inner_text(), detail.inner_text() if detail.count() else "")
+    project.locator(".entry", has_text="docker-system").locator(".main").click()
+    page.wait_for_timeout(300)
+    check("Projekt-Karte: zweiter Klick klappt wieder zu", project.locator(".entry", has_text="docker-system").locator(".detail").count() == 0)
+    check("Projekt-Karte: More-Info bleibt über das Info-Symbol erreichbar", project.locator('.item button[data-action="more-info"]').count() == 5)
 
     host = tcard(page, "Host-Update")
     check("Fehler-Karte: Status „Fehler“", "Fehler" in host.locator(".chip").first.inner_text())
@@ -129,7 +141,7 @@ def test_rendering(page: Page) -> None:
     check("Handlungsbedarf: Template ohne Meldung zeigt keine Box", tcard(page, "Deploy").locator(".needbox").count() == 0)
     rows = project.locator(".item .name").all_inner_texts()
     check("Projekt-Karte: Reihenfolge laufend, Fehler, Handlungsbedarf, Rest", [r.strip() for r in rows[:3]] == ["Proxmox Snapshot HAOS", "Host-Update", "docker-system aktualisieren"], rows)
-    check("Projekt-Karte: Symbol und Text bei Handlungsbedarf", project.locator(".item", has_text="docker-system").locator("ha-icon.need").count() == 1 and "Offene Updates: 10" in project.locator(".item", has_text="docker-system").locator(".sub").inner_text())
+    check("Projekt-Karte: Handlungsbedarf steht in einer eigenen Zeile", project.locator(".item", has_text="docker-system").locator(".needline").count() == 1 and "Offene Updates: 10" in project.locator(".item", has_text="docker-system").locator(".needline").inner_text())
 
     deploy = tcard(page, "Deploy")
     labels = deploy.locator(".survey label").all_inner_texts()
@@ -635,7 +647,8 @@ def test_disk_figures(page: Page) -> None:
     check("Platte: pialert – 1,4 / 15,7 GiB frei, 91,3 % belegt", "91,3 % belegt" in second and "1,4 / 15,7 GiB frei" in second, second)
     heights = [d.locator(".bar").bounding_box()["height"] for d in disks.all()]
     rows = [d.bounding_box()["height"] for d in disks.all()]
-    check("Platte: Balken ist höher (18 px) und die Zeile bleibt einzeilig", all(h >= 16 for h in heights) and all(r < 30 for r in rows), (heights, rows))
+    # der Platzbedarf („· Updates brauchen …“) darf in eine zweite Zeile umbrechen: höchstens zwei Zeilen
+    check("Platte: Balken ist höher (18 px) und die Zeile umbricht höchstens einmal", all(h >= 16 for h in heights) and all(r < 56 for r in rows), (heights, rows))
     bars = card.locator(".disk .bar")
     classes = [(b.get_attribute("class") or "").replace("bar", "").strip() for b in bars.all()]
     check("Platte: Balken – dockerhost normal, pialert (über 90 %) rot", classes == ["", "crit"], classes)

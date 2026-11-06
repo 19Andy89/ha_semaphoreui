@@ -266,6 +266,7 @@ for the host without a report. The bundled playbook therefore wraps the pre-chec
 **Dashboard:** In the card, under **Visibility**, set a condition “Entity → State” on the *Needs action* sensor
 (state `On`) – the card appears only when something needs doing. The project card can show everything in one list:
 the option `only_needed: true` hides templates without action needed, without errors and without a running task.
+In the project card, a click on a template unfolds its details (times, failure reason, result per host, link to Semaphore); the info icon on the right of the row opens More-info.
 **Keep the template card visible for 24 hours after a run:** switch on “Keep templates visible for 24 hours after a run” in the integration **options**.
 Every template then has the diagnostic sensor **Card visible** (`binary_sensor`, attributes `reason` = `running` / `error` / `needs_action` / `recent`, `until`):
 on while it runs, failed, reports action needed or – only with the option – ran less than 24 hours ago and was not “marked as done”.

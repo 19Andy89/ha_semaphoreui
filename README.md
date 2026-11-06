@@ -265,6 +265,7 @@ für den Host. Das mitgelieferte Playbook fasst die Vorprüfungen deshalb in ein
 **Dashboard:** In der Karte unter **Sichtbarkeit** eine Bedingung „Entität → Zustand“ auf den Sensor *Handlungsbedarf*
 setzen (Zustand `Ein`) – die Karte erscheint nur, wenn etwas zu tun ist. Die Projekt-Karte kann alles in einer Liste
 zeigen: Option `only_needed: true` blendet Templates ohne Handlungsbedarf, ohne Fehler und ohne laufenden Task aus.
+In der Projekt-Karte klappt ein Klick auf ein Template dessen Details auf (Zeiten, Fehlergrund, Ergebnis je Host, Link zu Semaphore); More-Info öffnet das Info-Symbol rechts in der Zeile.
 **Template-Karte nach dem Lauf noch 24 Stunden zeigen:** In den **Optionen** der Integration „Templates nach einem Lauf 24 Stunden sichtbar lassen“ einschalten.
 Jedes Template hat dann den Diagnose-Sensor **Karte sichtbar** (`binary_sensor`, Attribute `reason` = `running` / `error` / `needs_action` / `recent`, `until`):
 an, solange es läuft, fehlgeschlagen ist, Handlungsbedarf meldet oder – nur mit der Option – weniger als 24 Stunden her ist und nicht „Als erledigt markiert“ wurde.
