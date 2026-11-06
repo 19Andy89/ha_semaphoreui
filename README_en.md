@@ -2,6 +2,8 @@
 
 🇩🇪 [Deutsche Version](README.md)
 
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=19Andy89&repository=hacs_semaphoreui&category=integration)
+
 Controls [Semaphore UI](https://semaphoreui.com) (Ansible/Terraform/Bash templates) from Home Assistant.
 One entry per Semaphore **project**, one device per **template** – with status, start/dry run/stop
 and a ready-made **report**: what was started when, how long it ran, the result and – for failures – why.
@@ -254,7 +256,7 @@ query of `deb.debian.org/debian/dists/stable/Release`) and then goes into `notes
 ```
 
 A complete, tested playbook (disk space check, update, reboot check, Debian check, `HA_RESULT` with
-note) is available at [`playbooks/update-linux.yml`](playbooks/update-linux.yml); the output in `yaml` and `json` format is
+note) is available at [`playbooks/update-linux.yml`](playbooks/update-linux.yml); for **Proxmox hosts** (dist-upgrade, restart needed also when a newer kernel is installed) there is [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); the output in `yaml` and `json` format is
 stored as a test case.
 
 **Report on failures, too:** If a pre-check aborts (not enough space, apt error), no action-needed sensor would ever be created
@@ -264,6 +266,12 @@ for the host without a report. The bundled playbook therefore wraps the pre-chec
 **Dashboard:** In the card, under **Visibility**, set a condition “Entity → State” on the *Needs action* sensor
 (state `On`) – the card appears only when something needs doing. The project card can show everything in one list:
 the option `only_needed: true` hides templates without action needed, without errors and without a running task.
+**Keep the template card visible for 24 hours after a run:** switch on “Keep templates visible for 24 hours after a run” in the integration **options**.
+Every template then has the diagnostic sensor **Card visible** (`binary_sensor`, attributes `reason` = `running` / `error` / `needs_action` / `recent`, `until`):
+on while it runs, failed, reports action needed or – only with the option – ran less than 24 hours ago and was not “marked as done”.
+Use it as the visibility condition of the card (“Entity → State → On”), or tick **“Hide the card when there is nothing to show”** in the template card
+(`hide_when_idle: true`; the card stays visible in edit mode). The button **Mark as done and hide** in the card (or the button entity *Mark as done*) ends the visibility earlier; a new run shows the card again.
+With `show_recent: true` in addition, a template stays visible for **24 hours after its run**, even if nothing else needs doing; a button (eye) “Mark as done and hide” hides it earlier (button entity *Mark as done*, valid for all devices; a new run shows it again).
 For updates that Home Assistant knows itself (Core, OS, Supervisor, containers), the same visibility condition on
 the respective `update` entity is enough – no `HA_RESULT` is needed for that.
 
@@ -405,6 +413,7 @@ name: Homelab                                  # optional
 sort: status                                   # status | name | last_run
 show_never_run: true                           # show templates without a run
 only_needed: false                             # true = only templates with action needed, error or running task
+show_recent: false                             # true (with only_needed) = also templates of the last 24 h, with a hide button
 show_start: true                               # start button per row
 confirm_start: false                           # confirmation before starting
 show_version: true                             # Semaphore version in the header

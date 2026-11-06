@@ -79,7 +79,8 @@
           "renew_username": "Benutzer für den Notfall (optional)",
           "renew_password": "Passwort für den Notfall (optional)",
           "clear_login": "Gespeicherten Benutzer und Passwort entfernen",
-          "live_updates": "Live-Updates während ein Task läuft (WebSocket)"
+          "live_updates": "Live-Updates während ein Task läuft (WebSocket)",
+          "keep_recent": "Templates nach einem Lauf 24 Stunden sichtbar lassen"
         },
         "data_description": {
           "allow_parallel_runs": "Aus (Standard): Solange für ein Template ein Lauf wartet oder läuft, sind Starten und Testlauf gesperrt – Karte, Taste und Aktion. An: Home Assistant startet trotzdem; Semaphore reiht den Lauf ein oder startet ihn parallel (je nach „Parallele Tasks erlauben“ am Template). Erlaubt das Template in Semaphore parallele Tasks, gilt das immer.",
@@ -89,7 +90,8 @@
           "renew_username": "Nur nötig, wenn Semaphore ein Token schon ablehnt (abgelaufen oder gelöscht): Dann meldet sich die Integration an, legt ein neues Token an und meldet sich wieder ab. Beim Speichern wird die Anmeldung geprüft. Ein zweiter Faktor ist nicht möglich.",
           "renew_password": "Wird nicht wieder angezeigt; leer lassen behält das gespeicherte Passwort. Es wird – wie das Token – verschlüsselt gespeichert.",
           "clear_login": "Haken setzen und speichern: Benutzer und Passwort werden gelöscht.",
-          "live_updates": "An (Standard): Solange ein Task läuft, hält Home Assistant eine Verbindung zu Semaphore offen. Status und der laufende Schritt erscheinen sofort statt erst bei der nächsten Abfrage. Ohne laufenden Task besteht keine Verbindung. Klappt es nicht, wird einfach weiter abgefragt."
+          "live_updates": "An (Standard): Solange ein Task läuft, hält Home Assistant eine Verbindung zu Semaphore offen. Status und der laufende Schritt erscheinen sofort statt erst bei der nächsten Abfrage. Ohne laufenden Task besteht keine Verbindung. Klappt es nicht, wird einfach weiter abgefragt.",
+          "keep_recent": "Aus (Standard): nichts ändert sich. An: Der Sensor „Karte sichtbar“ bleibt nach einem Lauf 24 Stunden an (bis „Als erledigt markieren“ oder ein neuer Lauf kommt), auch wenn nichts zu tun ist. Als Sichtbarkeitsbedingung einer Karte nutzbar; die Template-Karte kann sich damit selbst ausblenden."
         }
       }
     },
@@ -199,6 +201,9 @@
       },
       "project_running": {
         "name": "Template läuft"
+      },
+      "show_card": {
+        "name": "Karte sichtbar"
       }
     },
     "button": {
@@ -210,6 +215,9 @@
       },
       "stop": {
         "name": "Stoppen"
+      },
+      "dismiss": {
+        "name": "Als erledigt markieren"
       }
     },
     "event": {

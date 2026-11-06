@@ -2,6 +2,8 @@
 
 🇬🇧 [English version](README_en.md)
 
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=19Andy89&repository=hacs_semaphoreui&category=integration)
+
 Steuert [Semaphore UI](https://semaphoreui.com) (Ansible/Terraform/Bash-Templates) aus Home Assistant.
 Pro Semaphore-**Projekt** ein Eintrag, pro **Template** ein Gerät – mit Status, Start/Testlauf/Stopp
 und einem fertigen **Bericht**: was wann gestartet wurde, wie lange es lief, Ergebnis und – bei Fehlern – warum.
@@ -253,7 +255,7 @@ Abfrage von `deb.debian.org/debian/dists/stable/Release`) und wandert dann in `n
 ```
 
 Ein vollständiges, getestetes Playbook (Speicherplatz-Prüfung, Update, Neustart-Prüfung, Debian-Prüfung, `HA_RESULT` mit
-Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); die Ausgabe im Format `yaml` und `json` ist
+Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); für **Proxmox-Hosts** (dist-upgrade, Neustartbedarf auch bei neuerem Kernel) gibt es [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); die Ausgabe im Format `yaml` und `json` ist
 als Testfall hinterlegt.
 
 **Auch bei Fehlern melden:** Bricht eine Vorprüfung ab (zu wenig Platz, apt-Fehler), entstünde ohne Meldung nie ein Handlungsbedarf-Sensor
@@ -263,6 +265,12 @@ für den Host. Das mitgelieferte Playbook fasst die Vorprüfungen deshalb in ein
 **Dashboard:** In der Karte unter **Sichtbarkeit** eine Bedingung „Entität → Zustand“ auf den Sensor *Handlungsbedarf*
 setzen (Zustand `Ein`) – die Karte erscheint nur, wenn etwas zu tun ist. Die Projekt-Karte kann alles in einer Liste
 zeigen: Option `only_needed: true` blendet Templates ohne Handlungsbedarf, ohne Fehler und ohne laufenden Task aus.
+**Template-Karte nach dem Lauf noch 24 Stunden zeigen:** In den **Optionen** der Integration „Templates nach einem Lauf 24 Stunden sichtbar lassen“ einschalten.
+Jedes Template hat dann den Diagnose-Sensor **Karte sichtbar** (`binary_sensor`, Attribute `reason` = `running` / `error` / `needs_action` / `recent`, `until`):
+an, solange es läuft, fehlgeschlagen ist, Handlungsbedarf meldet oder – nur mit der Option – weniger als 24 Stunden her ist und nicht „Als erledigt markiert“ wurde.
+Als Sichtbarkeitsbedingung der Karte „Entität → Zustand → Ein“ verwenden, oder in der Template-Karte den Haken **„Karte ausblenden, wenn nichts zu zeigen ist“** setzen
+(`hide_when_idle: true`; im Bearbeitungsmodus bleibt die Karte sichtbar). Hat die Karte schon eine eigene **Sichtbarkeitsregel** (z. B. „Update verfügbar“), ergänzt der Haken **Sichtbarkeitsregel ergänzen** im Karten-Editor den Sensor per ODER – sonst bliebe die Karte während eines Laufs verborgen, weil Home Assistant die Regel selbst auswertet. Der Knopf **Als erledigt ausblenden** in der Karte (oder die Button-Entität *Als erledigt markieren*) beendet die Sichtbarkeit früher; ein neuer Lauf zeigt die Karte wieder.
+Mit zusätzlich `show_recent: true` bleibt ein Template **24 Stunden nach seinem Lauf** sichtbar, auch wenn sonst nichts zu tun ist; ein Knopf (Auge) „Als erledigt ausblenden“ blendet es früher aus (Button-Entität *Als erledigt markieren*, gilt für alle Geräte; ein neuer Lauf blendet es wieder ein).
 Für Updates, die Home Assistant selbst kennt (Core, OS, Supervisor, Container), genügt dieselbe Sichtbarkeits-Bedingung auf
 die jeweilige `update`-Entität – dafür braucht es kein `HA_RESULT`.
 
@@ -404,6 +412,7 @@ name: Homelab                                  # optional
 sort: status                                   # status | name | last_run
 show_never_run: true                           # Templates ohne Lauf zeigen
 only_needed: false                             # true = nur Templates mit Handlungsbedarf, Fehler oder laufendem Task
+show_recent: false                             # true (mit only_needed) = zusätzlich Templates der letzten 24 h, mit Ausblenden-Knopf
 show_start: true                               # Start-Knopf je Zeile
 confirm_start: false                           # Rückfrage vor dem Start
 show_version: true                             # Semaphore-Version in der Kopfzeile

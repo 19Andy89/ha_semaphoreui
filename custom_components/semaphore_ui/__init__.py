@@ -28,6 +28,7 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
 from . import issues, secrets_store, tokens
@@ -35,6 +36,7 @@ from .api import SemaphoreClient
 from .cards import async_register_cards
 from .const import CONF_API_TOKEN, CONF_RENEW_PASSWORD, DEFAULT_WAIT_TIMEOUT, DOMAIN
 from .coordinator import (
+    dismiss_store_name,
     TEMPLATE_IDENTIFIER_RE,
     SemaphoreConfigEntry,
     SemaphoreCoordinator,
@@ -281,6 +283,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) ->
     session = async_get_clientsession(hass, verify_ssl=entry.data[CONF_VERIFY_SSL])
     client = SemaphoreClient(session, entry.data[CONF_URL], token)
     coordinator = SemaphoreCoordinator(hass, entry, client)
+    await coordinator.async_load_dismissed()
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     coordinator.register_project_device()
@@ -306,6 +309,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) -
     """The project was removed: its repairs are obsolete."""
     issues.clear(hass, entry.entry_id)
     tokens.forget(hass, entry.entry_id)
+    await Store(hass, 1, dismiss_store_name(entry.entry_id)).async_remove()
 
 
 async def async_remove_config_entry_device(

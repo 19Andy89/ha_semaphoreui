@@ -19,11 +19,15 @@ const TEXTS = {
     dry_run: "Testlauf",
     dry_run_hint: "Der letzte Lauf war ein Testlauf (es wurde nichts verändert)",
     stop: "Stoppen",
+    dismiss: "Als erledigt ausblenden",
     last_run: "Letzter Lauf",
     duration: "Dauer",
     never: "Noch nie ausgeführt",
     running_since: "Gestartet",
     step: "Schritt",
+    step_of: "Schritt {n} / {total}",
+    step_n: "Schritt {n}",
+    step_est: "Gesamtzahl geschätzt nach dem letzten erfolgreichen Lauf",
     live: "Live-Verbindung aktiv",
     error: "Fehler",
     task: "Task",
@@ -126,6 +130,8 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Eingabefelder (Survey-Variablen) zeigen",
       show_details: "Fehlergrund und Parameter zeigen",
+      show_when_active: "Sichtbarkeitsregel ergänzen: Karte zusätzlich zeigen, wenn das Template läuft, fehlgeschlagen ist, Handlungsbedarf hat oder (falls in den Optionen eingeschaltet) in den letzten 24 Stunden lief – trägt den Sensor „Karte sichtbar“ per ODER in die Sichtbarkeit der Karte ein",
+      hide_when_idle: "Karte ausblenden, wenn nichts zu zeigen ist (läuft, Fehler, Handlungsbedarf oder – falls in den Optionen eingeschaltet – 24 Stunden nach dem Lauf; ohne HA_RESULT im Playbook und ohne die 24-Stunden-Option ist die Karte nach dem Lauf weg)",
       confirm_start: "Start bestätigen lassen",
       sort: "Sortierung der Templates",
       sort_name: "Name",
@@ -134,6 +140,7 @@ const TEXTS = {
       show_never_run: "Templates ohne Lauf zeigen",
       show_start: "Start-Knopf in der Liste zeigen",
       only_needed: "Nur Templates mit Handlungsbedarf, Fehler oder laufendem Lauf zeigen",
+      show_recent: "Dazu Templates zeigen, die in den letzten 24 Stunden gelaufen sind (mit Ausblenden-Knopf; nur zusammen mit „Nur Templates mit Handlungsbedarf …“)",
       show_version: "Semaphore-Version anzeigen",
       show_integration_version: "Version der Integration anzeigen",
       hacs_update_entity: "Update-Entität der Integration (HACS), optional",
@@ -146,11 +153,15 @@ const TEXTS = {
     dry_run: "Dry run",
     dry_run_hint: "The last run was a dry run (nothing was changed)",
     stop: "Stop",
+    dismiss: "Mark as done and hide",
     last_run: "Last run",
     duration: "Duration",
     never: "Never run",
     running_since: "Started",
     step: "Step",
+    step_of: "Step {n} / {total}",
+    step_n: "Step {n}",
+    step_est: "Total estimated from the last successful run",
     live: "Live connection active",
     error: "Error",
     task: "Task",
@@ -253,6 +264,8 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Show input fields (survey variables)",
       show_details: "Show failure reason and parameters",
+      show_when_active: "Extend the visibility rule: also show the card while the template runs, failed, needs action or (if switched on in the options) ran in the last 24 hours - adds the \"Show card\" sensor with OR to the card's visibility",
+      hide_when_idle: "Hide the card when there is nothing to show (running, failed, action needed or - if switched on in the options - 24 hours after the run; without HA_RESULT in the playbook and without the 24-hour option the card is gone after the run)",
       confirm_start: "Ask for confirmation before starting",
       sort: "Sort templates by",
       sort_name: "Name",
@@ -261,6 +274,7 @@ const TEXTS = {
       show_never_run: "Show templates that never ran",
       show_start: "Show start button in the list",
       only_needed: "Show only templates that need action, failed or are running",
+      show_recent: "Also show templates that ran in the last 24 hours (with a hide button; only together with “Show only templates that need action …”)",
       show_version: "Show the Semaphore version",
       show_integration_version: "Show the version of the integration",
       hacs_update_entity: "Update entity of the integration (HACS), optional",
@@ -424,10 +438,14 @@ const STYLE = `
   .disks { margin-top: 6px; display: grid; gap: 4px; }
   .disk { display: flex; align-items: center; gap: 8px; font-size: 0.85em; color: var(--secondary-text-color); }
   .needbox .disk ha-icon { --mdc-icon-size: 16px; flex: none; color: var(--secondary-text-color); }
-  .disk .dtext { flex: none; white-space: nowrap; }
+  .disk { flex-wrap: wrap; }
+  .disk .dtext, .disk .dneed { flex: none; white-space: nowrap; }
   .disk .bar { position: relative; flex: 1; min-width: 70px; height: 18px; border-radius: 9px; background: var(--divider-color, #e0e0e0); overflow: hidden; }
   .disk .bar i { position: absolute; inset: 0 auto 0 0; background: var(--success-color, #43a047); opacity: 0.6; }
   .disk .bar b { position: relative; display: block; text-align: center; line-height: 18px; font-size: 0.9em; font-weight: 600; color: var(--primary-text-color); }
+  .stepbar { position: relative; height: 18px; margin: 2px 0 4px; border-radius: 9px; background: var(--divider-color, #e0e0e0); overflow: hidden; }
+  .stepbar i { position: absolute; inset: 0 auto 0 0; background: var(--primary-color, #03a9f4); opacity: 0.55; transition: width 0.4s ease; }
+  .stepbar b { position: relative; display: block; text-align: center; line-height: 18px; font-size: 0.85em; font-weight: 600; color: var(--primary-text-color); }
   .disk .bar.warn i { background: var(--warning-color, #ffa600); }
   .disk .bar.crit i { background: var(--error-color, #db4437); }
   .errbox { margin-top: 12px; padding: 8px 12px; border-radius: 8px; font-size: 0.9em; overflow-wrap: anywhere;
@@ -452,7 +470,8 @@ const STYLE = `
                background: color-mix(in srgb, var(--primary-color) 14%, transparent); flex: none; }
   button.pkg:hover { background: color-mix(in srgb, var(--primary-color) 24%, transparent); }
   button.pkg:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  .item .need { --mdc-icon-size: 16px; margin-left: 6px; vertical-align: text-bottom; color: var(--warning-color, #ffa600); }
+  .item .needline { display: flex; align-items: flex-start; gap: 4px; margin-top: 2px; font-size: 0.85em; color: var(--warning-color, #ffa600); white-space: normal; overflow-wrap: anywhere; }
+  .item .needline ha-icon { --mdc-icon-size: 16px; flex: none; }
   .params { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   .param { font-size: 0.8em; padding: 1px 8px; border-radius: 10px; background: var(--secondary-background-color); }
   .survey { margin-top: 14px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
@@ -726,12 +745,40 @@ class SemaphoreBaseCard extends HTMLElement {
     this._sig = sig;
     this._renderPending = false;
     if (active && active.getAttribute && active.getAttribute("data-action") === "pkgs") this._focusPkgs = active.dataset.key || "";
+    // A redraw must not move the page: keep the card as high as it was until the new content is laid out,
+    // and put the scroll position of the page / scrolling parents back if the browser changed it anyway.
+    const keep = this._scrollState();
+    const height = this.offsetHeight;
+    if (height) this.style.minHeight = `${height}px`;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${this._html()}`;
     for (const el of this.shadowRoot.querySelectorAll('[data-action="more-info"], [data-action="filter"]')) {
       el.setAttribute("role", "button");
       el.setAttribute("tabindex", "0");
     }
     this._afterRender();
+    this._restoreScroll(keep);
+    requestAnimationFrame(() => {
+      this._restoreScroll(keep);
+      requestAnimationFrame(() => {
+        this.style.minHeight = "";
+        this._restoreScroll(keep);
+      });
+    });
+  }
+  /** Scroll position of the window and of every scrolling parent (also across shadow roots). */
+  _scrollState() {
+    const parents = [];
+    let node = this;
+    while (node) {
+      node = node.assignedSlot || node.parentElement || (node.getRootNode && node.getRootNode().host) || null;
+      if (node && node.scrollTop > 0) parents.push([node, node.scrollTop]);
+    }
+    return { x: window.scrollX, y: window.scrollY, parents };
+  }
+  _restoreScroll(state) {
+    if (!state) return;
+    for (const [el, top] of state.parents) if (el.scrollTop !== top) el.scrollTop = top;
+    if (state.y > 0 && Math.abs(window.scrollY - state.y) > 1) window.scrollTo(state.x, state.y);
   }
   _afterRender() {}
 
@@ -1034,7 +1081,7 @@ function describeCron(expr, lang) {
 /* ======================================================== template card */
 class SemaphoreTemplateCard extends SemaphoreBaseCard {
   static get defaults() {
-    return { show_survey: true, show_details: true, confirm_start: false, show_schedules: true, edit_schedules: true };
+    return { show_survey: true, show_details: true, confirm_start: false, show_schedules: true, edit_schedules: true, hide_when_idle: false };
   }
   static getConfigElement() {
     return document.createElement("semaphore-ui-card-editor");
@@ -1103,10 +1150,17 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       }
       const stepAttr = (this._state(byKey["sensor:status"]) || {}).attributes || {};
       if (running && (stepAttr.live || stepAttr.current_step)) {
-        const no = stepAttr.step_number ? `${stepAttr.step_number}. ` : "";
+        const no = "";
         const dot = stepAttr.live ? `<span class="live-dot" title="${esc(T.live)}" aria-label="${esc(T.live)}"></span>` : "";
         const text = stepAttr.current_step ? no + stepAttr.current_step : "…";
         rows.push(row(T.step, `<span class="v" title="${esc(stepAttr.current_step || "")}">${dot}${esc(text)}</span>`, byKey["sensor:status"]));
+        if (stepAttr.step_number) {
+          const n = stepAttr.step_number;
+          const total = stepAttr.step_total;
+          const label = (total ? T.step_of.replace("{total}", total) : T.step_n).replace("{n}", n);
+          const pct = total ? Math.min(100, Math.round((n / total) * 100)) : 0;
+          rows.push(`<div class="stepbar" role="progressbar" aria-valuemin="0" aria-valuemax="${total || n}" aria-valuenow="${n}" aria-label="${esc(label)}" title="${esc(total ? `${label} (${T.step_est})` : label)}"><i style="width:${pct}%"></i><b>${esc(label)}</b></div>`);
+        }
       }
       if (running && startedIso) {
         rows.push(row(T.duration, `<span class="v elapsed" data-since="${esc(startedIso)}"></span>`, byKey["sensor:last_duration"]));
@@ -1179,6 +1233,9 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     }
     const dryBtn = dryId && !confirming ? `<button class="btn${this._busy.has(dryId) ? " busy" : ""}" data-action="press" data-entity="${dryId}"${this._busyAttrs(dryId)} ${can(dryId) && !locked ? "" : "disabled"}${lockTitle}>${this._ico(dryId, "mdi:flask-outline")}${esc(T.dry_run)}</button>` : "";
     const stopBtn = stopId && running && !confirming ? `<button class="btn danger${this._busy.has(stopId) ? " busy" : ""}" data-action="press" data-entity="${stopId}"${this._busyAttrs(stopId)} ${can(stopId) ? "" : "disabled"}>${this._ico(stopId, "mdi:stop")}${esc(T.stop)}</button>` : "";
+    const dismissId = byKey["button:dismiss"];
+    const recent = (this._state(byKey["binary_sensor:show_card"]) || { attributes: {} }).attributes.reason === "recent";
+    const dismissBtn = dismissId && recent && !running && !confirming ? `<button class="btn${this._busy.has(dismissId) ? " busy" : ""}" data-action="press" data-entity="${dismissId}"${this._busyAttrs(dismissId)}>${this._ico(dismissId, "mdi:eye-off-outline")}${esc(T.dismiss)}</button>` : "";
     const link = rep.url ? `<a class="link" href="${esc(rep.url)}" target="_blank" rel="noopener"><ha-icon icon="mdi:open-in-new"></ha-icon>${esc(T.open)}</a>` : "";
 
     return `<ha-card>
@@ -1192,7 +1249,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       ${details}
       ${schedHtml}
       ${surveyHtml}
-      ${this._dlg ? this._dialogHtml(T) : `<div class="actions">${startBtn}${dryBtn}${stopBtn}${link}</div>`}
+      ${this._dlg ? this._dialogHtml(T) : `<div class="actions">${startBtn}${dryBtn}${stopBtn}${dismissBtn}${link}</div>`}
       ${this._message ? `<div class="msg" role="alert">${esc(this._message)}</div>` : ""}
     </ha-card>`;
   }
@@ -1208,8 +1265,9 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const allHosts = Object.entries(a.hosts || {}).filter(([, h]) => h && typeof h === "object");
     const multi = allHosts.length > 1;
     const lang = langOf(hass);
-    const num = (n, digits = 1) => new Intl.NumberFormat(hass.locale?.language || lang, { maximumFractionDigits: digits }).format(n);
-    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024)} GiB` : `${num(mib, 0)} MiB`);
+    const num = (n, digits = 1, min = 0) => new Intl.NumberFormat(hass.locale?.language || lang, { minimumFractionDigits: min, maximumFractionDigits: digits }).format(n);
+    // GiB always with one decimal ("1,0 / 1,7"), so the numbers do not jump between "1" and "1,7"
+    const size = (mib) => (mib >= 1024 ? `${num(mib / 1024, 1, 1)} GiB` : `${num(mib, mib < 10 ? 1 : 0)} MiB`);
 
     // hint lines ("Debian 13 is out"), shown whether or not something is to do
     const noteLines = (items) =>
@@ -1230,14 +1288,14 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
       let text = "";
       if (free !== null && total !== null) {
         const gib = total >= 1024;
-        const f = (mib) => num(gib ? mib / 1024 : mib, gib ? 1 : 0);
+        const f = (mib) => (gib ? num(mib / 1024, 1, 1) : num(mib, 0));
         text = `${f(free)} / ${f(total)} ${gib ? "GiB" : "MiB"} ${T.disk_free}`;
       } else if (free !== null) text = `${size(free)} ${T.disk_free}`;
       const need = h.disk_required_mib > 0 ? `${T.disk_need} ${size(h.disk_required_mib)}` : "";
       const level = pct === null ? "" : pct >= 90 ? "crit" : pct >= 80 ? "warn" : "";
       const full = [name, text, pct !== null ? `${num(pct)} % ${T.disk_used}` : "", need].filter(Boolean).join(" · ");
       const bar = pct === null ? "" : `<span class="bar ${level}"><i style="width:${pct}%"></i><b>${num(pct, 0)} %</b></span>`;
-      return `<div class="disk" role="img" aria-label="${esc(full)}" title="${esc(full)}"><ha-icon icon="mdi:harddisk"></ha-icon>${bar}<span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(text)}</span></div>`;
+      return `<div class="disk" role="img" aria-label="${esc(full)}" title="${esc(full)}"><ha-icon icon="mdi:harddisk"></ha-icon>${bar}<span class="dtext">${name ? `<b>${esc(name)}:</b> ` : ""}${esc(text)}</span>${need ? `<span class="dneed">· ${esc(need)}</span>` : ""}</div>`;
     };
 
     // package chips; all are rendered, _fitPackages() folds them into one line and writes "+n more" into the button
@@ -1305,7 +1363,26 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     return `<label${title}><span>${esc(label)}${required}</span>${control}</label>`;
   }
 
+  /** "Hide the card when idle": tell Home Assistant (like a visibility condition) - but never while the dashboard is being edited. */
+  _applyVisibility() {
+    const show = this._ents().byKey["binary_sensor:show_card"];
+    const state = show ? this._state(show) : null;
+    let hide = !!this._config.hide_when_idle && !!state && state.state === "off";
+    if (hide) {
+      let node = this;
+      while (node) {
+        node = node.assignedSlot || node.parentElement || (node.getRootNode && node.getRootNode().host) || null;
+        if (node && node.lovelace && node.lovelace.editMode) hide = false;
+      }
+    }
+    if (this._hiddenByUs === hide) return;
+    this._hiddenByUs = hide;
+    this.style.display = hide ? "none" : "";
+    this.dispatchEvent(new CustomEvent("card-visibility-changed", { detail: { value: !hide }, bubbles: true, composed: true }));
+  }
+
   _afterRender() {
+    this._applyVisibility();
     this._tick();
     this._fitPackages();
     this._observeSize();
@@ -1326,7 +1403,7 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
     const key = this._focusPkgs;
     this._focusPkgs = false;
     const button = [...this.shadowRoot.querySelectorAll('[data-action="pkgs"]')].find((b) => (b.dataset.key || "") === key);
-    if (button && !button.hidden) button.focus();
+    if (button && !button.hidden) button.focus({ preventScroll: true });
   }
 
   /** Re-fit the package line when the card gets wider/narrower (and once the fonts are there). */
@@ -1487,7 +1564,7 @@ SemaphoreTemplateCard.prototype.getGridOptions = function () {
 /* ========================================================== project card */
 class SemaphoreProjectCard extends SemaphoreBaseCard {
   static get defaults() {
-    return { sort: "status", show_never_run: true, show_start: true, confirm_start: false, only_needed: false, show_version: true, show_integration_version: false, show_schedules: true };
+    return { sort: "status", show_never_run: true, show_start: true, confirm_start: false, only_needed: false, show_recent: false, show_version: true, show_integration_version: false, show_schedules: true };
   }
   static getConfigElement() {
     return document.createElement("semaphore-ui-card-editor");
@@ -1516,13 +1593,22 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
         started: this._val(byKey["sensor:last_started"]),
         duration: this._val(byKey["sensor:last_duration"]),
         rep: (sum && sum.attributes) || {},
+        ended: this._val(byKey["sensor:last_ended"]),
+        dismissedAt: ((this._state(byKey["sensor:status"]) || {}).attributes || {}).dismissed_at || "",
         needs: this._val(byKey["binary_sensor:needs_action"]),
         needText: ((this._state(byKey["binary_sensor:needs_action"]) || {}).attributes || {}).explanation || "",
       });
     }
     const cfg = this._config;
     let list = out.filter((t) => cfg.show_never_run || t.status !== "never_run");
-    if (cfg.only_needed) list = list.filter((t) => t.needs === "on" || t.status === "error" || ACTIVE.has(t.status));
+    // "ran in the last 24 h and not marked as done": a newer run ends after the mark, so it shows again
+    const recent = (t) => {
+      if (!cfg.show_recent || ACTIVE.has(t.status) || !t.ended || isNaN(Date.parse(t.ended))) return false;
+      const end = Date.parse(t.ended);
+      return Date.now() - end < 24 * 3600 * 1000 && !(t.dismissedAt && Date.parse(t.dismissedAt) >= end);
+    };
+    for (const t of out) t.recent = recent(t) && t.needs !== "on" && t.status !== "error"; // shown only for this reason: gets the hide button
+    if (cfg.only_needed) list = list.filter((t) => t.needs === "on" || t.status === "error" || ACTIVE.has(t.status) || recent(t));
     if (Array.isArray(cfg.templates) && cfg.templates.length) list = list.filter((t) => cfg.templates.includes(t.device.id));
     // tapped tile: only the running / failed / "needs action" templates
     if (this._filter === "running") list = list.filter((t) => ACTIVE.has(t.status));
@@ -1553,7 +1639,8 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
     add(byKey["sensor:token_expires"], "renew_error");
     for (const dev of templateDevicesOf(hass, c.device_id)) {
       const k = entitiesOfDevice(hass, dev.id).byKey;
-      for (const key of ["sensor:status", "sensor:last_started", "sensor:last_duration", "button:start", "button:stop"]) add(k[key]);
+      for (const key of ["sensor:status", "sensor:last_started", "sensor:last_ended", "sensor:last_duration", "button:start", "button:stop", "button:dismiss"]) add(k[key]);
+      add(k["sensor:status"], "dismissed_at");
       add(k["sensor:summary"], "short");
       add(k["binary_sensor:needs_action"], "explanation");
     }
@@ -1707,9 +1794,9 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
       if (!active && t.duration && !isNaN(Number(t.duration))) bits.push(fmtDuration(Number(t.duration), hass));
     }
     if (t.status === "error" && t.rep.error && t.rep.error.reason) bits.push(t.rep.error.reason);
-    else if (t.needs === "on" && t.needText) bits.push(t.needText);
     const dryItem = !!(t.rep && t.rep.dry_run) && !active && t.status !== "never_run"; // a dry run: lighter, dashed icon
-    const needIcon = t.needs === "on" ? `<ha-icon class="need" icon="mdi:package-up" title="${esc(t.needText)}"></ha-icon>` : "";
+    // open updates / reboot: an own, wrapping line (it was cut off in the one-line status)
+    const needLine = t.needs === "on" && t.needText ? `<div class="needline"><ha-icon icon="mdi:package-up"></ha-icon><span>${esc(t.needText)}</span></div>` : "";
     const startId = t.byKey["button:start"];
     const stopId = t.byKey["button:stop"];
     const unavailable = this._val(t.byKey["sensor:status"]) === "unavailable";
@@ -1723,10 +1810,18 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
            <button class="icon" data-action="confirm-no" aria-label="${esc(T.no)}"><ha-icon icon="mdi:close"></ha-icon></button>`
         : `<button class="icon${this._busy.has(startId) ? " busy" : ""}" data-action="start" data-entity="${startId}"${this._busyAttrs(startId)} ${unavailable ? "disabled" : ""} aria-label="${esc(T.start)} ${esc(t.name)}" title="${esc(T.start)}">${this._ico(startId, "mdi:play")}</button>`;
     }
+    const dryId = t.byKey["button:dry_run"];
+    if (!active && this._config.show_start && dryId) {
+      action = `<button class="icon${this._busy.has(dryId) ? " busy" : ""}" data-action="press" data-entity="${dryId}"${this._busyAttrs(dryId)} ${unavailable ? "disabled" : ""} aria-label="${esc(T.dry_run)} ${esc(t.name)}" title="${esc(T.dry_run)}">${this._ico(dryId, "mdi:flask-outline")}</button>` + action;
+    }
+    const dismissId = t.byKey["button:dismiss"];
+    if (t.recent && dismissId) {
+      action += `<button class="icon${this._busy.has(dismissId) ? " busy" : ""}" data-action="press" data-entity="${dismissId}"${this._busyAttrs(dismissId)} aria-label="${esc(T.dismiss)}: ${esc(t.name)}" title="${esc(T.dismiss)}">${this._ico(dismissId, "mdi:eye-off-outline")}</button>`;
+    }
     return `<div class="item">
       <ha-icon class="ic ${st.pulse ? "pulse" : ""}${dryItem ? " dry" : ""}" icon="${st.icon}" style="color:${st.color}"${dryItem ? ` title="${esc(T.dry_run_hint)}"` : ""}></ha-icon>
       <div class="main" data-action="more-info" data-entity="${t.byKey["sensor:status"]}">
-        <div class="name">${esc(t.name)}${needIcon}</div><div class="sub" title="${esc(bits.join(" · "))}">${esc(bits.join(" · "))}</div>
+        <div class="name">${esc(t.name)}</div><div class="sub" title="${esc(bits.join(" · "))}">${esc(bits.join(" · "))}</div>${needLine}
       </div>${action}</div>`;
   }
 
@@ -1821,6 +1916,7 @@ class SemaphoreCardEditor extends HTMLElement {
         },
         { name: "show_never_run", selector: { boolean: {} } },
         { name: "only_needed", selector: { boolean: {} } },
+        { name: "show_recent", selector: { boolean: {} } },
         { name: "show_start", selector: { boolean: {} } },
         { name: "confirm_start", selector: { boolean: {} } },
         { name: "show_version", selector: { boolean: {} } },
@@ -1829,17 +1925,67 @@ class SemaphoreCardEditor extends HTMLElement {
         { name: "show_schedules", selector: { boolean: {} } }
       );
     } else {
-      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } }, { name: "edit_schedules", selector: { boolean: {} } });
+      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "hide_when_idle", selector: { boolean: {} } }, { name: "show_when_active", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } }, { name: "edit_schedules", selector: { boolean: {} } });
     }
     return base;
   }
+  /** The "Show card" sensor of the chosen template (it carries the rule: running / failed / action / 24 h). */
+  _showEntity() {
+    return entitiesOfDevice(this._hass, this._config.device_id).byKey["binary_sensor:show_card"] || "";
+  }
+
+  _isMarker(cond, entity) {
+    return !!cond && cond.condition === "state" && !!entity && (cond.entity === entity || cond.entity_id === entity);
+  }
+
+  _hasActiveRule() {
+    const entity = this._showEntity();
+    const list = Array.isArray(this._config.visibility) ? this._config.visibility : [];
+    const found = (conds) => (conds || []).some((c) => this._isMarker(c, entity) || (c && c.condition === "or" && found(c.conditions)));
+    return found(list);
+  }
+
+  /**
+   * Home Assistant decides about "visibility" itself, a card cannot override it. So the editor writes
+   * the rule: existing rule OR sensor (single "or" block: the sensor is added to it; otherwise the
+   * existing conditions are wrapped as "and" inside a new "or").
+   */
+  _setActiveRule(on) {
+    const entity = this._showEntity();
+    if (!entity) return;
+    let list = Array.isArray(this._config.visibility) ? [...this._config.visibility] : [];
+    if (on) {
+      const marker = { condition: "state", entity, state: ["on"] };
+      if (!list.length) list = [marker];
+      else if (list.length === 1 && list[0].condition === "or") list = [{ ...list[0], conditions: [...(list[0].conditions || []), marker] }];
+      else list = [{ condition: "or", conditions: [{ condition: "and", conditions: list }, marker] }];
+    } else {
+      const strip = (conds) =>
+        (conds || [])
+          .filter((c) => !this._isMarker(c, entity))
+          .map((c) => (c && c.condition === "or" ? { ...c, conditions: strip(c.conditions) } : c));
+      list = strip(list);
+      // undo the wrapping: or[ and[...] ] -> the plain list
+      if (list.length === 1 && list[0].condition === "or" && list[0].conditions.length === 1 && list[0].conditions[0].condition === "and") {
+        list = list[0].conditions[0].conditions;
+      }
+    }
+    const config = { ...this._config };
+    if (list.length) config.visibility = list;
+    else delete config.visibility;
+    this._config = config;
+  }
+
   _render() {
     if (!this._hass || !this._config) return;
     if (!this._form) {
       this._form = document.createElement("ha-form");
       this._form.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
-        this._config = { ...this._config, ...ev.detail.value };
+        const { show_when_active: wanted, ...rest } = ev.detail.value;
+        this._config = { ...this._config, ...rest };
+        delete this._config.show_when_active;
+        if (typeof wanted === "boolean" && wanted !== this._hasActiveRule()) this._setActiveRule(wanted);
         this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
       });
       this.appendChild(this._form);
@@ -1849,7 +1995,7 @@ class SemaphoreCardEditor extends HTMLElement {
     const defaults = project ? SemaphoreProjectCard.defaults : SemaphoreTemplateCard.defaults;
     this._form.hass = this._hass;
     this._form.schema = this._schema();
-    this._form.data = { ...defaults, ...this._config };
+    this._form.data = { ...defaults, ...this._config, show_when_active: this._hasActiveRule() };
     this._form.computeLabel = (s) => (s.name === "device_id" ? (project ? T.device_id_p : T.device_id_t) : T[s.name] || s.name);
     this._form.computeHelper = (s) => (s.name === "device_id" ? (project ? T.help_device_p : T.help_device_t) : undefined);
     if (!this._notice) {

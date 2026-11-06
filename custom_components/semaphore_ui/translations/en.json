@@ -79,7 +79,8 @@
           "renew_username": "User name for emergencies (optional)",
           "renew_password": "Password for emergencies (optional)",
           "clear_login": "Remove the stored user name and password",
-          "live_updates": "Live updates while a task runs (WebSocket)"
+          "live_updates": "Live updates while a task runs (WebSocket)",
+          "keep_recent": "Keep templates visible for 24 hours after a run"
         },
         "data_description": {
           "allow_parallel_runs": "Off (default): while a run of a template is queued or running, start and dry run are blocked - card, button and action. On: Home Assistant starts anyway; Semaphore queues the run or starts it in parallel (depending on \"Allow parallel tasks\" of the template). If the template allows parallel tasks in Semaphore, this always applies.",
@@ -89,7 +90,8 @@
           "renew_username": "Only needed when Semaphore already rejects a token (expired or deleted): the integration then signs in, creates a new token and signs out again. The sign-in is checked when you save. A second factor is not possible.",
           "renew_password": "It is not shown again; leaving it empty keeps the stored password. It is stored - like the token - encrypted.",
           "clear_login": "Tick and save: the user name and password are deleted.",
-          "live_updates": "On (default): while a task runs, Home Assistant keeps a connection to Semaphore open. Status and the running step show up at once instead of at the next poll. No connection exists while nothing runs. If it does not work, polling simply continues."
+          "live_updates": "On (default): while a task runs, Home Assistant keeps a connection to Semaphore open. Status and the running step show up at once instead of at the next poll. No connection exists while nothing runs. If it does not work, polling simply continues.",
+          "keep_recent": "Off (default): nothing changes. On: the sensor \"Card visible\" stays on for 24 hours after a run (until it is marked as done or a new run starts), even if nothing needs doing. Use it as the visibility condition of a card; the template card can hide itself with it."
         }
       }
     },
@@ -199,6 +201,9 @@
       },
       "project_running": {
         "name": "Template running"
+      },
+      "show_card": {
+        "name": "Card visible"
       }
     },
     "button": {
@@ -210,6 +215,9 @@
       },
       "stop": {
         "name": "Stop"
+      },
+      "dismiss": {
+        "name": "Mark as done"
       }
     },
     "event": {

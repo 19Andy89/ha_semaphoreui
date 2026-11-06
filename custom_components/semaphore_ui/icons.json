@@ -85,6 +85,9 @@
       },
       "stop": {
         "default": "mdi:stop"
+      },
+      "dismiss": {
+        "default": "mdi:eye-off-outline"
       }
     },
     "event": {
@@ -102,6 +105,12 @@
       },
       "project_running": {
         "default": "mdi:play-circle-outline"
+      },
+      "show_card": {
+        "default": "mdi:eye-off-outline",
+        "state": {
+          "on": "mdi:eye-outline"
+        }
       }
     },
     "switch": {

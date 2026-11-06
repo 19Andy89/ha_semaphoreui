@@ -34,7 +34,8 @@ results: list[bool] = []
 
 def check(name: str, ok: bool, info: object = "") -> None:
     results.append(bool(ok))
-    print(("PASS  " if ok else "FAIL  ") + name + ("" if ok or not info else f"   [{info}]"))
+    # only the name is printed: the details may hold page text (CodeQL: clear-text logging)
+    print(("PASS  " if ok else "FAIL  ") + name)
 
 
 def ctl(action: str) -> list:

@@ -2,7 +2,24 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
-## Nächste Version – Vorbereitung für public, hassfest
+## Nächste Version – 24 h sichtbar lassen (Issue #13), Vorbereitung für public, hassfest
+- **Projekt-Karte:** Neue Option `show_recent` (Haken im Karten-Editor, zusammen mit „nur Templates mit Handlungsbedarf …“): Ein Template bleibt 24 h nach seinem Lauf in der Liste. Der Knopf **Als erledigt ausblenden** (Auge) blendet es früher aus; ein neuer Lauf blendet es wieder ein.
+- Der Zustand liegt in Home Assistant, nicht im Browser: neue Button-Entität *Als erledigt markieren* je Template, Attribut `dismissed_at` am Status-Sensor, gespeichert in `.storage` und beim Entfernen des Projekts gelöscht. Dadurch gilt „ausgeblendet“ auf allen Geräten.
+- **Projekt-Karte:** Je Template jetzt auch ein **Testlauf**-Knopf (Kolben) neben Start. Offene Updates/Neustart stehen in einer **eigenen, umbrechenden Zeile** statt abgeschnitten im Status.
+- **Template-Karte, Editor:** Neuer Haken **Sichtbarkeitsregel ergänzen**. Home Assistant wertet `visibility` selbst aus (eine Karte kann das nicht übersteuern), deshalb trägt der Editor den Sensor *Karte sichtbar* per ODER in die Sichtbarkeit der Karte ein (läuft, Fehler, Handlungsbedarf, ggf. 24 h nach dem Lauf); ausschalten entfernt ihn wieder. Bestehende Regeln bleiben erhalten.
+- **Fix:** Der Bericht eines gerade beendeten Laufs wird bis zu zweimal (je Abruf) neu aus dem Log gelesen. Semaphore meldet „fertig“ teils, bevor die letzten Log-Zeilen gespeichert sind; dann fehlten z. B. Hosts im Bericht und der HA_RESULT-Handlungsbedarf, bis HA neu gestartet wurde.
+- Tests: CodeQL-Hinweis „Clear-text logging“ in `tests/browser/check_cards.py` behoben (nur noch der Testname wird ausgegeben).
+- README: Marketplace-/HACS-Badge („Open your Home Assistant instance …“, `marketplace_repository`) für den Katalog.
+- Playbook `update-proxmox.yml`: `df`-Argument gequotet (Komma teilte es in zwei Argumente).
+- Die einzelne Template-Karte bleibt unverändert (sie zeigt das Template ohnehin immer).
+- **Sichtbarkeit der Template-Karte (Issue #13):** Neue Option „Templates nach einem Lauf 24 Stunden sichtbar lassen“ und neuer Diagnose-Sensor **Karte sichtbar** je Template (an bei laufend, Fehler, Handlungsbedarf und mit der Option 24 h nach dem Lauf; Attribute `reason`, `until`). Als Sichtbarkeitsbedingung nutzbar oder über den neuen Haken `hide_when_idle` in der Template-Karte (blendet die Karte selbst aus, nicht im Bearbeitungsmodus). Die Template-Karte hat jetzt auch den Knopf **Als erledigt ausblenden**.
+- **Platzbedarf sichtbar:** In der Platten-Zeile steht jetzt neben „frei“ auch „· benötigt 4,8 MiB“ (bisher nur im Tooltip); Werte unter 10 MiB mit einer Nachkommastelle.
+- **Fortschritt beim Lauf:** Die Template-Karte zeigt unter „Schritt“ einen Balken „Schritt 7 / 20“. Die Gesamtzahl ist die Zahl der Schritte des letzten erfolgreichen Laufs (geschätzt); ohne bekannten Lauf steht nur „Schritt 7“. Der Status-Sensor hat dafür das Attribut `step_total`.
+- **Neues Playbook `playbooks/update-proxmox.yml`** (Proxmox VE, `dist-upgrade`, Neustartbedarf auch bei neuerem installierten Kernel, `HA_RESULT`). Ohne `HA_RESULT` kennt die Integration keinen Handlungsbedarf – eine Karte mit „ausblenden, wenn nichts zu zeigen ist“ ist dann nach dem Lauf weg.
+- Manifest: `categories` (`computers_network.cloud_developer_tools`); Workflows nutzen `actions/checkout@v5` und `ubuntu-24.04` (Node-20-Hinweis, Runner-Wechsel).
+- **GiB-Anzeige immer mit einer Nachkommastelle** („1,0 / 1,7 GiB“ statt „1 / 1,7“) in der Platten-Zeile und beim Platzbedarf.
+- **Seite springt bei Updates nach oben:** Beim Neuzeichnen hält die Karte jetzt ihre Höhe, stellt die Scrollposition der Seite wieder her und der Fokus auf „+n weitere“ scrollt nicht mehr (`preventScroll`). Im Testaufbau ließ sich der Sprung nicht auslösen; bitte an der echten Instanz während eines laufenden Tasks prüfen.
+- **Playbook `update-linux.yml` (Issue #10):** Im **Testlauf** stand der Platzbedarf auf 0 MiB, weil Ansible den Berechnungsschritt (`shell`) im Prüfmodus übersprungen hat. Der Schritt hat jetzt `check_mode: false`. **Wer das Playbook in seinem eigenen Repository liegen hat, trägt diese eine Zeile dort nach** (Aufgabe „Benötigten Speicherplatz der Updates berechnen“).
 - **Beta** statt Alpha (README-Titel); `manifest.json` zeigt auf dieses Repository (Dokumentation, Issues, Codeowner).
 - **hassfest-konform**: Die Aktionen `run_template` und `create_schedule` haben das Feld **Template (`device_id`)** mit Geräteauswahl statt eines Ziel-Filters (bestehende Automationen mit `target: device_id` laufen unverändert); Reparatur-Texte stehen im Dialog statt zusätzlich an der Meldung; Beispiel-Adressen in den Texten sind Platzhalter.
 - Neu: `SECURITY.md`, `CONTRIBUTING.md`, Issue-Vorlagen (Deutsch/Englisch), Workflow „Validate“ (hassfest, HACS).

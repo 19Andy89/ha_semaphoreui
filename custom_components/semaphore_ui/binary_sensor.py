@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -13,7 +14,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import STATUS_ACTIVE
+from .const import RECENT_HOURS, STATUS_ACTIVE
 from .coordinator import SemaphoreConfigEntry, SemaphoreCoordinator
 from .entity import (
     SemaphoreProjectEntity,
@@ -37,6 +38,11 @@ PROBLEM = BinarySensorEntityDescription(
 NEEDS_ACTION = BinarySensorEntityDescription(
     key="needs_action",
     translation_key="needs_action",
+)
+SHOW_CARD = BinarySensorEntityDescription(
+    key="show_card",
+    translation_key="show_card",
+    entity_category=EntityCategory.DIAGNOSTIC,
 )
 CONNECTIVITY = BinarySensorEntityDescription(
     key="connectivity",
@@ -81,6 +87,7 @@ async def async_setup_entry(
         for template_id in sorted(new_ids):
             entities.append(SemaphoreRunningSensor(coordinator, template_id))
             entities.append(SemaphoreProblemSensor(coordinator, template_id))
+            entities.append(SemaphoreShowCardSensor(coordinator, template_id))
         async_add_entities(entities)
 
     _add_new_templates()
@@ -291,3 +298,44 @@ class SemaphoreProjectRunningSensor(SemaphoreProjectEntity, BinarySensorEntity):
             "task_ids": sorted({task for item in items for task in item["task_ids"]}),
             "details": items,
         }
+
+
+class SemaphoreShowCardSensor(SemaphoreTemplateEntity, BinarySensorEntity):
+    """On while the card of the template is worth showing: running, failed, something to do, or (option) ran lately.
+
+    Meant as a visibility condition of the dashboard card ("Entity -> State"); the template card can hide itself with it.
+    """
+
+    entity_description = SHOW_CARD
+
+    def __init__(self, coordinator: SemaphoreCoordinator, template_id: int) -> None:
+        super().__init__(coordinator, template_id, SHOW_CARD.key)
+
+    def _reason(self) -> str | None:
+        coordinator = self.coordinator
+        if task_status(self.last_task) in STATUS_ACTIVE or coordinator.active_task_ids(self.template_id):
+            return "running"
+        if task_status(self.last_task) == "error":
+            return "error"
+        report = coordinator.action_report(self.template_id)
+        if report and report["ha_result"]["needed"]:
+            return "needs_action"
+        if coordinator.recent_run(self.template_id) is not None:
+            return "recent"
+        return None
+
+    @property
+    def is_on(self) -> bool:
+        """True if there is a reason to show the card."""
+        return self._reason() is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Why the card is shown and, for a recent run, until when (it can be marked as done earlier)."""
+        reason = self._reason()
+        attrs: dict[str, Any] = {"reason": reason}
+        if reason == "recent":
+            ended = self.coordinator.recent_run(self.template_id)
+            if ended is not None:
+                attrs["until"] = (ended + timedelta(hours=RECENT_HOURS)).isoformat()
+        return attrs

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from custom_components.semaphore_ui.const import CONF_LIVE
+from custom_components.semaphore_ui.const import CONF_LIVE, DOMAIN
 from custom_components.semaphore_ui.live import parse_step
 from homeassistant.core import HomeAssistant
 
@@ -85,6 +85,38 @@ async def test_step_is_read_from_the_log_when_the_task_started_before_the_connec
     status = eid(hass, "sensor", 1, "status")
     assert await _wait(hass, lambda: hass.states.get(status).attributes.get("current_step") == "Update")
     assert hass.states.get(status).attributes["step_number"] == 2
+
+
+async def test_total_steps_come_from_the_last_successful_run(hass: HomeAssistant, fake, make_entry) -> None:
+    server, _ = fake
+    server.add_finished_task(
+        1, output="PLAY [x] ***\nTASK [Gathering Facts] ***\nok\nTASK [Update] ***\nok\nRUNNING HANDLER [Restart] ***\nok"
+    )
+    await setup(hass, make_entry)
+    coordinator = hass.config_entries.async_entries(DOMAIN)[0].runtime_data
+    assert coordinator.step_totals == {1: 3}
+
+    # a task that runs: the sensor shows number and (estimated) total
+    task = server.add_finished_task(1, status="running")
+    task.pop("end")
+    server.outputs[task["id"]] = [{"id": 1, "task_id": task["id"], "output": "TASK [Gathering Facts] ***"}]
+    await tick(hass)
+    status = eid(hass, "sensor", 1, "status")
+    assert await _wait(hass, lambda: hass.states.get(status).attributes.get("step_total") == 3)
+    assert hass.states.get(status).attributes["step_number"] == 1
+
+
+async def test_log_lines_that_arrive_late_are_picked_up(hass: HomeAssistant, fake, make_entry) -> None:
+    """Semaphore can say "finished" before the last log lines exist: the report is read again."""
+    server, _ = fake
+    task = server.add_finished_task(1, output="TASK [Gathering Facts] ***\nok")
+    await setup(hass, make_entry)
+    coordinator = hass.config_entries.async_entries(DOMAIN)[0].runtime_data
+    task_id = task["id"]
+    assert coordinator._log_rows[task_id] == len(server.outputs[task_id])  # noqa: SLF001
+    server.outputs[task_id].append({"id": 99, "task_id": task_id, "output": "TASK [Late] ***"})
+    await tick(hass)
+    assert coordinator._log_rows[task_id] == len(server.outputs[task_id])  # noqa: SLF001
 
 
 async def test_no_websocket_when_live_updates_are_off(hass: HomeAssistant, fake, make_entry) -> None:

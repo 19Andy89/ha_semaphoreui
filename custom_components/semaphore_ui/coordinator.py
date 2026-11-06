@@ -22,6 +22,7 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -38,6 +39,7 @@ from .api import (
 from .const import (
     ACTIVE_SCAN_INTERVAL,
     CONF_ALLOW_PARALLEL,
+    CONF_KEEP_RECENT,
     CONF_LIVE,
     CONF_CHECK_UPDATES,
     CONF_EXCLUDED_TEMPLATES,
@@ -58,13 +60,14 @@ from .const import (
     STATUS_FINISHED,
     VERSION_SCAN_INTERVAL,
 )
-from .live import LiveStream
+from .live import LiveStream, parse_step
 from .report import (
     build_report,
     failure_info,
     failure_text,
     ha_result_text,
     is_dry_run,
+    task_ended,
     task_started,
     task_status,
 )
@@ -80,6 +83,8 @@ TEMPLATE_IDENTIFIER_RE = re.compile(r"^(?P<entry>[^_]+)_template_(?P<tid>\d+)$")
 # How often the log of a finished task is read again after reading it failed
 # (Semaphore sometimes answers slowly; the log carries the failure reason and HA_RESULT).
 MAX_LOG_ATTEMPTS = 5
+# Re-reads of the log of a just finished task (one per poll) to catch lines that arrived late
+LOG_RECHECKS = 2
 
 # Newer Home Assistant versions replace ``via_device`` by ``via_device_id``.
 _HAS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__annotations__
@@ -101,6 +106,11 @@ class SemaphoreData:
 def template_identifier(entry_id: str, template_id: int) -> tuple[str, str]:
     """Device identifier of a template."""
     return (DOMAIN, f"{entry_id}_template_{template_id}")
+
+
+def dismiss_store_name(entry_id: str) -> str:
+    """Name of the file in ``.storage`` that keeps the "done" marks of a project."""
+    return f"semaphore_ui.dismissed_{entry_id}"
 
 
 class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
@@ -150,6 +160,10 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self._reports: dict[int, dict[str, Any]] = {}
         # task_id -> number of failed attempts to read its log
         self._log_failed: dict[int, int] = {}
+        # task_id -> number of log lines at the last read / re-reads still to do: Semaphore can
+        # report "finished" before the last log lines are stored (a host was missing in the report)
+        self._log_rows: dict[int, int] = {}
+        self._log_recheck: dict[int, int] = {}
         # template_id -> newest successful task (None: none found in the history)
         self._last_success: dict[int, dict[str, Any] | None] = {}
         # template_id -> id of the last task for which the history was read
@@ -160,7 +174,48 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self.problem: dict[str, str] | None = None
         self._first_done = False
         self.live_enabled: bool = entry.options.get(CONF_LIVE, True)
+        self.keep_recent: bool = entry.options.get(CONF_KEEP_RECENT, False)
         self.live = LiveStream(self)
+        # template_id -> ISO time at which the finished run was marked "done" (hidden in the project card)
+        self.dismissed: dict[int, str] = {}
+        # template_id -> number of Ansible steps in its last successful run (estimate of the total while a run is going)
+        self.step_totals: dict[int, int] = {}
+        self._dismiss_store: Store[dict[str, str]] = Store(
+            hass, 1, dismiss_store_name(entry.entry_id), private=False
+        )
+
+    # ------------------------------------------------------------------ #
+    # "Done" marks: a finished run can be hidden in the project card
+    # ------------------------------------------------------------------ #
+    async def async_load_dismissed(self) -> None:
+        """Read the marks saved earlier (a missing or damaged file means: nothing hidden)."""
+        data = await self._dismiss_store.async_load()
+        if not isinstance(data, dict):
+            return
+        self.dismissed = {
+            int(key): value
+            for key, value in data.items()
+            if str(key).isdigit() and isinstance(value, str)
+        }
+
+    async def async_dismiss_template(self, template_id: int) -> None:
+        """Mark the last finished run of a template as done; a newer run shows it again."""
+        self.dismissed[template_id] = dt_util.utcnow().isoformat()
+        await self._dismiss_store.async_save({str(key): value for key, value in self.dismissed.items()})
+        self.async_update_listeners()
+
+    def recent_run(self, template_id: int) -> datetime | None:
+        """End of the last run if it is less than 24 h ago and not marked as done (option "keep visible")."""
+        if not self.keep_recent:
+            return None
+        template = self.data.templates.get(template_id)
+        ended = task_ended(template.get("last_task")) if template else None
+        if ended is None or dt_util.utcnow() - ended >= timedelta(hours=const.RECENT_HOURS):
+            return None
+        marked = dt_util.parse_datetime(self.dismissed.get(template_id, ""))
+        if marked is not None and marked >= ended:
+            return None
+        return ended
 
     # ------------------------------------------------------------------ #
     # Convenience
@@ -181,6 +236,14 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         if last.get("status") in STATUS_ACTIVE and "id" in last:
             ids.add(last["id"])
         return sorted(ids)
+
+    def _note_steps(self, template_id: int, task: dict[str, Any], output: list[dict[str, Any]]) -> None:
+        """Remember how many steps a successful run had: the total for the progress bar of the next run."""
+        if task_status(task) != "success":
+            return
+        count = sum(1 for row in output if parse_step(str(row.get("output", ""))))
+        if count:
+            self.step_totals[template_id] = count
 
     def current_step(self, template_id: int) -> tuple[int, str] | None:
         """(number, name) of the Ansible step that runs right now (needs live updates)."""
@@ -697,7 +760,36 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
                 self._log_failed[task["id"]] = self._log_failed.get(task["id"], 0) + 1
             else:
                 self._log_failed.pop(task["id"], None)
+                self._log_rows[task["id"]] = len(output)
+                self._log_recheck.setdefault(task["id"], LOG_RECHECKS)
+                self._note_steps(template["id"], task, output)
         return self._report(template, task, output)
+
+    async def _async_recheck_logs(
+        self, templates: dict[int, dict[str, Any]], skip: set[int]
+    ) -> None:
+        """Read the log of a just finished task again: late lines change the report."""
+        for template in templates.values():
+            last = template.get("last_task") or {}
+            task_id = last.get("id")
+            if (
+                task_id is None
+                or task_id in skip
+                or self._log_recheck.get(task_id, 0) <= 0
+                or last.get("status") not in STATUS_FINISHED
+            ):
+                continue
+            self._log_recheck[task_id] -= 1
+            try:
+                rows = await self.client.get_task_output(self.project_id, task_id)
+            except SemaphoreError:
+                continue
+            if len(rows) == self._log_rows.get(task_id):
+                continue
+            report = await self._async_make_report(template, last)
+            self._reports[template["id"]] = report
+            self._log_recheck[task_id] = LOG_RECHECKS  # still growing: look again
+            self.async_update_listeners()
 
     async def _async_retry_unread_logs(
         self, templates: dict[int, dict[str, Any]], skip: set[int]
@@ -717,6 +809,9 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         # forget tasks that are no longer the last task of a template
         current = {(tpl.get("last_task") or {}).get("id") for tpl in templates.values()}
         self._log_failed = {k: v for k, v in self._log_failed.items() if k in current}
+        self._log_rows = {k: v for k, v in self._log_rows.items() if k in current}
+        self._log_recheck = {k: v for k, v in self._log_recheck.items() if k in current}
+        await self._async_recheck_logs(templates, skip)
         if not retry:
             return
         semaphore = asyncio.Semaphore(5)
