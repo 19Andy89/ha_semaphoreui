@@ -130,6 +130,7 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Eingabefelder (Survey-Variablen) zeigen",
       show_details: "Fehlergrund und Parameter zeigen",
+      show_when_active: "Sichtbarkeitsregel ergänzen: Karte zusätzlich zeigen, wenn das Template läuft, fehlgeschlagen ist, Handlungsbedarf hat oder (falls in den Optionen eingeschaltet) in den letzten 24 Stunden lief – trägt den Sensor „Karte sichtbar“ per ODER in die Sichtbarkeit der Karte ein",
       hide_when_idle: "Karte ausblenden, wenn nichts zu zeigen ist (läuft, Fehler, Handlungsbedarf oder – falls in den Optionen eingeschaltet – 24 Stunden nach dem Lauf; ohne HA_RESULT im Playbook und ohne die 24-Stunden-Option ist die Karte nach dem Lauf weg)",
       confirm_start: "Start bestätigen lassen",
       sort: "Sortierung der Templates",
@@ -263,6 +264,7 @@ const TEXTS = {
       name: "Name (optional)",
       show_survey: "Show input fields (survey variables)",
       show_details: "Show failure reason and parameters",
+      show_when_active: "Extend the visibility rule: also show the card while the template runs, failed, needs action or (if switched on in the options) ran in the last 24 hours - adds the \"Show card\" sensor with OR to the card's visibility",
       hide_when_idle: "Hide the card when there is nothing to show (running, failed, action needed or - if switched on in the options - 24 hours after the run; without HA_RESULT in the playbook and without the 24-hour option the card is gone after the run)",
       confirm_start: "Ask for confirmation before starting",
       sort: "Sort templates by",
@@ -1923,17 +1925,67 @@ class SemaphoreCardEditor extends HTMLElement {
         { name: "show_schedules", selector: { boolean: {} } }
       );
     } else {
-      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "hide_when_idle", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } }, { name: "edit_schedules", selector: { boolean: {} } });
+      base.push({ name: "show_survey", selector: { boolean: {} } }, { name: "show_details", selector: { boolean: {} } }, { name: "hide_when_idle", selector: { boolean: {} } }, { name: "show_when_active", selector: { boolean: {} } }, { name: "confirm_start", selector: { boolean: {} } }, { name: "show_schedules", selector: { boolean: {} } }, { name: "edit_schedules", selector: { boolean: {} } });
     }
     return base;
   }
+  /** The "Show card" sensor of the chosen template (it carries the rule: running / failed / action / 24 h). */
+  _showEntity() {
+    return entitiesOfDevice(this._hass, this._config.device_id).byKey["binary_sensor:show_card"] || "";
+  }
+
+  _isMarker(cond, entity) {
+    return !!cond && cond.condition === "state" && !!entity && (cond.entity === entity || cond.entity_id === entity);
+  }
+
+  _hasActiveRule() {
+    const entity = this._showEntity();
+    const list = Array.isArray(this._config.visibility) ? this._config.visibility : [];
+    const found = (conds) => (conds || []).some((c) => this._isMarker(c, entity) || (c && c.condition === "or" && found(c.conditions)));
+    return found(list);
+  }
+
+  /**
+   * Home Assistant decides about "visibility" itself, a card cannot override it. So the editor writes
+   * the rule: existing rule OR sensor (single "or" block: the sensor is added to it; otherwise the
+   * existing conditions are wrapped as "and" inside a new "or").
+   */
+  _setActiveRule(on) {
+    const entity = this._showEntity();
+    if (!entity) return;
+    let list = Array.isArray(this._config.visibility) ? [...this._config.visibility] : [];
+    if (on) {
+      const marker = { condition: "state", entity, state: ["on"] };
+      if (!list.length) list = [marker];
+      else if (list.length === 1 && list[0].condition === "or") list = [{ ...list[0], conditions: [...(list[0].conditions || []), marker] }];
+      else list = [{ condition: "or", conditions: [{ condition: "and", conditions: list }, marker] }];
+    } else {
+      const strip = (conds) =>
+        (conds || [])
+          .filter((c) => !this._isMarker(c, entity))
+          .map((c) => (c && c.condition === "or" ? { ...c, conditions: strip(c.conditions) } : c));
+      list = strip(list);
+      // undo the wrapping: or[ and[...] ] -> the plain list
+      if (list.length === 1 && list[0].condition === "or" && list[0].conditions.length === 1 && list[0].conditions[0].condition === "and") {
+        list = list[0].conditions[0].conditions;
+      }
+    }
+    const config = { ...this._config };
+    if (list.length) config.visibility = list;
+    else delete config.visibility;
+    this._config = config;
+  }
+
   _render() {
     if (!this._hass || !this._config) return;
     if (!this._form) {
       this._form = document.createElement("ha-form");
       this._form.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
-        this._config = { ...this._config, ...ev.detail.value };
+        const { show_when_active: wanted, ...rest } = ev.detail.value;
+        this._config = { ...this._config, ...rest };
+        delete this._config.show_when_active;
+        if (typeof wanted === "boolean" && wanted !== this._hasActiveRule()) this._setActiveRule(wanted);
         this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
       });
       this.appendChild(this._form);
@@ -1943,7 +1995,7 @@ class SemaphoreCardEditor extends HTMLElement {
     const defaults = project ? SemaphoreProjectCard.defaults : SemaphoreTemplateCard.defaults;
     this._form.hass = this._hass;
     this._form.schema = this._schema();
-    this._form.data = { ...defaults, ...this._config };
+    this._form.data = { ...defaults, ...this._config, show_when_active: this._hasActiveRule() };
     this._form.computeLabel = (s) => (s.name === "device_id" ? (project ? T.device_id_p : T.device_id_t) : T[s.name] || s.name);
     this._form.computeHelper = (s) => (s.name === "device_id" ? (project ? T.help_device_p : T.help_device_t) : undefined);
     if (!this._notice) {
