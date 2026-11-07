@@ -4,7 +4,7 @@ blueprint:
   domain: automation
   homeassistant:
     min_version: 2024.10.0
-  source_url: https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/notify_task_result.yaml
+  source_url: https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml
   description: >-
     Schickt eine Benachrichtigung, wenn ein Semaphore-Task endet (auch bei Tasks, die in Semaphore oder per Zeitplan
     gestartet wurden). Der Text kommt fertig aus der Integration (Ergebnis, Dauer, Fehlergrund, Handlungsbedarf).

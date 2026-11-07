@@ -9,7 +9,7 @@ import yaml
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import Template
 
-BLUEPRINT = Path(__file__).parents[1] / "blueprints" / "automation" / "ha_semaphoreui" / "notify_task_result.yaml"
+BLUEPRINT = Path(__file__).parents[1] / "blueprints" / "automation" / "ha_semaphoreui" / "semaphore_task_result.yaml"
 
 
 class _Loader(yaml.SafeLoader):
@@ -30,7 +30,7 @@ def test_blueprint_is_complete() -> None:
     # Home Assistant knows only these keys under "blueprint" ("min_version" belongs under "homeassistant")
     assert set(blueprint) <= {"name", "description", "domain", "author", "source_url", "homeassistant", "input"}
     assert set(blueprint["homeassistant"]) == {"min_version"}
-    assert blueprint["source_url"].endswith("blueprints/automation/ha_semaphoreui/notify_task_result.yaml")
+    assert blueprint["source_url"].endswith("blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml")
     inputs = set(blueprint["input"])
     # every !input points to an input that exists
     used = {

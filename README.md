@@ -495,10 +495,10 @@ während ein Task läuft alle 5 s). Beim Start von Home Assistant werden alte Er
 
 Ohne YAML: Das Blueprint **„Semaphore UI – Benachrichtigung bei Taskende“** legt die Automation für dich an. Importieren:
 
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2F19Andy89%2Fha_semaphoreui%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fha_semaphoreui%2Fnotify_task_result.yaml)
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2F19Andy89%2Fha_semaphoreui%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fha_semaphoreui%2Fsemaphore_task_result.yaml)
 
 (oder *Einstellungen → Automatisierungen & Szenen → Blueprints → Blueprint importieren* mit
-`https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/notify_task_result.yaml`). Danach *Automation erstellen* und wählen:
+`https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml`). Danach *Automation erstellen* und wählen:
 
 * **Benachrichtigen:** eine oder mehrere `notify`-Entitäten (z. B. dein Handy).
 * **Wann:** *nur bei Fehlern*, *bei Fehlern und bei Handlungsbedarf* (auch erfolgreiche Läufe mit `HA_RESULT` `needed: true`) oder *bei jedem Ergebnis*.

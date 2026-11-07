@@ -496,10 +496,10 @@ every 5 s while a task is running). When Home Assistant starts, old results are 
 
 No YAML needed: the blueprint **“Semaphore UI – notification when a task ends”** creates the automation for you. Import it:
 
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2F19Andy89%2Fha_semaphoreui%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fha_semaphoreui%2Fnotify_task_result.yaml)
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2F19Andy89%2Fha_semaphoreui%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fha_semaphoreui%2Fsemaphore_task_result.yaml)
 
 (or *Settings → Automations & scenes → Blueprints → Import blueprint* with
-`https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/notify_task_result.yaml`). Then *Create automation* and choose:
+`https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml`). Then *Create automation* and choose:
 
 * **Notify:** one or more `notify` entities (e.g. your phone).
 * **When:** *only on failures*, *on failures and when action is needed* (also successful runs whose `HA_RESULT` says `needed: true`) or *on every result*.

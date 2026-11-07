@@ -3,7 +3,7 @@
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
 ## Nächste Version – Blueprint für Benachrichtigungen, Repository-Name ohne „HACS“
-- **Blueprint** „Semaphore UI – Benachrichtigung bei Taskende“ (`blueprints/automation/ha_semaphoreui/notify_task_result.yaml`): Benachrichtigung bei Fehlern, bei Fehlern und Handlungsbedarf oder bei jedem Ergebnis; Filter für Testläufe und Templates; zusätzliche Aktionen. Import per Badge/URL (siehe README), Bedingung mit 16 Fällen getestet. Mindestversion Home Assistant 2024.10.
+- **Blueprint** „Semaphore UI – Benachrichtigung bei Taskende“ (`blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml`): Benachrichtigung bei Fehlern, bei Fehlern und Handlungsbedarf oder bei jedem Ergebnis; Filter für Testläufe und Templates; zusätzliche Aktionen. Import per Badge/URL (siehe README), Bedingung mit 16 Fällen getestet. Mindestversion Home Assistant 2024.10.
 - Das Repository heißt jetzt `ha_semaphoreui` (der HACS-Katalog erlaubt „HACS“ nicht im Namen). Links in Manifest, README (Marketplace-Badge), SECURITY, CONTRIBUTING und Issue-Vorlagen angepasst; die Domain `semaphore_ui` und alle Entitäten bleiben unverändert. Alte Links werden von GitHub weitergeleitet.
 
 ## 0.20.0 – Einträge der Projekt-Karte aufklappen (Issue #14)
