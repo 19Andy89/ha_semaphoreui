@@ -27,6 +27,9 @@ def test_blueprint_is_complete() -> None:
     data = _load()
     blueprint = data["blueprint"]
     assert blueprint["domain"] == "automation"
+    # Home Assistant knows only these keys under "blueprint" ("min_version" belongs under "homeassistant")
+    assert set(blueprint) <= {"name", "description", "domain", "author", "source_url", "homeassistant", "input"}
+    assert set(blueprint["homeassistant"]) == {"min_version"}
     assert blueprint["source_url"].endswith("blueprints/automation/ha_semaphoreui/notify_task_result.yaml")
     inputs = set(blueprint["input"])
     # every !input points to an input that exists
