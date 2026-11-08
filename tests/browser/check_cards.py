@@ -172,11 +172,11 @@ def test_template_card_details(page: Page) -> None:
     """0.1.5: Zahlen je Host, Hinweise, anklickbare Zeilen und Fehlertext (More-Info der Standardaktion)."""
     docker, host = tcard(page, "docker-system"), tcard(page, "Host-Update")
     heads = [" ".join(h.split()) for h in docker.locator(".host .hh").all_inner_texts()]
-    check("Template-Karte: Zahlen je Host im eigenen Block", heads == ["dockerhost 8 Updates, Neustart", "pialert 2 Updates", "adguard aktuell"], heads)
+    check("Template-Karte: Zahlen je Host im eigenen Block", heads == ["dockerhost 8 Updates, Neustart", "pialert 2 Updates", "adguard aktuell, 5 installiert"], heads)
     notes = docker.locator(".note").all_inner_texts()
     in_adguard = docker.locator(".host", has_text="adguard").locator(".note").all_inner_texts()
     check("Template-Karte: Hinweis aus dem Playbook steht im Block des Hosts", len(notes) == 1 and in_adguard == notes and "Debian 13" in notes[0], notes)
-    check("Template-Karte: Hinweis zählt nicht als Handlungsbedarf (adguard bleibt „aktuell“)", heads[-1].endswith("aktuell"), heads)
+    check("Template-Karte: Hinweis zählt nicht als Handlungsbedarf (adguard bleibt „aktuell“, 5 installiert)", heads[-1].endswith("aktuell, 5 installiert"), heads)
     check("Template-Karte ohne Meldung: keine Hinweise, keine Hostblöcke", tcard(page, "Deploy").locator(".note, .host").count() == 0)
 
     watch_more_info(page)
@@ -697,7 +697,7 @@ def test_hosts_blocks(page: Page) -> None:
     blocks = docker.locator(".needbox .host")
     check("Hosts: drei Blöcke (dockerhost, pialert, adguard)", blocks.count() == 3, blocks.count())
     heads = [" ".join(h.split()) for h in docker.locator(".host .hh").all_inner_texts()]
-    check("Hosts: Kopfzeilen mit Updates, Neustart bzw. „aktuell“", heads == ["dockerhost 8 Updates, Neustart", "pialert 2 Updates", "adguard aktuell"], heads)
+    check("Hosts: Kopfzeilen mit Updates, Neustart bzw. „aktuell“", heads == ["dockerhost 8 Updates, Neustart", "pialert 2 Updates", "adguard aktuell, 5 installiert"], heads)
     check("Hosts: die alte Sammelzeile „dockerhost: 8, Neustart · pialert: 2“ entfällt", docker.locator(".hostline").count() == 0)
     lines = docker.locator(".host").evaluate_all("els => els.map((e) => getComputedStyle(e).borderTopWidth)")
     check("Hosts: zwischen den Blöcken steht eine Linie (nicht vor dem ersten)", lines == ["0px", "1px", "1px"], lines)

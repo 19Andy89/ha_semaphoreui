@@ -36,7 +36,7 @@ ok: [dockerhost] =>
 ok: [pialert] =>
     msg: 'HA_RESULT {"updates": 2, "reboot_required": false, "packages": ["curl", "bash"], "disk_free_mib": 1400, "disk_required_mib": 80, "disk_used_percent": 91.3}'
 ok: [adguard] =>
-    msg: 'HA_RESULT {"updates": 0, "reboot_required": false, "notes": "Debian 13 (trixie) ist verfügbar"}'
+    msg: 'HA_RESULT {"updates": 0, "installed": 5, "reboot_required": false, "notes": "Debian 13 (trixie) ist verfügbar"}'
 PLAY RECAP *********************************************************************
 dockerhost                 : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
 pialert                    : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0

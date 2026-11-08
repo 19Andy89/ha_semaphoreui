@@ -173,7 +173,7 @@ ihn gestartet hat, auch ein Zeitplan in Semaphore) und legt daraus pro Template 
 
 | Entität | Inhalt |
 |---|---|
-| **Handlungsbedarf** (`binary_sensor`) | an = Updates offen oder Neustart nötig; aus = nichts zu tun; *unbekannt* = der letzte Lauf hat nichts gemeldet (z. B. fehlgeschlagen). Attribute: `updates`, `reboot_required`, `explanation`, `hosts` (je Host: `updates`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
+| **Handlungsbedarf** (`binary_sensor`) | an = Updates offen oder Neustart nötig; aus = nichts zu tun; *unbekannt* = der letzte Lauf hat nichts gemeldet (z. B. fehlgeschlagen). Attribute: `updates`, `installed`, `reboot_required`, `explanation`, `hosts` (je Host: `updates`, `installed`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
 | **Offene Updates** (`sensor`) | Zahl der offenen Updates (alle Hosts zusammen) |
 | **Templates mit Handlungsbedarf** (Projekt-Sensor) | Anzahl; Attribut `templates` = Namen |
 
@@ -181,7 +181,7 @@ Die beiden Template-Entitäten gibt es nur für Templates, die `HA_RESULT` schon
 bestehen). Der Bericht (Ereignis, Antwort der Aktion, Zusammenfassung) enthält außerdem `ha_result`; der Push-Text bekommt
 eine Zeile „Offene Updates: 3 · Neustart nötig“.
 
-**Schlüssel des JSON-Objekts** (alle optional): `updates` (Zahl), `reboot_required` (true/false), `packages` (Liste von Namen,
+**Schlüssel des JSON-Objekts** (alle optional): `updates` (Zahl), `installed` (Zahl der in diesem Lauf installierten Updates; im Testlauf weglassen – die Karte zeigt dann „5 installiert“ und der Text „Offene Updates: 0“ entfällt), `reboot_required` (true/false), `packages` (Liste von Namen,
 nur Anzeige, max. 50; die Karte zeigt sie in einer Zeile mit „+n weitere“), `host` (sonst der Host aus der Ansible-Ausgabe), `needed` (true/false – überschreibt die Regel),
 `notes` (Text oder Liste von Texten, siehe unten; auch `note` wird gelesen).
 **Platte des Hosts** (optional, nur Anzeige): `disk_free_mib` (freier Platz auf `/` in MiB), `disk_required_mib` (Platzbedarf der Updates in MiB)

@@ -174,7 +174,7 @@ started it, including a schedule in Semaphore) and creates the following per tem
 
 | Entity | Content |
 |---|---|
-| **Needs action** (`binary_sensor`; German UI: „Handlungsbedarf“) | on = updates pending or reboot required; off = nothing to do; *unknown* = the last run reported nothing (e.g. it failed). Attributes: `updates`, `reboot_required`, `explanation`, `hosts` (per host: `updates`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
+| **Needs action** (`binary_sensor`; German UI: „Handlungsbedarf“) | on = updates pending or reboot required; off = nothing to do; *unknown* = the last run reported nothing (e.g. it failed). Attributes: `updates`, `installed`, `reboot_required`, `explanation`, `hosts` (per host: `updates`, `installed`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
 | **Pending updates** (`sensor`; German UI: „Offene Updates“) | Number of pending updates (all hosts combined) |
 | **Templates needing action** (project sensor) | Count; attribute `templates` = names |
 
@@ -182,7 +182,7 @@ The two template entities exist only for templates that have reported `HA_RESULT
 report (event, action response, summary) also contains `ha_result`; the push text gets
 a line “Pending updates: 3 · Reboot required”.
 
-**Keys of the JSON object** (all optional): `updates` (number), `reboot_required` (true/false), `packages` (list of names,
+**Keys of the JSON object** (all optional): `updates` (number), `installed` (number of updates this run installed; leave it out in a dry run – the card then shows “5 installed”), `reboot_required` (true/false), `packages` (list of names,
 display only, max. 50; the card shows them in one line with “+n more”), `host` (otherwise the host from the Ansible output), `needed` (true/false – overrides the rule),
 `notes` (text or list of texts, see below; `note` is read as well).
 **Host disk** (optional, display only): `disk_free_mib` (free space on `/` in MiB), `disk_required_mib` (space the updates need, in MiB)

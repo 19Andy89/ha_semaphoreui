@@ -184,6 +184,7 @@
         lock_timeout: 300
         update_cache_retries: 3
         update_cache_retry_max_delay: 12
+      register: apt_upgrade
 
     - name: Neustartbedarf prüfen
       ansible.builtin.stat:
@@ -282,6 +283,12 @@
         - debian_stable_major is defined
         - (ansible_facts.distribution_major_version | int) < (debian_stable_major | int)
 
+    - name: Anzahl installierter Updates ermitteln
+      ansible.builtin.set_fact:
+        installed_updates: >-
+          {{ ((apt_upgrade.stdout | default('')) | regex_search('(\d+) upgraded, (\d+) newly installed', '\1', '\2') | default([0, 0], true) | map('int') | sum) }}
+      when: not ansible_check_mode   # im Testlauf wird nichts installiert
+
     - name: Ergebnis für Home Assistant melden
       ansible.builtin.debug:
         msg: >-
@@ -293,4 +300,4 @@
             'disk_required_mib': ((required_space_kib.stdout | default('0') | trim | int) / 1024) | round(1),
             'disk_used_percent': ((1 - ((root_available_kib.stdout_lines[-1] | int) / (root_total_kib.stdout_lines[-1] | int))) * 100) | round(1),
             'notes': ([debian_hinweis] if debian_hinweis is defined else [])
-          } | to_json }}
+          } | combine({'installed': installed_updates | int} if installed_updates is defined else {}) | to_json }}

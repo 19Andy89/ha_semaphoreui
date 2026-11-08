@@ -231,6 +231,12 @@
           - "Laufender Kernel: {{ running_kernel.stdout }}"
           - "Neuester installierter Kernel: {{ latest_kernel.stdout | trim | default('nicht ermittelt', true) }}"
 
+    - name: Anzahl installierter Updates ermitteln
+      ansible.builtin.set_fact:
+        installed_updates: >-
+          {{ ((pve_upgrade.stdout | default('')) | regex_search('(\d+) upgraded, (\d+) newly installed', '\1', '\2') | default([0, 0], true) | map('int') | sum) }}
+      when: not ansible_check_mode   # im Testlauf wird nichts installiert
+
     - name: Ergebnis für Home Assistant melden
       ansible.builtin.debug:
         msg: >-
@@ -246,4 +252,4 @@
               if ((latest_kernel.stdout | trim | length > 0) and ((latest_kernel.stdout | trim) != (running_kernel.stdout | trim)))
               else []
             )
-          } | to_json }}
+          } | combine({'installed': installed_updates | int} if installed_updates is defined else {}) | to_json }}
