@@ -15,6 +15,8 @@ Nothing in here talks to another server than Semaphore.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
@@ -22,12 +24,16 @@ import math
 import time
 from typing import Any
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_URL, CONF_USERNAME, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import (
+    async_create_clientsession,
+    async_get_clientsession,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -154,6 +160,26 @@ def _client_for(hass: HomeAssistant, entry: ConfigEntry, token: str) -> Semaphor
     )
 
 
+@asynccontextmanager
+async def _login_client(hass: HomeAssistant, entry: ConfigEntry) -> AsyncIterator[SemaphoreClient]:
+    """Client for the emergency login with a session of its own.
+
+    ``/auth/login`` answers with a ``semaphore`` session cookie. It must not land in the
+    cookie jar of Home Assistant's shared session (every other integration uses it), so
+    the login gets its own session without a cookie jar; the cookie is passed explicitly.
+    """
+    session = async_create_clientsession(
+        hass,
+        verify_ssl=entry.data[CONF_VERIFY_SSL],
+        auto_cleanup=False,  # the session lives only for this login; detached below
+        cookie_jar=aiohttp.DummyCookieJar(),
+    )
+    try:
+        yield SemaphoreClient(session, entry.data[CONF_URL], "")
+    finally:
+        session.detach()  # Home Assistant owns the connector; its close() must not be called
+
+
 async def _async_adopt(
     hass: HomeAssistant, entry: ConfigEntry, client: SemaphoreClient, new_token: str
 ) -> None:
@@ -194,14 +220,14 @@ async def async_token_by_login(
     Raises :class:`SemaphoreLoginError` (wrong login, second factor) or another
     :class:`SemaphoreError` (not reachable, ...).
     """
-    anonymous = _client_for(hass, entry, "")
-    cookie = await anonymous.login(username, password)
-    try:
-        created = await anonymous.create_token(
-            TOKEN_NAME, _expiry(lifetime), session_cookie=cookie
-        )
-    finally:
-        await anonymous.logout(cookie)
+    async with _login_client(hass, entry) as anonymous:
+        cookie = await anonymous.login(username, password)
+        try:
+            created = await anonymous.create_token(
+                TOKEN_NAME, _expiry(lifetime), session_cookie=cookie
+            )
+        finally:
+            await anonymous.logout(cookie)
     return str(created["id"])
 
 
@@ -213,16 +239,16 @@ async def async_test_login(
     Raises :class:`SemaphoreLoginError` (wrong login / second factor needed) or another
     :class:`SemaphoreError` (not reachable, ...).
     """
-    anonymous = _client_for(hass, entry, "")
-    cookie = await anonymous.login(username, password)
-    try:
-        await anonymous.get_tokens(session_cookie=cookie)
-    except SemaphoreAuthError as err:
-        raise SemaphoreLoginError(
-            "mfa_required" if err.body.upper().endswith("_REQUIRED") else "invalid_auth"
-        ) from err
-    finally:
-        await anonymous.logout(cookie)
+    async with _login_client(hass, entry) as anonymous:
+        cookie = await anonymous.login(username, password)
+        try:
+            await anonymous.get_tokens(session_cookie=cookie)
+        except SemaphoreAuthError as err:
+            raise SemaphoreLoginError(
+                "mfa_required" if err.body.upper().endswith("_REQUIRED") else "invalid_auth"
+            ) from err
+        finally:
+            await anonymous.logout(cookie)
 
 
 async def async_recover(
