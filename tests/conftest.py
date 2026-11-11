@@ -20,6 +20,32 @@ from homeassistant.const import CONF_URL, CONF_VERIFY_SSL
 from .fake_semaphore import TOKEN, FakeSemaphore
 
 
+def _require_supported_home_assistant() -> None:
+    """Stop with a clear message if the installed Home Assistant is older than hacs.json demands.
+
+    Otherwise a too old test environment shows up as dozens of confusing failures.
+    """
+    import json
+    from pathlib import Path
+
+    from homeassistant.const import __version__ as installed
+
+    wanted = json.loads((Path(__file__).parents[1] / "hacs.json").read_text())["homeassistant"]
+
+    def parts(version: str) -> tuple[int, ...]:
+        return tuple(int(p) for p in version.split("b")[0].split(".")[:3] if p.isdigit())
+
+    if parts(installed) < parts(wanted):
+        pytest.exit(
+            f"Home Assistant {installed} is installed, but this integration needs {wanted} or newer "
+            "(hacs.json). Install the current test requirements: pip install -r requirements_test.txt",
+            returncode=4,
+        )
+
+
+_require_supported_home_assistant()
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Let HA load custom_components/semaphore_ui in every test."""
