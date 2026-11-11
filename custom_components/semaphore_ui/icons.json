@@ -88,6 +88,9 @@
       },
       "dismiss": {
         "default": "mdi:eye-off-outline"
+      },
+      "blueprint_download": {
+        "default": "mdi:file-download-outline"
       }
     },
     "event": {

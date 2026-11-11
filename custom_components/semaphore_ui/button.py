@@ -5,10 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DRY_RUN_APPS
+from .blueprint import BlueprintError
 from .coordinator import SemaphoreConfigEntry, SemaphoreCoordinator
 from .entity import SemaphoreTemplateEntity
 
@@ -18,6 +21,11 @@ START = ButtonEntityDescription(key="start", translation_key="start")
 DRY_RUN = ButtonEntityDescription(key="dry_run", translation_key="dry_run")
 STOP = ButtonEntityDescription(key="stop", translation_key="stop")
 DISMISS = ButtonEntityDescription(key="dismiss", translation_key="dismiss")
+BLUEPRINT = ButtonEntityDescription(
+    key="blueprint_download",
+    translation_key="blueprint_download",
+    entity_category=EntityCategory.CONFIG,
+)
 
 
 async def async_setup_entry(
@@ -45,6 +53,9 @@ async def async_setup_entry(
             entities.append(SemaphoreStopButton(coordinator, template_id))
             entities.append(SemaphoreDismissButton(coordinator, template_id))
         async_add_entities(entities)
+
+    if coordinator.blueprint_coordinator is not None:
+        async_add_entities([SemaphoreBlueprintButton(coordinator)])
 
     _add_new_templates()
     entry.async_on_unload(coordinator.async_add_listener(_add_new_templates))
@@ -125,3 +136,25 @@ class SemaphoreDismissButton(SemaphoreTemplateEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Hide the template until its next run."""
         await self.coordinator.async_dismiss_template(self.template_id)
+
+
+class SemaphoreBlueprintButton(ButtonEntity):
+    """Downloads the latest notification blueprint into /config/blueprints (also if it is current)."""
+
+    _attr_has_entity_name = True
+    entity_description = BLUEPRINT
+
+    def __init__(self, coordinator: SemaphoreCoordinator) -> None:
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{BLUEPRINT.key}"
+        self._attr_device_info = coordinator.project_device_info()
+
+    async def async_press(self) -> None:
+        """Download and write; an old, different file is kept as .bak."""
+        blueprint = self._coordinator.blueprint_coordinator
+        if blueprint is None:
+            raise HomeAssistantError("Blueprint handling is not available")
+        try:
+            await blueprint.async_install()
+        except BlueprintError as err:
+            raise HomeAssistantError(str(err)) from err

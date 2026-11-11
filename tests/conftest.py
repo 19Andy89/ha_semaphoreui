@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.semaphore_ui import coordinator
+from custom_components.semaphore_ui import blueprint, coordinator
 from custom_components.semaphore_ui.const import (
     CONF_API_TOKEN,
     CONF_PROJECT_ID,
@@ -32,6 +32,8 @@ async def fake(socket_enabled, monkeypatch) -> AsyncGenerator[tuple[FakeSemaphor
     url = await server.start_server()
     monkeypatch.setattr(coordinator, "GITHUB_LATEST_URL", f"{url}/github/latest")
     monkeypatch.setattr(coordinator, "DOCKER_TAG_URL", f"{url}/docker/tags/{{tag}}")
+    monkeypatch.setattr(blueprint, "BLUEPRINT_RELEASE_URL", f"{url}/bp/release")
+    monkeypatch.setattr(blueprint, "BLUEPRINT_RAW_URL", f"{url}/bp/raw/{{tag}}/{{path}}")
     yield server, url
     await server.close()
 

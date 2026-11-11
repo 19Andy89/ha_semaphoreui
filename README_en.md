@@ -505,6 +505,8 @@ No YAML needed: the blueprint **“Semaphore UI – notification when a task end
 * **When:** *only on failures*, *on failures and when action is needed* (also successful runs whose `HA_RESULT` says `needed: true`) or *on every result*.
 * **Include dry runs** (default: yes), **only certain templates** (names as in Semaphore) and **extra actions** (the report is in `trigger.event.data`).
 
+**Keep the blueprint current:** The project device has the entity **Blueprint update** (shows the installed and the latest version, *Install* button) and the button **Download blueprint** (fetches the file from the latest release, even if it is current). The file goes to `/config/blueprints/automation/19Andy89/semaphore_task_result.yaml`, where the import dialog puts it too; existing automations keep using it and are reloaded. A different existing file is kept as `semaphore_task_result.yaml.bak`. The installed version is a comment in the first line; a file imported by hand counts as current if its content equals the release, otherwise as "unknown". It is checked every 6 hours (switch it off with "Check for new Semaphore version" in the options; the button still downloads on request).
+
 Title and text come ready-made from the integration. A nightly dry run with open updates reports on “action needed”
 every night until they are installed; use the template filter or “only on failures” for that.
 
@@ -587,7 +589,7 @@ sequence:
   status and the Ansible step currently running (“Step 7: Paketlisten aktualisieren”, attribute `current_step` on the status sensor
   and a line in the template card) appear immediately. While no task is running there is no connection; if it fails or the
   Semaphore version does not know `/api/ws`, polling simply continues.
-* Check for new Semaphore version (German UI: „Auf neue Semaphore-Version prüfen“; asks the GitHub releases every 6 h; without a token, only this one request)
+* Check for new Semaphore version (German UI: „Auf neue Semaphore-Version prüfen“; asks the GitHub releases every 6 h; without a token; plus the release check of the blueprint in this repository every 6 h)
 * Allow starting again (default: off; German UI: „Mehrfachstart erlauben“) – lifts the block against a second start while a run is already
   waiting or running for a template (see [Template device](#template-device-one-per-template))
 * **Show templates in Home Assistant** (German UI: „Templates in Home Assistant anzeigen“) – list of all templates of the project, all ticked. Unticked templates get

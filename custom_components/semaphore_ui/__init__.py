@@ -33,6 +33,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from . import issues, secrets_store, tokens
 from .api import SemaphoreClient
+from .blueprint import SemaphoreBlueprintCoordinator
 from .cards import async_register_cards
 from .const import CONF_API_TOKEN, CONF_RENEW_PASSWORD, DEFAULT_WAIT_TIMEOUT, DOMAIN
 from .coordinator import (
@@ -295,6 +296,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: SemaphoreConfigEntry) ->
     # When does the token expire / replace it in time: a failure here must not block either.
     coordinator.token_coordinator = tokens.SemaphoreTokenCoordinator(hass, entry, client)
     await coordinator.token_coordinator.async_refresh()
+
+    # The notification blueprint (installed vs. latest release): a failure here must not block either.
+    coordinator.blueprint_coordinator = SemaphoreBlueprintCoordinator(hass, entry)
+    await coordinator.blueprint_coordinator.async_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

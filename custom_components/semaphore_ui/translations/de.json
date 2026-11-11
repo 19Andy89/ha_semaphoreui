@@ -218,6 +218,9 @@
       },
       "dismiss": {
         "name": "Als erledigt markieren"
+      },
+      "blueprint_download": {
+        "name": "Blueprint herunterladen"
       }
     },
     "event": {
@@ -238,6 +241,9 @@
     "update": {
       "semaphore_update": {
         "name": "Semaphore-Update"
+      },
+      "blueprint_update": {
+        "name": "Blueprint-Update"
       }
     },
     "switch": {

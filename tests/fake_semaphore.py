@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 import secrets
+from pathlib import Path
 from typing import Any
 
 from aiohttp import web
@@ -65,6 +66,11 @@ class FakeSemaphore:
         }
         self.version = "v2.16.10"
         self.latest_release = {"tag_name": "v2.17.0", "html_url": "https://example.test/release"}
+        # release of the integration itself (blueprint download); the file is the one of this repository
+        self.blueprint_release: dict[str, Any] | None = {"tag_name": "v9.0.0", "html_url": "https://example.test/ha_release"}
+        self.blueprint_text: str | None = (
+            Path(__file__).parents[1] / "blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml"
+        ).read_text(encoding="utf-8")
         self.info_update: dict[str, Any] | None = None
         # (status, body): answer every API call with this instead (HTML page, 404, ...)
         self.raw_answer: tuple[int, str] | None = None
@@ -310,6 +316,20 @@ class FakeSemaphore:
             # must never receive the Semaphore token
             self.requests.append(("GITHUB", request.path, request.headers.get("Authorization")))
             return web.json_response(self.latest_release)
+
+        @routes.get("/bp/release")
+        async def bp_release(request: web.Request) -> web.Response:
+            self.requests.append(("BLUEPRINT", request.path, request.headers.get("Authorization")))
+            if self.blueprint_release is None:
+                return web.Response(status=404)
+            return web.json_response(self.blueprint_release)
+
+        @routes.get("/bp/raw/{tag}/{path:.*}")
+        async def bp_raw(request: web.Request) -> web.Response:
+            self.requests.append(("BLUEPRINT", request.path, request.headers.get("Authorization")))
+            if self.blueprint_text is None:
+                return web.Response(status=404)
+            return web.Response(text=self.blueprint_text)
 
         @routes.get("/api/projects")
         async def projects(request: web.Request) -> web.Response:

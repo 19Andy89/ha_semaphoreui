@@ -504,6 +504,8 @@ Ohne YAML: Das Blueprint **„Semaphore UI – Benachrichtigung bei Taskende“*
 * **Wann:** *nur bei Fehlern*, *bei Fehlern und bei Handlungsbedarf* (auch erfolgreiche Läufe mit `HA_RESULT` `needed: true`) oder *bei jedem Ergebnis*.
 * **Testläufe einbeziehen** (Standard: ja), **nur bestimmte Templates** (Namen wie in Semaphore) und **zusätzliche Aktionen** (der Bericht steht in `trigger.event.data`).
 
+**Blueprint aktuell halten:** Am Gerät des Projekts gibt es die Entität **Blueprint-Update** (zeigt die installierte und die neueste Version, Knopf *Installieren*) und den Knopf **Blueprint herunterladen** (lädt die Datei aus dem neuesten Release, auch wenn sie schon aktuell ist). Die Datei landet in `/config/blueprints/automation/19Andy89/semaphore_task_result.yaml`, also dort, wo auch der Import-Dialog sie ablegt; bestehende Automationen nutzen sie weiter und werden neu geladen. Eine vorhandene, abweichende Datei bleibt als `semaphore_task_result.yaml.bak` erhalten. Die installierte Version steht als Kommentar in der ersten Zeile; eine von Hand importierte Datei gilt als aktuell, wenn ihr Inhalt dem Release entspricht, sonst als „unknown“. Geprüft wird alle 6 Stunden (abschaltbar mit „Auf neue Semaphore-Version prüfen“ in den Optionen; der Knopf lädt dann trotzdem auf Wunsch).
+
 Titel und Text kommen fertig aus der Integration. Ein nächtlicher Testlauf mit offenen Updates meldet bei „Handlungsbedarf“
 jede Nacht, bis sie installiert sind; dafür gibt es den Filter nach Templates oder die Einstellung „nur bei Fehlern“.
 
@@ -586,7 +588,7 @@ sequence:
   Status und der gerade laufende Ansible-Schritt („Schritt 7: Paketlisten aktualisieren“, Attribut `current_step` am Status-Sensor
   und Zeile in der Template-Karte) erscheinen sofort. Ohne laufenden Task besteht keine Verbindung; fällt sie aus oder kennt
   die Semaphore-Version `/api/ws` nicht, wird einfach weiter abgefragt.
-* Auf neue Semaphore-Version prüfen (fragt alle 6 Std. die GitHub-Releases ab; ohne Token, nur diese eine Anfrage)
+* Auf neue Semaphore-Version prüfen (fragt alle 6 Std. die GitHub-Releases ab; ohne Token; dazu alle 6 Std. die Release-Prüfung des Blueprints in diesem Repository)
 * Mehrfachstart erlauben (Standard: aus) – hebt die Sperre gegen einen zweiten Start auf, solange für ein Template schon ein
   Lauf wartet oder läuft (siehe [Template-Gerät](#template-gerät-eins-pro-template))
 * **Templates in Home Assistant anzeigen** – Liste aller Templates des Projekts, alle angehakt. Abgewählte Templates bekommen

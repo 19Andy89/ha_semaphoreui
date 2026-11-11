@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 import logging
 import re
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -89,6 +89,9 @@ LOG_RECHECKS = 2
 # Newer Home Assistant versions replace ``via_device`` by ``via_device_id``.
 _HAS_VIA_DEVICE_ID = "via_device_id" in DeviceInfo.__annotations__
 
+if TYPE_CHECKING:
+    from .blueprint import SemaphoreBlueprintCoordinator
+
 
 @dataclass
 class SemaphoreData:
@@ -140,6 +143,7 @@ class SemaphoreCoordinator(DataUpdateCoordinator[SemaphoreData]):
         self.base_url: str = client.base_url
         self.project_device_id: str | None = None
         self.version_coordinator: SemaphoreVersionCoordinator | None = None
+        self.blueprint_coordinator: SemaphoreBlueprintCoordinator | None = None
         self.token_coordinator: tokens.SemaphoreTokenCoordinator | None = None
         # a template may be started while one of its runs is queued/running
         self.allow_parallel: bool = entry.options.get(CONF_ALLOW_PARALLEL, False)
