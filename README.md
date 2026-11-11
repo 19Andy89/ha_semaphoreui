@@ -173,7 +173,7 @@ ihn gestartet hat, auch ein Zeitplan in Semaphore) und legt daraus pro Template 
 
 | Entität | Inhalt |
 |---|---|
-| **Handlungsbedarf** (`binary_sensor`) | an = Updates offen oder Neustart nötig; aus = nichts zu tun; *unbekannt* = der letzte Lauf hat nichts gemeldet (z. B. fehlgeschlagen). Attribute: `updates`, `reboot_required`, `explanation`, `hosts` (je Host: `updates`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
+| **Handlungsbedarf** (`binary_sensor`) | an = Updates offen oder Neustart nötig; aus = nichts zu tun; *unbekannt* = der letzte Lauf hat nichts gemeldet (z. B. fehlgeschlagen). Attribute: `updates`, `installed`, `reboot_required`, `explanation`, `hosts` (je Host: `updates`, `installed`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
 | **Offene Updates** (`sensor`) | Zahl der offenen Updates (alle Hosts zusammen) |
 | **Templates mit Handlungsbedarf** (Projekt-Sensor) | Anzahl; Attribut `templates` = Namen |
 
@@ -181,7 +181,7 @@ Die beiden Template-Entitäten gibt es nur für Templates, die `HA_RESULT` schon
 bestehen). Der Bericht (Ereignis, Antwort der Aktion, Zusammenfassung) enthält außerdem `ha_result`; der Push-Text bekommt
 eine Zeile „Offene Updates: 3 · Neustart nötig“.
 
-**Schlüssel des JSON-Objekts** (alle optional): `updates` (Zahl), `reboot_required` (true/false), `packages` (Liste von Namen,
+**Schlüssel des JSON-Objekts** (alle optional): `updates` (Zahl), `installed` (Zahl der in diesem Lauf installierten Updates; im Testlauf weglassen – die Karte zeigt dann „5 installiert“ und der Text „Offene Updates: 0“ entfällt), `reboot_required` (true/false), `packages` (Liste von Namen,
 nur Anzeige, max. 50; die Karte zeigt sie in einer Zeile mit „+n weitere“), `host` (sonst der Host aus der Ansible-Ausgabe), `needed` (true/false – überschreibt die Regel),
 `notes` (Text oder Liste von Texten, siehe unten; auch `note` wird gelesen).
 **Platte des Hosts** (optional, nur Anzeige): `disk_free_mib` (freier Platz auf `/` in MiB), `disk_required_mib` (Platzbedarf der Updates in MiB)
@@ -491,6 +491,24 @@ Bus-Ereignisse: `semaphore_ui_task_started` und `semaphore_ui_task_finished`
 (auch für Tasks, die in der Semaphore-Oberfläche oder per Zeitplan gestartet wurden – Erkennung beim nächsten Abruf,
 während ein Task läuft alle 5 s). Beim Start von Home Assistant werden alte Ergebnisse **nicht** erneut gemeldet.
 
+### Fertiges Blueprint (empfohlen)
+
+Ohne YAML: Das Blueprint **„Semaphore UI – Benachrichtigung bei Taskende“** legt die Automation für dich an. Importieren:
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2F19Andy89%2Fha_semaphoreui%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fha_semaphoreui%2Fsemaphore_task_result.yaml)
+
+(oder *Einstellungen → Automatisierungen & Szenen → Blueprints → Blueprint importieren* mit
+`https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml`). Danach *Automation erstellen* und wählen:
+
+* **Benachrichtigen:** eine oder mehrere `notify`-Entitäten (z. B. dein Handy).
+* **Wann:** *nur bei Fehlern*, *bei Fehlern und bei Handlungsbedarf* (auch erfolgreiche Läufe mit `HA_RESULT` `needed: true`) oder *bei jedem Ergebnis*.
+* **Testläufe einbeziehen** (Standard: ja), **nur bestimmte Templates** (Namen wie in Semaphore) und **zusätzliche Aktionen** (der Bericht steht in `trigger.event.data`).
+
+Titel und Text kommen fertig aus der Integration. Ein nächtlicher Testlauf mit offenen Updates meldet bei „Handlungsbedarf“
+jede Nacht, bis sie installiert sind; dafür gibt es den Filter nach Templates oder die Einstellung „nur bei Fehlern“.
+
+### Selbst bauen
+
 Per UI: *Automation → Auslöser „Ereignis“ → `semaphore_ui_task_finished`*, Aktion „Benachrichtigung senden“ mit
 `{{ trigger.event.data.title }}` / `{{ trigger.event.data.text }}`. Als YAML:
 
@@ -682,14 +700,11 @@ URL, Token oder die SSL-Prüfung später ändern: *Einstellungen → Geräte & D
   Annahme aus der API-Beschreibung und noch nicht gegen eine echte Instanz geprüft. Greift das Template-Flag nicht, hilft die
   Option „Mehrfachstart erlauben“ der Integration. Ein in Semaphore gestarteter Lauf sperrt erst nach dem nächsten Abruf.
 * Geplantes und Ideen stehen als [Issues](../../issues) im Repository.
-* Token-Erneuerung: gegen den Nachbau der API und ein frisches Home Assistant getestet, **noch nicht an einer echten Instanz mit
-  ablaufendem Token** (die Felder `expires_at`/`name` gibt es ab Semaphore 2.18.2; `POST /api/user/tokens` mit dem Token selbst
-  ist aus dem Quellcode abgeleitet). Bitte beim ersten Mal mit einem Token mit kurzer Laufzeit prüfen.
+* Token-Erneuerung (ablaufendes Token): an einer echten Instanz bestätigt (Semaphore 2.19.17).
 * Hinweise (`notes`) und Paketlisten werden gekürzt (10 Hinweise zu je 200 Zeichen, 200 Pakete je Lauf und Host); fehlende Pakete meldet die Karte als „n weitere Pakete nicht aufgelistet“, der Rest bleibt im Log von Semaphore.
 * Zeitpläne: Die Integration schaltet sie nur ein/aus und zeigt sie an (anlegen und ändern geht in Semaphore). Der Endpunkt
   `…/schedules/<id>/active` ist im Quellcode von Semaphore 2.19 geprüft, gegen den Nachbau getestet und an einer echten Instanz
-  (2.19.17) zum **Ausschalten** bestätigt; das Einschalten ruft denselben Endpunkt mit `true` auf. Fehlt dem Token die
-  Berechtigung, sagt die Meldung es.
+  (2.19.17) zum **Ein- und Ausschalten** bestätigt. Fehlt dem Token die Berechtigung, sagt die Meldung es.
   „Nächster Lauf“ ist eine Berechnung aus dem Cron-Text und der Zeitzone; Zeitumstellungen und `@every` sind nur eingeschränkt vorhersagbar.
 * Survey: Mehrfachauswahl (*select*) und *secret* nur über die Aktion; Das Senden der Werte folgt dem, was die
   Semaphore-Weboberfläche macht (`environment` bzw. `secret` als JSON-Text im Task) – bitte einmal mit einer

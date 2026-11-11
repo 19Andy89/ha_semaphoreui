@@ -61,6 +61,7 @@ const TEXTS = {
     more_n: "+{n} weitere",
     updates_n: "{n} Updates",
     update_1: "1 Update",
+    installed_n: "{n} installiert",
     pkgs_omitted: "{n} weitere Pakete nicht aufgelistet",
     host_ok: "aktuell",
     host_action: "Handlungsbedarf",
@@ -198,6 +199,7 @@ const TEXTS = {
     reboot_short: "reboot",
     more_n: "+{n} more",
     updates_n: "{n} updates",
+    installed_n: "{n} installed",
     update_1: "1 update",
     pkgs_omitted: "{n} more packages not listed",
     host_ok: "up to date",
@@ -1359,7 +1361,8 @@ class SemaphoreTemplateCard extends SemaphoreBaseCard {
         if (h.updates) status.push((h.updates === 1 ? T.update_1 : T.updates_n.replace("{n}", num(h.updates, 0))));
         if (h.reboot_required) status.push(T.reboot_short);
         const need = !!h.needed;
-        const text = status.length ? status.join(", ") : need ? T.host_action : T.host_ok;
+        const inst = h.installed > 0 ? T.installed_n.replace("{n}", num(h.installed, 0)) : ""; // what the last run installed
+        const text = [status.length ? status.join(", ") : need ? T.host_action : T.host_ok, inst].filter(Boolean).join(", ");
         const own = Array.isArray(h.notes) ? h.notes.filter(Boolean).map((t) => ({ text: String(t) })) : [];
         const names = Array.isArray(h.packages) ? h.packages : [];
         return `<div class="host"><div class="hh"><span class="hn">${esc(name)}</span><span class="hs${need ? " need" : ""}">${esc(text)}</span></div>${hasDisk(h) ? `<div class="disks">${diskHtmlOf("", h)}</div>` : ""}${pkgBox(names, name, h.packages_omitted || 0)}${noteLines(own)}</div>`;
@@ -1884,6 +1887,7 @@ class SemaphoreProjectCard extends SemaphoreBaseCard {
           if (!h.needed && !h.updates && !h.reboot_required) bits.push(T.host_ok);
           if (typeof h.updates === "number" && h.updates > 0) bits.push(h.updates === 1 ? T.update_1 : T.updates_n.replace("{n}", h.updates));
           if (h.reboot_required) bits.push(T.reboot_short);
+          if (h.installed > 0) bits.push(T.installed_n.replace("{n}", h.installed));
           const disk = hasDisk(h) ? `<div class="disks">${diskRow(hass, T, "", h)}</div>` : "";
           const notes = (Array.isArray(h.notes) ? h.notes : []).filter(Boolean).map((n) => `<div class="meta">${esc(typeof n === "object" ? n.text : n)}</div>`).join("");
           return `<div class="dhost"><div><strong>${esc(name)}</strong>${bits.length ? " · " + esc(bits.join(" · ")) : ""}</div>${disk}${notes}</div>`;

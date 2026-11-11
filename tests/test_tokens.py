@@ -566,3 +566,36 @@ def test_the_lifetime_is_the_time_between_creation_and_end() -> None:
     assert tokens.data_from_row(row).lifetime == timedelta(days=90)
     assert tokens.data_from_row({"created": "2026-01-01T00:00:00Z"}).lifetime is None
     assert tokens.data_from_row(None).found is False
+
+
+async def test_the_login_uses_a_session_of_its_own_without_cookie_jar(hass: HomeAssistant, fake, make_entry) -> None:
+    """Semaphore's session cookie must not land in the cookie jar every integration shares."""
+    import aiohttp
+    from homeassistant.helpers import aiohttp_client
+
+    server, _ = fake
+    server.users["andy"] = "secret"
+    own_token(server, left=30)
+    entry = make_entry(LOGIN)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    shared = aiohttp_client.async_get_clientsession(hass, verify_ssl=entry.data["verify_ssl"])
+    shared.cookie_jar.clear()
+
+    created: list[Any] = []
+    real = aiohttp_client.async_create_clientsession
+
+    def spy(*args: Any, **kwargs: Any):
+        session = real(*args, **kwargs)
+        created.append(session)
+        return session
+
+    from unittest.mock import patch
+
+    with patch.object(tokens, "async_create_clientsession", spy):
+        await tokens.async_test_login(hass, entry, "andy", "secret")
+    assert len(created) == 1
+    assert isinstance(created[0].cookie_jar, aiohttp.DummyCookieJar)
+    assert created[0].closed  # detached again: no session is left behind
+    assert len(shared.cookie_jar) == 0  # the shared jar did not get the "semaphore" cookie

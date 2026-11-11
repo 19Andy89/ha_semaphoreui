@@ -203,6 +203,7 @@ class SemaphoreNeedsActionSensor(SemaphoreTemplateEntity, BinarySensorEntity):
         result = report["ha_result"]
         return {
             "updates": result["updates"],
+            "installed": result.get("installed"),
             "reboot_required": result["reboot_required"],
             "explanation": ha_result_text(result, self.coordinator.hass.config.language),
             "hosts": result["hosts"],

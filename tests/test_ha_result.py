@@ -281,6 +281,16 @@ def test_result_text() -> None:
     assert ha_result_text({"needed": True, "updates": 1, "reboot_required": False}, "en") == (
         "Pending updates: 1"
     )
+    # what the run installed is named, with or without open updates and a reboot
+    assert ha_result_text({"needed": False, "updates": 0, "installed": 5, "reboot_required": False}, "de") == (
+        "5 installiert"
+    )
+    assert ha_result_text({"needed": True, "updates": 0, "installed": 5, "reboot_required": True}, "en") == (
+        "5 installed · Reboot required"
+    )
+    assert ha_result_text({"needed": False, "updates": 0, "installed": 0, "reboot_required": False}, "de") == (
+        "Nichts zu tun"
+    )
     # no "Offene Updates: 0" next to a reboot: only open updates are named
     assert ha_result_text({"needed": True, "updates": 0, "reboot_required": True}, "de") == (
         "Neustart nötig"
@@ -434,3 +444,22 @@ def test_a_percentage_above_100_is_ignored() -> None:
 def test_disk_figures_do_not_change_whether_action_is_needed() -> None:
     result = parse_ha_result(_marker({"updates": 0, "disk_free_mib": 5, "disk_used_percent": 99}))
     assert result["needed"] is False
+
+
+def test_installed_is_parsed_per_host_and_summed() -> None:
+    result = parse_ha_result(
+        [
+            'ok: [a] => {"msg": "HA_RESULT {\\"host\\": \\"a\\", \\"updates\\": 0, \\"installed\\": 5}"}',
+            'HA_RESULT {"host": "b", "updates": 2, "installed": 3}',
+            'HA_RESULT {"host": "c", "updates": 0, "installed": "x"}',
+            'HA_RESULT {"host": "d", "updates": 0}',
+        ]
+    )
+    assert result is not None
+    assert result["hosts"]["a"]["installed"] == 5
+    assert result["hosts"]["b"]["installed"] == 3
+    assert "installed" not in result["hosts"]["c"]  # invalid value: ignored
+    assert "installed" not in result["hosts"]["d"]  # dry run: not reported
+    assert result["installed"] == 8
+    only_dry = parse_ha_result(['HA_RESULT {"updates": 4}'])
+    assert only_dry is not None and only_dry["installed"] is None

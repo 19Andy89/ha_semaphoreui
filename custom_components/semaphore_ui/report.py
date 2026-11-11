@@ -90,6 +90,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "dt_short": "%d.%m. %H:%M",
         "changed": "geändert",
         "pending_updates": "Offene Updates",
+        "installed_n": "{n} installiert",
         "reboot_required": "Neustart nötig",
         "nothing_to_do": "Nichts zu tun",
         "hint": "Hinweis",
@@ -121,6 +122,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "dt_short": "%m-%d %H:%M",
         "changed": "changed",
         "pending_updates": "Pending updates",
+        "installed_n": "{n} installed",
         "reboot_required": "Reboot required",
         "nothing_to_do": "Nothing to do",
         "hint": "Hint",
@@ -503,7 +505,7 @@ def parse_ha_result(lines: list[str]) -> dict[str, Any] | None:
     """Evaluate the ``HA_RESULT {...}`` lines a playbook printed (``None`` if there are none).
 
     Keys of the JSON object (all optional): ``updates`` (number of pending updates),
-    ``reboot_required`` (bool), ``needed`` (bool, overrides the rule below),
+    ``installed`` (number of updates this run installed; leave it out in a dry run), ``reboot_required`` (bool), ``needed`` (bool, overrides the rule below),
     ``packages`` (list of names), ``disk_free_mib`` / ``disk_required_mib`` (MiB free / needed
     by the updates) and ``disk_used_percent`` (0-100) of the host (shown only), ``notes`` (a hint or a list of hints, e.g. "Debian 13
     available"; shown only, they do not count as action), ``host`` (otherwise the host
@@ -515,6 +517,7 @@ def parse_ha_result(lines: list[str]) -> dict[str, Any] | None:
     packages: list[str] = []
     for host, payload in _marker_payloads(lines):
         updates = _as_count(payload.get("updates"))
+        installed = _as_count(payload.get("installed"))
         reboot = _as_flag(payload.get("reboot_required"))
         explicit = _as_flag(payload.get("needed")) if "needed" in payload else None
         hosts[host] = {
@@ -524,6 +527,8 @@ def parse_ha_result(lines: list[str]) -> dict[str, Any] | None:
             "updates": updates,
             "reboot_required": reboot,
         }
+        if installed is not None:
+            hosts[host]["installed"] = installed
         # optional disk figures of the host (root file system): free, needed by the updates, used in percent
         for key, maximum in DISK_KEYS.items():
             number = _as_number(payload.get(key), maximum=maximum)
@@ -548,10 +553,12 @@ def parse_ha_result(lines: list[str]) -> dict[str, Any] | None:
     if not hosts:
         return None
     counts = [h["updates"] for h in hosts.values() if h["updates"] is not None]
+    installed_counts = [h["installed"] for h in hosts.values() if "installed" in h]
     flags = [h["reboot_required"] for h in hosts.values() if h["reboot_required"] is not None]
     return {
         "needed": any(h["needed"] for h in hosts.values()),
         "updates": sum(counts) if counts else None,
+        "installed": sum(installed_counts) if installed_counts else None,
         "reboot_required": any(flags) if flags else None,
         "hosts": hosts,
         "packages": packages[:MAX_PACKAGES],
@@ -683,6 +690,9 @@ def ha_result_text(ha_result: dict[str, Any], lang: str | None = "de") -> str:
     # "Offene Updates: 0" next to "Neustart nötig" says nothing: only name updates that are open
     if isinstance(ha_result.get("updates"), (int, float)) and ha_result["updates"] > 0:
         parts.append(f"{t['pending_updates']}: {ha_result['updates']}")
+    installed = ha_result.get("installed")
+    if isinstance(installed, (int, float)) and not isinstance(installed, bool) and installed > 0:
+        parts.append(t["installed_n"].format(n=int(installed)))  # what this run installed
     if ha_result.get("reboot_required"):
         parts.append(t["reboot_required"])
     if not parts:

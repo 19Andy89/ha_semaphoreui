@@ -2,7 +2,10 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
-## Nächste Version – Repository-Name ohne „HACS“
+## Nächste Version – Blueprint für Benachrichtigungen, Repository-Name ohne „HACS“
+- **Notfall-Login mit eigener Session** (Review-Hinweis des HACS-Teams): Die Anmeldung mit gespeichertem Benutzer/Passwort (`/auth/login`) läuft jetzt über eine eigene kurzlebige Session ohne Cookie-Jar. Das `semaphore`-Session-Cookie landet damit nicht mehr im Cookie-Jar der gemeinsamen Home-Assistant-Session, die alle anderen Integrationen mitbenutzen. Das Cookie wird weiterhin explizit im Header übergeben. Neuer Test dazu.
+- **Installierte Updates werden angezeigt**: Das neue optionale `HA_RESULT`-Feld `installed` nennt, wie viele Updates ein echter Lauf installiert hat. Template-Karte, Projekt-Karte und Zusammenfassung zeigen z. B. „5 installiert“ (je Host und gesamt), auch wenn danach 0 Updates offen sind. Die mitgelieferten Playbooks `update-linux.yml` und `update-proxmox.yml` melden den Wert (im Testlauf nicht, dort wird nichts installiert); eigene Playbooks können ihn ergänzen.
+- **Blueprint** „Semaphore UI – Benachrichtigung bei Taskende“ (`blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml`): Benachrichtigung bei Fehlern, bei Fehlern und Handlungsbedarf oder bei jedem Ergebnis; Filter für Testläufe und Templates; zusätzliche Aktionen. Import per Badge/URL (siehe README), Bedingung mit 16 Fällen getestet. Mindestversion Home Assistant 2024.10.
 - Das Repository heißt jetzt `ha_semaphoreui` (der HACS-Katalog erlaubt „HACS“ nicht im Namen). Links in Manifest, README (Marketplace-Badge), SECURITY, CONTRIBUTING und Issue-Vorlagen angepasst; die Domain `semaphore_ui` und alle Entitäten bleiben unverändert. Alte Links werden von GitHub weitergeleitet.
 
 ## 0.20.0 – Einträge der Projekt-Karte aufklappen (Issue #14)

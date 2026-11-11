@@ -174,7 +174,7 @@ started it, including a schedule in Semaphore) and creates the following per tem
 
 | Entity | Content |
 |---|---|
-| **Needs action** (`binary_sensor`; German UI: „Handlungsbedarf“) | on = updates pending or reboot required; off = nothing to do; *unknown* = the last run reported nothing (e.g. it failed). Attributes: `updates`, `reboot_required`, `explanation`, `hosts` (per host: `updates`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
+| **Needs action** (`binary_sensor`; German UI: „Handlungsbedarf“) | on = updates pending or reboot required; off = nothing to do; *unknown* = the last run reported nothing (e.g. it failed). Attributes: `updates`, `installed`, `reboot_required`, `explanation`, `hosts` (per host: `updates`, `installed`, `reboot_required`, `needed`, `notes`, `disk_free_mib`, `disk_required_mib`, `disk_used_percent`), `packages`, `notes`, `checked`, `checked_local`, `dry_run`, `task_id`, `url` |
 | **Pending updates** (`sensor`; German UI: „Offene Updates“) | Number of pending updates (all hosts combined) |
 | **Templates needing action** (project sensor) | Count; attribute `templates` = names |
 
@@ -182,7 +182,7 @@ The two template entities exist only for templates that have reported `HA_RESULT
 report (event, action response, summary) also contains `ha_result`; the push text gets
 a line “Pending updates: 3 · Reboot required”.
 
-**Keys of the JSON object** (all optional): `updates` (number), `reboot_required` (true/false), `packages` (list of names,
+**Keys of the JSON object** (all optional): `updates` (number), `installed` (number of updates this run installed; leave it out in a dry run – the card then shows “5 installed”), `reboot_required` (true/false), `packages` (list of names,
 display only, max. 50; the card shows them in one line with “+n more”), `host` (otherwise the host from the Ansible output), `needed` (true/false – overrides the rule),
 `notes` (text or list of texts, see below; `note` is read as well).
 **Host disk** (optional, display only): `disk_free_mib` (free space on `/` in MiB), `disk_required_mib` (space the updates need, in MiB)
@@ -492,6 +492,24 @@ Bus events: `semaphore_ui_task_started` and `semaphore_ui_task_finished`
 (also for tasks that were started in the Semaphore interface or by a schedule – detected at the next poll,
 every 5 s while a task is running). When Home Assistant starts, old results are **not** reported again.
 
+### Ready-made blueprint (recommended)
+
+No YAML needed: the blueprint **“Semaphore UI – notification when a task ends”** creates the automation for you. Import it:
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2F19Andy89%2Fha_semaphoreui%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fha_semaphoreui%2Fsemaphore_task_result.yaml)
+
+(or *Settings → Automations & scenes → Blueprints → Import blueprint* with
+`https://github.com/19Andy89/ha_semaphoreui/blob/main/blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml`). Then *Create automation* and choose:
+
+* **Notify:** one or more `notify` entities (e.g. your phone).
+* **When:** *only on failures*, *on failures and when action is needed* (also successful runs whose `HA_RESULT` says `needed: true`) or *on every result*.
+* **Include dry runs** (default: yes), **only certain templates** (names as in Semaphore) and **extra actions** (the report is in `trigger.event.data`).
+
+Title and text come ready-made from the integration. A nightly dry run with open updates reports on “action needed”
+every night until they are installed; use the template filter or “only on failures” for that.
+
+### Build it yourself
+
 Via UI: *Automation → trigger “Event” → `semaphore_ui_task_finished`*, action “Send a notification” with
 `{{ trigger.event.data.title }}` / `{{ trigger.event.data.text }}`. As YAML:
 
@@ -683,13 +701,11 @@ To change the URL, token or SSL check later: *Settings → Devices & services �
   assumption from the API description and has not yet been verified against a real instance. If the template flag has no effect, the integration’s
   option “Allow starting again” helps. A run started in Semaphore blocks only after the next poll.
 * Planned items and ideas are listed as [issues](../../issues) in the repository.
-* Token renewal: tested against the API replica and a fresh Home Assistant, **not yet on a real instance with an
-  expiring token** (the fields `expires_at`/`name` exist since Semaphore 2.18.2; `POST /api/user/tokens` with the token itself
-  is derived from the source code). Please verify the first time with a short-lived token.
+* Token renewal (expiring token): confirmed on a real instance (Semaphore 2.19.17).
 * Notes (`notes`) and package lists are truncated (10 notes of 200 characters each, 200 packages per run and host); the card reports missing packages as “n more packages not listed”, the rest stays in Semaphore’s log.
 * Schedules: The integration only switches them on/off and displays them (creating and changing is done in Semaphore). The endpoint
   `…/schedules/<id>/active` was checked in the source code of Semaphore 2.19, tested against the replica and confirmed on a real instance
-  (2.19.17) for **switching off**; switching on calls the same endpoint with `true`. If the token lacks the
+  (2.19.17) for **switching on and off**. If the token lacks the
   permission, the message says so.
   “Next run” is a calculation from the cron text and the time zone; daylight-saving changes and `@every` are only partly predictable.
 * Survey: Multiple choice (*select*) and *secret* only via the action; sending the values follows what the
