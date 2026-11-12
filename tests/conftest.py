@@ -59,6 +59,11 @@ async def fake(socket_enabled, monkeypatch) -> AsyncGenerator[tuple[FakeSemaphor
     monkeypatch.setattr(coordinator, "GITHUB_LATEST_URL", f"{url}/github/latest")
     monkeypatch.setattr(coordinator, "DOCKER_TAG_URL", f"{url}/docker/tags/{{tag}}")
     monkeypatch.setattr(blueprint, "BLUEPRINT_RELEASE_URL", f"{url}/bp/release")
+    # independent of the manifest version (the dev workflow stamps "-dev.N" into it before the tests run)
+    async def _stable(_hass: Any) -> bool:
+        return False
+
+    monkeypatch.setattr(blueprint, "async_is_dev_version", _stable)
     monkeypatch.setattr(blueprint, "BLUEPRINT_RELEASES_URL", f"{url}/bp/releases")
     monkeypatch.setattr(blueprint, "BLUEPRINT_RAW_URL", f"{url}/bp/raw/{{tag}}/{{path}}")
     yield server, url
