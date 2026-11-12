@@ -503,6 +503,8 @@ No YAML needed: the blueprint **“Semaphore UI – notification when a task end
 
 * **Notify:** one or more `notify` entities (e.g. your phone).
 * **When:** *only on failures*, *on failures and when action is needed* (also successful runs whose `HA_RESULT` says `needed: true`) or *on every result*.
+* **Also notify on open updates** (default: off): reports every run after which updates are still open, independent of “When”. Combined with “Only on failures” you get no message just because of a required reboot.
+* **Show the count per host** (default: on): appends one line per host, e.g. `• pve: 28 Updates · Neustart nötig` or `• docker: aktuell · 5 installiert` (the lines are in German).
 * **Include dry runs** (default: yes), **only certain templates** (names as in Semaphore) and **extra actions** (the report is in `trigger.event.data`).
 
 **Keep the blueprint current:** The project device has the entity **Blueprint update** (shows the installed and the latest version, *Install* button) and the button **Download blueprint** (fetches the file from the latest release, even if it is current). The file goes to `/config/blueprints/automation/19Andy89/semaphore_task_result.yaml`, where the import dialog puts it too; existing automations keep using it and are reloaded. A different existing file is kept as `semaphore_task_result.yaml.bak`. The installed version is a comment in the first line; a file imported by hand counts as current if its content equals the release, otherwise as "unknown". It is checked every 6 hours (switch it off with "Check for new Semaphore version" in the options; the button still downloads on request).

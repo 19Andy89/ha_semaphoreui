@@ -502,6 +502,8 @@ Ohne YAML: Das Blueprint **„Semaphore UI – Benachrichtigung bei Taskende“*
 
 * **Benachrichtigen:** eine oder mehrere `notify`-Entitäten (z. B. dein Handy).
 * **Wann:** *nur bei Fehlern*, *bei Fehlern und bei Handlungsbedarf* (auch erfolgreiche Läufe mit `HA_RESULT` `needed: true`) oder *bei jedem Ergebnis*.
+* **Auch bei offenen Updates benachrichtigen** (Standard: aus): meldet jeden Lauf, nach dem noch Updates offen sind, unabhängig von „Wann“. Mit „Nur bei Fehlern“ kombiniert kommt also kein Hinweis nur wegen eines nötigen Neustarts.
+* **Anzahl je Host anzeigen** (Standard: an): hängt eine Zeile pro Host an, z. B. `• pve: 28 Updates · Neustart nötig` oder `• docker: aktuell · 5 installiert`.
 * **Testläufe einbeziehen** (Standard: ja), **nur bestimmte Templates** (Namen wie in Semaphore) und **zusätzliche Aktionen** (der Bericht steht in `trigger.event.data`).
 
 **Blueprint aktuell halten:** Am Gerät des Projekts gibt es die Entität **Blueprint-Update** (zeigt die installierte und die neueste Version, Knopf *Installieren*) und den Knopf **Blueprint herunterladen** (lädt die Datei aus dem neuesten Release, auch wenn sie schon aktuell ist). Die Datei landet in `/config/blueprints/automation/19Andy89/semaphore_task_result.yaml`, also dort, wo auch der Import-Dialog sie ablegt; bestehende Automationen nutzen sie weiter und werden neu geladen. Eine vorhandene, abweichende Datei bleibt als `semaphore_task_result.yaml.bak` erhalten. Die installierte Version steht als Kommentar in der ersten Zeile; eine von Hand importierte Datei gilt als aktuell, wenn ihr Inhalt dem Release entspricht, sonst als „unknown“. Geprüft wird alle 6 Stunden (abschaltbar mit „Auf neue Semaphore-Version prüfen“ in den Optionen; der Knopf lädt dann trotzdem auf Wunsch).
