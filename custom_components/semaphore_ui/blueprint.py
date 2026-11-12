@@ -9,6 +9,8 @@ entity + button of the project device) and puts it where the import dialog would
   A file imported by hand carries no stamp: it counts as the latest version if its content
   equals the one in the release, otherwise as "unknown".
 * An existing different file is saved as ``<name>.yaml.bak`` first.
+* Stable version installed: only the latest stable release counts. Dev pre-release installed
+  (``x.y.z-dev.N``): the newest release including pre-releases counts, so its blueprint is offered too.
 * Only fixed GitHub URLs are used; the Semaphore token is never sent there.
 """
 
@@ -27,13 +29,15 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.loader import async_get_integration
 
 from .api import REQUEST_TIMEOUT
 from .const import (
     BLUEPRINT_FILE,
     BLUEPRINT_RAW_URL,
     BLUEPRINT_RELEASE_URL,
+    BLUEPRINT_RELEASES_URL,
     BLUEPRINT_SCAN_INTERVAL,
     BLUEPRINT_SOURCE,
     BLUEPRINT_SUBDIR,
@@ -125,18 +129,30 @@ def write_blueprint(path: Path, content: str) -> bool:
     return backup
 
 
+async def async_is_dev_version(hass: HomeAssistant) -> bool:
+    """``True`` if a dev pre-release of the integration (``x.y.z-dev.N``) is installed."""
+    integration = await async_get_integration(hass, DOMAIN)
+    return "-dev" in str(integration.version)
+
+
 async def async_fetch_latest(
-    session: aiohttp.ClientSession, *, with_text: bool
+    session: aiohttp.ClientSession, *, with_text: bool, include_dev: bool = False
 ) -> tuple[str, str | None, str | None] | None:
-    """``(tag, release_url, text)`` of the latest release (``None``: not reachable / nothing found)."""
+    """``(tag, release_url, text)`` of the latest release (``None``: not reachable / nothing found).
+
+    ``include_dev``: the newest release counts even if it is a pre-release (for people on a dev version).
+    """
     try:
         async with asyncio.timeout(REQUEST_TIMEOUT * 2):
             async with session.get(
-                BLUEPRINT_RELEASE_URL, headers={"Accept": "application/vnd.github+json"}
+                BLUEPRINT_RELEASES_URL if include_dev else BLUEPRINT_RELEASE_URL,
+                headers={"Accept": "application/vnd.github+json"},
             ) as resp:
                 if resp.status != 200:
                     return None
                 release = await resp.json(content_type=None)
+            if include_dev:  # the list: newest first
+                release = release[0] if isinstance(release, list) and release else None
             tag = str(release.get("tag_name") or "") if isinstance(release, dict) else ""
             if not re.fullmatch(r"v?[0-9A-Za-z.\-+]+", tag):
                 return None
@@ -176,7 +192,9 @@ class SemaphoreBlueprintCoordinator(DataUpdateCoordinator[BlueprintData]):
         latest = None
         if self.check_updates:
             latest = await async_fetch_latest(
-                async_get_clientsession(self.hass), with_text=True
+                async_get_clientsession(self.hass),
+                with_text=True,
+                include_dev=await async_is_dev_version(self.hass),
             )
         path = blueprint_path(self.hass)
         tag, url, text = latest if latest else (None, None, None)
@@ -185,7 +203,11 @@ class SemaphoreBlueprintCoordinator(DataUpdateCoordinator[BlueprintData]):
 
     async def async_install(self) -> str:
         """Download the latest release and write it. Returns the version. Raises :class:`BlueprintError`."""
-        fetched = await async_fetch_latest(async_get_clientsession(self.hass), with_text=True)
+        fetched = await async_fetch_latest(
+            async_get_clientsession(self.hass),
+            with_text=True,
+            include_dev=await async_is_dev_version(self.hass),
+        )
         if fetched is None or fetched[2] is None:
             raise BlueprintError("The blueprint could not be downloaded from GitHub")
         tag, _url, text = fetched

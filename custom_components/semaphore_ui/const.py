@@ -109,6 +109,7 @@ VERSION_SCAN_INTERVAL: Final = 6 * 60 * 60
 
 # Notification blueprint: downloaded from the GitHub release of this integration on request
 BLUEPRINT_RELEASE_URL: Final = "https://api.github.com/repos/19Andy89/ha_semaphoreui/releases/latest"
+BLUEPRINT_RELEASES_URL: Final = "https://api.github.com/repos/19Andy89/ha_semaphoreui/releases?per_page=1"  # newest, pre-releases included
 BLUEPRINT_RAW_URL: Final = "https://raw.githubusercontent.com/19Andy89/ha_semaphoreui/{tag}/{path}"
 BLUEPRINT_SOURCE: Final = "blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml"
 BLUEPRINT_SUBDIR: Final = "19Andy89"  # the folder Home Assistant's import dialog uses (author of the repository)

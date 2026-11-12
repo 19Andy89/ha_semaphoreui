@@ -169,3 +169,41 @@ async def test_with_the_check_off_nothing_is_requested_until_the_button(
         "button", SERVICE_PRESS, {ATTR_ENTITY_ID: entity(hass, "button", entry, "blueprint_download")}, blocking=True
     )
     assert (tmp_path / TARGET).exists()
+
+
+async def test_a_stable_version_ignores_dev_blueprints(hass: HomeAssistant, fake, make_entry, tmp_path: Path) -> None:
+    server, _ = fake
+    entry = await start(hass, tmp_path, make_entry)  # the installed test version is a stable one
+    state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
+    assert state.attributes["latest_version"] == "v9.0.0"
+    assert not any(path == "/bp/releases" for _k, path, _a in github_requests(server))
+
+
+async def test_a_dev_version_also_offers_the_dev_blueprint(
+    hass: HomeAssistant, fake, make_entry, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    server, _ = fake
+
+    async def dev(_hass: HomeAssistant) -> bool:
+        return True
+
+    monkeypatch.setattr(blueprint, "async_is_dev_version", dev)
+    entry = await start(hass, tmp_path, make_entry)
+    state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
+    assert state.state == STATE_ON and state.attributes["latest_version"] == "v9.1.0-dev.3"
+    assert state.attributes["release_url"] == "https://example.test/ha_dev_release"
+    await hass.services.async_call(
+        "button", SERVICE_PRESS, {ATTR_ENTITY_ID: entity(hass, "button", entry, "blueprint_download")}, blocking=True
+    )
+    assert (tmp_path / TARGET).read_text(encoding="utf-8").startswith("# ha_semaphoreui blueprint v9.1.0-dev.3\n")
+    state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
+    assert state.state == STATE_OFF and state.attributes["installed_version"] == "v9.1.0-dev.3"
+
+
+async def test_the_dev_check_recognises_dev_versions(hass: HomeAssistant) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    for version, expected in (("0.22.0-dev.2", True), ("0.22.0", False)):
+        with patch.object(blueprint, "async_get_integration", AsyncMock(return_value=SimpleNamespace(version=version))):
+            assert await blueprint.async_is_dev_version(hass) is expected

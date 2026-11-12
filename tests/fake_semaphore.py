@@ -68,6 +68,10 @@ class FakeSemaphore:
         self.latest_release = {"tag_name": "v2.17.0", "html_url": "https://example.test/release"}
         # release of the integration itself (blueprint download); the file is the one of this repository
         self.blueprint_release: dict[str, Any] | None = {"tag_name": "v9.0.0", "html_url": "https://example.test/ha_release"}
+        self.blueprint_dev_release: dict[str, Any] | None = {
+            "tag_name": "v9.1.0-dev.3",
+            "html_url": "https://example.test/ha_dev_release",
+        }
         self.blueprint_text: str | None = (
             Path(__file__).parents[1] / "blueprints/automation/ha_semaphoreui/semaphore_task_result.yaml"
         ).read_text(encoding="utf-8")
@@ -316,6 +320,11 @@ class FakeSemaphore:
             # must never receive the Semaphore token
             self.requests.append(("GITHUB", request.path, request.headers.get("Authorization")))
             return web.json_response(self.latest_release)
+
+        @routes.get("/bp/releases")
+        async def bp_releases(request: web.Request) -> web.Response:
+            self.requests.append(("BLUEPRINT", request.path, request.headers.get("Authorization")))
+            return web.json_response([self.blueprint_dev_release] if self.blueprint_dev_release else [])
 
         @routes.get("/bp/release")
         async def bp_release(request: web.Request) -> web.Response:
