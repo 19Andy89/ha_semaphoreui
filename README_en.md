@@ -506,6 +506,7 @@ No YAML needed: the blueprint **“Semaphore UI – notification when a task end
 * **Notify:** one or more `notify` entities (e.g. your phone).
 * **When:** *only on failures*, *on failures and when action is needed* (also successful runs whose `HA_RESULT` says `needed: true`) or *on every result*.
 * **Also notify on open updates** (default: off): reports every run after which updates are still open, independent of “When”. Combined with “Only on failures” you get no message just because of a required reboot.
+* **Also notify on installed updates** (default: on): reports every real run that installed updates (`installed` above 0), even if nothing is open afterwards. Dry runs do not trigger it.
 * **Also report runs without HA_RESULT** (default: on): runs of playbooks without `HA_RESULT` (e.g. build/deploy) send a short message (result, duration, one line per host) instead of nothing.
 * **Include dry runs** (default: yes), **only certain templates** (names as in Semaphore) and **extra actions** (the report is in `trigger.event.data`).
 

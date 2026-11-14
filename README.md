@@ -505,6 +505,7 @@ Ohne YAML: Das Blueprint **„Semaphore UI – Benachrichtigung bei Taskende“*
 * **Benachrichtigen:** eine oder mehrere `notify`-Entitäten (z. B. dein Handy).
 * **Wann:** *nur bei Fehlern*, *bei Fehlern und bei Handlungsbedarf* (auch erfolgreiche Läufe mit `HA_RESULT` `needed: true`) oder *bei jedem Ergebnis*.
 * **Auch bei offenen Updates benachrichtigen** (Standard: aus): meldet jeden Lauf, nach dem noch Updates offen sind, unabhängig von „Wann“. Mit „Nur bei Fehlern“ kombiniert kommt also kein Hinweis nur wegen eines nötigen Neustarts.
+* **Auch bei installierten Updates benachrichtigen** (Standard: an): meldet jeden echten Lauf, der Updates installiert hat (`installed` größer 0), auch wenn danach nichts mehr offen ist. Testläufe lösen das nicht aus.
 * **Auch Läufe ohne HA_RESULT melden** (Standard: an): Läufe von Playbooks ohne `HA_RESULT` (z. B. Build/Deploy) melden sich mit einer kurzen Nachricht (Ergebnis, Dauer, eine Zeile pro Host) statt gar nicht.
 * **Testläufe einbeziehen** (Standard: ja), **nur bestimmte Templates** (Namen wie in Semaphore) und **zusätzliche Aktionen** (der Bericht steht in `trigger.event.data`).
 

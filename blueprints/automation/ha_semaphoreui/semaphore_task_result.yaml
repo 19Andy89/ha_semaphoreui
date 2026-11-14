@@ -42,6 +42,15 @@ blueprint:
       default: false
       selector:
         boolean: {}
+    notify_installed:
+      name: Auch bei installierten Updates benachrichtigen
+      description: >-
+        Meldet jeden echten Lauf, der Updates installiert hat (`installed` größer 0 im `HA_RESULT`) – unabhängig
+        von „Wann benachrichtigen?“, auch wenn danach nichts mehr offen ist. Testläufe installieren nichts und
+        lösen das nicht aus.
+      default: true
+      selector:
+        boolean: {}
     notify_without_result:
       name: Auch Läufe ohne HA_RESULT melden
       description: >-
@@ -79,6 +88,7 @@ max: 10
 variables:
   when: !input when
   notify_updates: !input notify_updates
+  notify_installed: !input notify_installed
   notify_without_result: !input notify_without_result
   include_dry_runs: !input include_dry_runs
   only_templates: !input only_templates
@@ -94,9 +104,10 @@ conditions:
       {% set failed = d.result == 'failed' %}
       {% set action = (d.ha_result is mapping) and (d.ha_result.get('needed', false) | bool(false)) %}
       {% set pending = (d.ha_result is mapping) and ((d.ha_result.get('updates', 0) | int(0)) > 0) %}
+      {% set installed = (d.ha_result is mapping) and ((d.ha_result.get('installed', 0) | int(0)) > 0) %}
       {% set no_report = d.ha_result is not mapping %}
       {% set by_result = (d.result != 'stopped' or when == 'all') and
-         (when == 'all' or failed or (when == 'problems' and action) or (notify_updates and pending)
+         (when == 'all' or failed or (when == 'problems' and action) or (notify_updates and pending) or (notify_installed and installed)
           or (notify_without_result and no_report)) %}
       {% set by_dry_run = include_dry_runs or not d.dry_run %}
       {% set by_template = (only_templates | length == 0) or (d.template in only_templates) %}
