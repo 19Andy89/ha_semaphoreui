@@ -271,6 +271,8 @@ Ein vollständiges, getestetes Playbook (Speicherplatz-Prüfung, Update, Neustar
 Hinweis) liegt unter [`playbooks/update-linux.yml`](playbooks/update-linux.yml); für **Proxmox-Hosts** (dist-upgrade, Neustartbedarf auch bei neuerem Kernel) gibt es [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); die Ausgabe im Format `yaml` und `json` ist
 als Testfall hinterlegt.
 
+**Läuft Semaphore selbst in Docker auf dem aktualisierten Host?** Ein Update von `docker-ce`/`containerd.io` startet den Docker-Dienst neu und beendet damit Semaphore samt laufendem Task (kein `HA_RESULT`, Lauf hängt oder schlägt fehl). `update-linux.yml` stellt solche Pakete deshalb zurück: Sie werden während des Laufs mit `apt hold` festgehalten, der Lauf endet normal und meldet sein Ergebnis, danach installiert ein von systemd gestarteter Job sie (nach 45 s; `deferred_upgrade_delay_seconds`). In der Meldung stehen sie als installiert und als Hinweis („Werden nach dem Lauf im Hintergrund installiert: docker-ce, …“). Die Liste steht in `deferred_upgrade_packages` (Standard: Docker-Pakete; leere Liste = alles im Lauf installieren). Im Testlauf wird nichts zurückgestellt, die Pakete zählen dort als offene Updates.
+
 **Auch bei Fehlern melden:** Bricht eine Vorprüfung ab (zu wenig Platz, apt-Fehler), entstünde ohne Meldung nie ein Handlungsbedarf-Sensor
 für den Host. Das mitgelieferte Playbook fasst die Vorprüfungen deshalb in einen `block`; im `rescue` gibt es
 `HA_RESULT {"needed": true, "notes": ["Update nicht gestartet: …"], "disk_free_mib": …}` aus und lässt den Lauf danach mit `fail` scheitern.

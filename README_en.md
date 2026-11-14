@@ -272,6 +272,8 @@ A complete, tested playbook (disk space check, update, reboot check, Debian chec
 note) is available at [`playbooks/update-linux.yml`](playbooks/update-linux.yml); for **Proxmox hosts** (dist-upgrade, restart needed also when a newer kernel is installed) there is [`playbooks/update-proxmox.yml`](playbooks/update-proxmox.yml); the output in `yaml` and `json` format is
 stored as a test case.
 
+**Does Semaphore itself run in Docker on the updated host?** An update of `docker-ce`/`containerd.io` restarts the Docker service and kills Semaphore together with the running task (no `HA_RESULT`, the run hangs or fails). `update-linux.yml` therefore defers such packages: they are held with `apt hold` during the run, the run ends normally and reports its result, then a job started by systemd installs them (after 45 s; `deferred_upgrade_delay_seconds`). The report counts them as installed and adds a note (in German: "Werden nach dem Lauf im Hintergrund installiert: docker-ce, …"). The list is `deferred_upgrade_packages` (default: Docker packages; an empty list installs everything during the run). A dry run defers nothing; the packages count as open updates there.
+
 **Report on failures, too:** If a pre-check aborts (not enough space, apt error), no action-needed sensor would ever be created
 for the host without a report. The bundled playbook therefore wraps the pre-checks in a `block`; in the `rescue` it outputs
 `HA_RESULT {"needed": true, "notes": ["Update nicht gestartet: …"], "disk_free_mib": …}` and then lets the run fail with `fail`.

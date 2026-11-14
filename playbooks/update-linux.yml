@@ -9,9 +9,25 @@
   #   min_free_space_kib     – absolute Mindestreserve auf / in KiB (Default: 512 MiB)
   #   update_space_buffer_kib – Puffer über dem errechneten Update-Bedarf in KiB (Default: 256 MiB)
   # Bei Root-Partitionen >= 15 GiB wird automatisch eine Mindestreserve von 2 GiB verwendet.
+  #
+  #   deferred_upgrade_packages – Pakete, die erst NACH dem Lauf installiert werden (Default: Docker).
+  #     Hintergrund: Läuft Semaphore selbst in Docker auf diesem Host, startet ein Update von docker-ce/containerd
+  #     den Docker-Dienst neu und beendet damit Semaphore samt laufendem Task. Solche Pakete werden deshalb
+  #     während des Laufs festgehalten (apt hold), der Lauf endet normal und meldet sein HA_RESULT; danach
+  #     installiert ein vom Lauf losgelöster systemd-Job sie (nach deferred_upgrade_delay_seconds).
+  #     Leere Liste = alles im Lauf installieren (altes Verhalten).
+  #   deferred_upgrade_delay_seconds – Wartezeit, bis Semaphore den Task sicher abgeschlossen hat (Default: 45)
   vars:
     min_free_space_kib: 524288
     update_space_buffer_kib: 262144
+    deferred_upgrade_packages:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+      - docker-buildx-plugin
+      - docker.io
+    deferred_upgrade_delay_seconds: 45
 
   tasks:
     - name: Erreichbarkeit prüfen
@@ -177,14 +193,47 @@
             msg: "{{ ansible_failed_result.msg | default('Vorprüfung fehlgeschlagen') }}"
 
 
-    - name: Installierte Pakete aktualisieren
-      ansible.builtin.apt:
-        auto_install_module_deps: true
-        upgrade: safe
-        lock_timeout: 300
-        update_cache_retries: 3
-        update_cache_retry_max_delay: 12
-      register: apt_upgrade
+    - name: Zurückzustellende Pakete bestimmen (nur solche mit anstehendem Update)
+      ansible.builtin.set_fact:
+        deferred_now: >-
+          {{ upgrade_simulation.stdout_lines
+             | select('match', '^Inst ')
+             | map('regex_replace', '^Inst (\S+).*$', '\1')
+             | select('in', deferred_upgrade_packages)
+             | list }}
+
+    - name: Zurückgestellte Pakete anzeigen
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Werden nach dem Lauf im Hintergrund installiert' if not ansible_check_mode
+             else 'Würden nach dem Lauf im Hintergrund installiert' }}: {{ deferred_now | join(', ') }}
+      when: deferred_now | length > 0
+
+    - name: Pakete aktualisieren (zurückgestellte Pakete bleiben festgehalten)
+      block:
+        - name: Zurückgestellte Pakete festhalten
+          ansible.builtin.dpkg_selections:
+            name: "{{ item }}"
+            selection: hold
+          loop: "{{ deferred_now }}"
+          when: not ansible_check_mode
+
+        - name: Installierte Pakete aktualisieren
+          ansible.builtin.apt:
+            auto_install_module_deps: true
+            upgrade: safe
+            lock_timeout: 300
+            update_cache_retries: 3
+            update_cache_retry_max_delay: 12
+          register: apt_upgrade
+      always:
+        # Auch bei einem Fehler: das Festhalten darf nie bestehen bleiben
+        - name: Festhalten wieder aufheben
+          ansible.builtin.dpkg_selections:
+            name: "{{ item }}"
+            selection: install
+          loop: "{{ deferred_now }}"
+          when: not ansible_check_mode
 
     - name: Neustartbedarf prüfen
       ansible.builtin.stat:
@@ -283,21 +332,59 @@
         - debian_stable_major is defined
         - (ansible_facts.distribution_major_version | int) < (debian_stable_major | int)
 
+    - name: Zurückgestellte Pakete, die nach dem Lauf installiert werden (im Testlauf keine)
+      ansible.builtin.set_fact:
+        deferred_to_install: "{{ [] if ansible_check_mode else deferred_now }}"
+
     - name: Anzahl installierter Updates ermitteln
       ansible.builtin.set_fact:
         installed_updates: >-
-          {{ ((apt_upgrade.stdout | default('')) | regex_search('(\d+) upgraded, (\d+) newly installed', '\1', '\2') | default([0, 0], true) | map('int') | sum) }}
-      when: not ansible_check_mode   # im Testlauf wird nichts installiert
+          {{ ((apt_upgrade.stdout | default('')) | regex_search('(\d+) upgraded, (\d+) newly installed', '\1', '\2') | default([0, 0], true) | map('int') | sum)
+             + (deferred_now | length) }}
+      when: not ansible_check_mode   # im Testlauf wird nichts installiert; zurückgestellte Pakete zählen als installiert
 
     - name: Ergebnis für Home Assistant melden
       ansible.builtin.debug:
         msg: >-
           HA_RESULT {{ {
-            'updates': (upgrade_final.stdout_lines | select('match', '^Inst ') | list | length),
+            'updates': (upgrade_final.stdout_lines | select('match', '^Inst ') | map('regex_replace', '^Inst (\S+).*$', '\1') | reject('in', deferred_to_install) | list | length),
             'reboot_required': reboot_required.stat.exists,
-            'packages': (upgrade_final.stdout_lines | select('match', '^Inst ') | map('regex_replace', '^Inst (\S+).*$', '\1') | list),
+            'packages': (upgrade_final.stdout_lines | select('match', '^Inst ') | map('regex_replace', '^Inst (\S+).*$', '\1') | reject('in', deferred_to_install) | list),
             'disk_free_mib': ((root_available_kib.stdout_lines[-1] | int) / 1024) | round(1),
             'disk_required_mib': ((required_space_kib.stdout | default('0') | trim | int) / 1024) | round(1),
             'disk_used_percent': ((1 - ((root_available_kib.stdout_lines[-1] | int) / (root_total_kib.stdout_lines[-1] | int))) * 100) | round(1),
             'notes': ([debian_hinweis] if debian_hinweis is defined else [])
+                     + ([(('Wird' if deferred_to_install | length == 1 else 'Werden') if not ansible_check_mode else 'Würde' if deferred_now | length == 1 else 'Würden')
+                         ~ ' nach dem Lauf im Hintergrund installiert: ' ~ (deferred_now | join(', '))] if deferred_now | length > 0 else [])
           } | combine({'installed': installed_updates | int} if installed_updates is defined else {}) | to_json }}
+
+# Zweites Play: läuft erst, wenn ALLE Hosts des ersten Plays fertig sind (inkl. HA_RESULT).
+# Der Job wird von systemd gestartet und hängt nicht an der SSH-Sitzung: Er überlebt das Ende von
+# Semaphore, falls der Docker-Neustart Semaphore selbst beendet.
+- name: Zurückgestellte Pakete im Hintergrund installieren
+  hosts: linux_guests
+  become: true
+  gather_facts: false
+
+  # Play-Variablen gelten nicht über Plays hinweg: hier noch einmal (Extra-Vars/host_vars überschreiben beide)
+  vars:
+    deferred_upgrade_delay_seconds: 45
+
+  tasks:
+    - name: Hintergrund-Update starten
+      ansible.builtin.command:
+        argv:
+          - systemd-run
+          - --no-block
+          - --collect
+          - --unit=semaphore-deferred-upgrade
+          - --description=Zurückgestellte Paket-Updates (Semaphore)
+          - /bin/sh
+          - -c
+          - >-
+            sleep {{ deferred_upgrade_delay_seconds | int }};
+            DEBIAN_FRONTEND=noninteractive exec apt-get install -y --only-upgrade
+            -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold
+            {{ deferred_to_install | join(' ') }}
+      when: deferred_to_install | default([]) | length > 0
+      changed_when: true
