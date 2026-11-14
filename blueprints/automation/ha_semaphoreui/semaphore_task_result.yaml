@@ -42,11 +42,12 @@ blueprint:
       default: false
       selector:
         boolean: {}
-    show_hosts:
-      name: Anzahl je Host anzeigen
+    notify_without_result:
+      name: Auch Läufe ohne HA_RESULT melden
       description: >-
-        Hängt der Nachricht eine Zeile pro Host an, z. B. „pve: 28 Updates · Neustart nötig“ oder
-        „docker: aktuell · 5 installiert“. Nur bei Playbooks, die `HA_RESULT` je Host melden.
+        Meldet auch Läufe, bei denen das Playbook kein `HA_RESULT` liefert (z. B. Build- oder Deploy-Playbooks),
+        mit einer kurzen Nachricht: Ergebnis, Dauer und eine Zeile pro Host aus der Ansible-Zusammenfassung.
+        Aus = solche Läufe melden sich nur bei einem Fehler (oder bei „Bei jedem Ergebnis“).
       default: true
       selector:
         boolean: {}
@@ -78,7 +79,7 @@ max: 10
 variables:
   when: !input when
   notify_updates: !input notify_updates
-  show_hosts: !input show_hosts
+  notify_without_result: !input notify_without_result
   include_dry_runs: !input include_dry_runs
   only_templates: !input only_templates
 
@@ -93,8 +94,10 @@ conditions:
       {% set failed = d.result == 'failed' %}
       {% set action = (d.ha_result is mapping) and (d.ha_result.get('needed', false) | bool(false)) %}
       {% set pending = (d.ha_result is mapping) and ((d.ha_result.get('updates', 0) | int(0)) > 0) %}
+      {% set no_report = d.ha_result is not mapping %}
       {% set by_result = (d.result != 'stopped' or when == 'all') and
-         (when == 'all' or failed or (when == 'problems' and action) or (notify_updates and pending)) %}
+         (when == 'all' or failed or (when == 'problems' and action) or (notify_updates and pending)
+          or (notify_without_result and no_report)) %}
       {% set by_dry_run = include_dry_runs or not d.dry_run %}
       {% set by_template = (only_templates | length == 0) or (d.template in only_templates) %}
       {{ by_result and by_dry_run and by_template }}
@@ -105,18 +108,6 @@ actions:
       entity_id: !input notify_entities
     data:
       title: "{{ trigger.event.data.title }}"
-      message: >-
-        {% set d = trigger.event.data %}{{ d.text }}
-        {%- set hosts = d.ha_result.get('hosts') if d.ha_result is mapping else none %}
-        {%- if show_hosts and hosts is mapping and hosts | length > 0 %}
-        {%- for name, h in hosts.items() | sort %}
-        {%- set u = h.get('updates') %}
-        {%- set bits = [] %}
-        {%- if u is number %}{% set bits = bits + [('aktuell' if u == 0 else (u | int ~ (' Update' if u == 1 else ' Updates')))] %}{% endif %}
-        {%- if (h.get('installed') or 0) > 0 %}{% set bits = bits + [h.installed | int ~ ' installiert'] %}{% endif %}
-        {%- if h.get('reboot_required') %}{% set bits = bits + ['Neustart nötig'] %}{% endif %}
-        {{- '\n' }}• {{ name }}: {{ bits | join(' · ') if bits else 'keine Angaben' }}
-        {%- endfor %}
-        {%- endif %}
+      message: "{{ trigger.event.data.text }}"
   - choose: []
     default: !input extra_actions

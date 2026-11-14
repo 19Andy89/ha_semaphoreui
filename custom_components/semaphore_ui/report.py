@@ -89,6 +89,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "dt_long": "%d.%m.%Y %H:%M:%S",
         "dt_short": "%d.%m. %H:%M",
         "changed": "geändert",
+        "host_pending": "{n} offene Updates",
+        "host_pending_1": "1 offenes Update",
+        "host_changes_open": "{n} Änderungen offen",
+        "host_changed": "{n} geändert",
+        "host_failed": "{n} fehlgeschlagen",
+        "host_unreachable": "{n} nicht erreichbar",
+        "host_current": "aktuell",
+        "host_ok": "ok",
+        "host_action": "Handlungsbedarf",
         "pending_updates": "Offene Updates",
         "installed_n": "{n} installiert",
         "reboot_required": "Neustart nötig",
@@ -121,6 +130,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "dt_long": "%Y-%m-%d %H:%M:%S",
         "dt_short": "%m-%d %H:%M",
         "changed": "changed",
+        "host_pending": "{n} pending updates",
+        "host_pending_1": "1 pending update",
+        "host_changes_open": "{n} changes pending",
+        "host_changed": "{n} changed",
+        "host_failed": "{n} failed",
+        "host_unreachable": "{n} unreachable",
+        "host_current": "up to date",
+        "host_ok": "ok",
+        "host_action": "Action needed",
         "pending_updates": "Pending updates",
         "installed_n": "{n} installed",
         "reboot_required": "Reboot required",
@@ -700,6 +718,49 @@ def ha_result_text(ha_result: dict[str, Any], lang: str | None = "de") -> str:
     return " · ".join(parts)
 
 
+def host_lines(
+    recap: list[dict[str, Any]],
+    ha_result: dict[str, Any] | None,
+    *,
+    dry_run: bool,
+    lang: str | None = "de",
+) -> list[str]:
+    """One line per host, without zero values: ``• pve: 28 offene Updates · Neustart nötig``.
+
+    With ``HA_RESULT`` the numbers are exact (open / installed updates, reboot). Without it only the
+    Ansible recap is known: ``changed`` of a dry run is what would change, of a real run what changed.
+    """
+    t = _texts(lang)
+    reported = (ha_result or {}).get("hosts") or {}
+    names = [r["host"] for r in recap]
+    names += sorted(h for h in reported if h not in names)
+    by_recap = {r["host"]: r for r in recap}
+    lines: list[str] = []
+    for name in names:
+        rec = by_recap.get(name)
+        info = reported.get(name)
+        bits: list[str] = []
+        if info:
+            updates = info.get("updates")
+            if isinstance(updates, (int, float)) and not isinstance(updates, bool) and updates > 0:
+                bits.append(t["host_pending_1"] if updates == 1 else t["host_pending"].format(n=int(updates)))
+            installed = info.get("installed")
+            if isinstance(installed, (int, float)) and not isinstance(installed, bool) and installed > 0:
+                bits.append(t["installed_n"].format(n=int(installed)))
+            if info.get("reboot_required"):
+                bits.append(t["reboot_required"])
+        elif rec and rec["changed"] > 0:
+            bits.append(t["host_changes_open" if dry_run else "host_changed"].format(n=rec["changed"]))
+        if rec and rec["failed"] > 0:
+            bits.append(t["host_failed"].format(n=rec["failed"]))
+        if rec and rec["unreachable"] > 0:
+            bits.append(t["host_unreachable"].format(n=rec["unreachable"]))
+        if not bits:
+            bits.append(t["host_action"] if info and info.get("needed") else t["host_current" if info else "host_ok"])
+        lines.append(f"• {name}: {' · '.join(bits)}")
+    return lines
+
+
 # --------------------------------------------------------------------------- #
 # Report
 # --------------------------------------------------------------------------- #
@@ -776,16 +837,12 @@ def build_report(
     if duration_text:
         lines.append(f"{t['duration']}: {duration_text}")
     if finished:
-        result_line = f"{t['result']}: {t[result]}"
-        if recap:
-            result_line += " – " + "; ".join(
-                f"{r['host']}: ok={r['ok']} {t['changed']}={r['changed']} failed={r['failed']}"
-                + (f" unreachable={r['unreachable']}" if r["unreachable"] else "")
-                for r in recap
-            )
-        lines.append(result_line)
+        lines.append(f"{t['result']}: {t[result]}")
+        lines.extend(host_lines(recap, ha_result, dry_run=dry_run, lang=lang))
     if ha_result:
-        lines.append(ha_result_text(ha_result, lang))
+        # one host: its line already says it all; several hosts (or none named): add the total
+        if len((ha_result.get("hosts") or {})) != 1:
+            lines.append(ha_result_text(ha_result, lang))
         for item in (ha_result.get("notes") or [])[:3]:
             lines.append(f"{t['hint']} ({item['host']}): {item['text']}")
     if error:

@@ -9,6 +9,7 @@ from custom_components.semaphore_ui.report import (
     analyze_output,
     build_report,
     format_duration,
+    host_lines,
 )
 
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -102,7 +103,8 @@ def test_report_success_de() -> None:
     assert rep["url"] == "https://semaphore.example/project/1/templates/1?t=7"
     assert "Gestartet: 24.10.2026 14:03:01 (von Andreas)" in rep["text"]
     assert "Dauer: 1 Min 12 s" in rep["text"]
-    assert "dockerhost: ok=2 geändert=1 failed=0" in rep["text"]
+    assert "Ergebnis: erfolgreich\n• dockerhost: 1 geändert" in rep["text"]  # without HA_RESULT: the recap, no zero values
+    assert "failed=0" not in rep["text"] and "ok=" not in rep["text"]
     assert rep["error"] is None
     assert rep["short"].startswith("✅ erfolgreich · 1 Min 12 s · 24.10. 14:03")
     assert len(rep["short"]) <= 255
@@ -159,3 +161,59 @@ def test_format_duration_and_url() -> None:
     assert normalize_base_url("semaphore.local:3000/") == "http://semaphore.local:3000"
     assert normalize_base_url("https://a.b/api/") == "https://a.b"
     assert normalize_base_url(" https://a.b/prefix/api ") == "https://a.b/prefix"
+
+
+def _recap(host: str, *, ok: int = 1, changed: int = 0, failed: int = 0, unreachable: int = 0) -> dict:
+    return {"host": host, "ok": ok, "changed": changed, "failed": failed, "unreachable": unreachable}
+
+
+def test_host_lines_are_one_line_per_host_without_zero_values() -> None:
+    recap = [_recap("pve", changed=4), _recap("docker", changed=1), _recap("pi", ok=3)]
+    ha = {
+        "needed": True,
+        "updates": 29,
+        "reboot_required": True,
+        "hosts": {
+            "pve": {"updates": 28, "installed": 0, "reboot_required": True, "needed": True},
+            "docker": {"updates": 1, "reboot_required": False, "needed": True},
+            "pi": {"updates": 0, "reboot_required": False, "needed": False},
+        },
+    }
+    # dry run: "changed" is not shown, the open updates are
+    assert host_lines(recap, ha, dry_run=True, lang="de") == [
+        "• pve: 28 offene Updates · Neustart nötig",
+        "• docker: 1 offenes Update",
+        "• pi: aktuell",
+    ]
+    # real run: what was installed
+    ha_after = {
+        "hosts": {
+            "pve": {"updates": 0, "installed": 28, "reboot_required": True},
+            "docker": {"updates": 0, "installed": 1},
+            "pi": {"updates": 0, "installed": 0},
+        }
+    }
+    assert host_lines(recap, ha_after, dry_run=False, lang="de") == [
+        "• pve: 28 installiert · Neustart nötig",
+        "• docker: 1 installiert",
+        "• pi: aktuell",
+    ]
+    assert host_lines(recap[:1], {"hosts": {"pve": {"updates": 2}}}, dry_run=True, lang="en") == [
+        "• pve: 2 pending updates"
+    ]
+
+
+def test_host_lines_without_ha_result_use_the_recap_only() -> None:
+    recap = [_recap("a", changed=3), _recap("b"), _recap("c", failed=1, unreachable=0), _recap("d", ok=0, unreachable=1)]
+    assert host_lines(recap, None, dry_run=False, lang="de") == [
+        "• a: 3 geändert",
+        "• b: ok",
+        "• c: 1 fehlgeschlagen",
+        "• d: 1 nicht erreichbar",
+    ]
+    assert host_lines(recap[:1], None, dry_run=True, lang="de") == ["• a: 3 Änderungen offen"]
+
+
+def test_host_only_known_from_ha_result_is_listed_and_action_is_named() -> None:
+    ha = {"hosts": {"zeta": {"updates": 0, "needed": True}, "alpha": {"updates": 5}}}
+    assert host_lines([], ha, dry_run=True, lang="de") == ["• alpha: 5 offene Updates", "• zeta: Handlungsbedarf"]

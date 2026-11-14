@@ -2,9 +2,11 @@
 
 Die Versionsnummern entsprechen den GitHub-Releases (Tags `vX.Y.Z`); die Einträge sind nach Release gruppiert, neueste zuerst. Offenes steht in [BACKLOG.md](BACKLOG.md).
 
-## Nächste Version – Blueprint: offene Updates und Anzahl je Host
+## Nächste Version – Hostzeilen im Bericht, Blueprint: offene Updates, Läufe ohne HA_RESULT, Blueprint-Download
 - **Blueprint: Schalter „Auch bei offenen Updates benachrichtigen“** (Standard aus): meldet jeden Lauf mit `updates` größer 0, unabhängig von „Wann benachrichtigen?“ – z. B. zusammen mit „Nur bei Fehlern“, damit ein reiner Neustartbedarf nicht meldet.
-- **Blueprint: „Anzahl je Host anzeigen“** (Standard an): Die Nachricht bekommt eine Zeile pro Host, z. B. „• pve: 28 Updates · Neustart nötig“ oder „• docker: aktuell · 5 installiert“. Bedingung und Nachricht sind mit 26 Fällen getestet.
+- **Berichtstext: eine Zeile pro Host, ohne Nullwerte**: Statt `Ergebnis: erfolgreich – pve: ok=12 geändert=3 failed=0; …` steht jeder Host in einer eigenen Zeile, z. B. `• pve: 28 offene Updates · Neustart nötig` (Testlauf), `• pve: 28 installiert · Neustart nötig` (echter Lauf) oder `• docker: aktuell`. Werte mit 0 erscheinen nicht. Ohne `HA_RESULT` bleibt der Ansible-Recap (`• a: 3 geändert`, im Testlauf `3 Änderungen offen`). Bei mehreren Hosts folgt eine Summenzeile. Wirkt in jedem Benachrichtigungsweg, nicht nur im Blueprint.
+- **Blueprint: „Auch Läufe ohne HA_RESULT melden“** (Standard an): Läufe ohne `HA_RESULT` (z. B. Build/Deploy) melden sich mit der kurzen Nachricht statt gar nicht. Die Option „Anzahl je Host anzeigen“ entfällt, die Hostzeilen kommen aus dem Text der Integration.
+- **Blueprint-Update erscheint nicht mehr bei jedem Dev-Build**: Es zählt der Inhalt der Datei, nicht nur das Release-Tag; unveränderte Blueprints gelten als aktuell.
 - **Dev-Versionen bekommen auch Dev-Blueprints**: Ist eine Dev-Version der Integration (`…-dev.N`) installiert, zählt für das Blueprint-Update das neueste Release einschließlich Vorab-Releases, bei einer stabilen Version nur das neueste stabile.
 - **Blueprint herunterladen und aktuell halten** (Gerät des Projekts): Neue Entität *Blueprint-Update* zeigt die installierte und die neueste Version und installiert per Knopf; der Knopf *Blueprint herunterladen* lädt `semaphore_task_result.yaml` aus dem neuesten Release nach `/config/blueprints/automation/19Andy89/`, lädt die Automationen neu und sichert eine abweichende alte Datei als `.yaml.bak`. Die Version steht als Kommentar in der ersten Zeile; eine von Hand importierte, inhaltsgleiche Datei gilt als aktuell. Geprüft alle 6 Stunden (folgt der Option „Auf neue Semaphore-Version prüfen“). Geschrieben wird nur nach dem Drücken, nie von selbst. 14 neue Tests.
 

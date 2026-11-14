@@ -6,8 +6,9 @@ entity + button of the project device) and puts it where the import dialog would
 (``/config/blueprints/automation/19Andy89/``); automations that use it keep working.
 
 * The file is stamped with its release (first line), so the installed version can be shown.
-  A file imported by hand carries no stamp: it counts as the latest version if its content
-  equals the one in the release, otherwise as "unknown".
+  A file counts as the latest version whenever its content equals the one in the latest release
+  (the stamp may name an older tag, e.g. between two dev builds). A file imported by hand carries
+  no stamp: if its content differs it counts as "unknown".
 * An existing different file is saved as ``<name>.yaml.bak`` first.
 * Stable version installed: only the latest stable release counts. Dev pre-release installed
   (``x.y.z-dev.N``): the newest release including pre-releases counts, so its blueprint is offered too.
@@ -100,10 +101,12 @@ def installed_version(path: Path, latest_text: str | None, latest_tag: str | Non
         return NOT_INSTALLED
     except (OSError, UnicodeDecodeError):
         return UNKNOWN
+    if latest_text is not None and latest_tag and unstamp(text) == unstamp(latest_text):
+        # Same content as the latest release (also if stamped with an older tag: every dev build
+        # gets a new tag, but the blueprint rarely changes) -> no update
+        return latest_tag
     if match := STAMP_RE.match(text):
         return match["tag"]
-    if latest_text is not None and latest_tag and unstamp(text) == unstamp(latest_text):
-        return latest_tag  # imported by hand, same content as the release
     return UNKNOWN
 
 

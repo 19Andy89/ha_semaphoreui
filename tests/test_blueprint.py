@@ -71,75 +71,53 @@ def _event(
 
 
 @pytest.mark.parametrize(
-    ("when", "event", "include_dry_runs", "only", "expected", "notify_updates"),
+    ("when", "event", "include_dry_runs", "only", "expected", "notify_updates", "notify_without_result"),
     [
-        ("failed", _event("failed"), True, [], True, False),
-        ("failed", _event("success", needed=True), True, [], False, False),
-        ("failed", _event("success"), True, [], False, False),
-        ("problems", _event("success", needed=True), True, [], True, False),
-        ("problems", _event("success", needed=False), True, [], False, False),
-        ("problems", _event("success"), True, [], False, False),
-        ("problems", _event("failed"), True, [], True, False),
-        ("all", _event("success"), True, [], True, False),
-        ("all", _event("stopped"), True, [], True, False),
-        ("failed", _event("stopped"), True, [], False, False),
-        ("problems", _event("stopped"), True, [], False, False),
-        ("all", _event("success", dry_run=True), False, [], False, False),
-        ("all", _event("success", dry_run=True), True, [], True, False),
-        ("all", _event("failed", template="proxmox"), True, ["docker"], False, False),
-        ("all", _event("failed", template="docker"), True, ["docker"], True, False),
+        ("failed", _event("failed"), True, [], True, False, False),
+        ("failed", _event("success", needed=True), True, [], False, False, False),
+        ("failed", _event("success"), True, [], False, False, False),
+        ("problems", _event("success", needed=True), True, [], True, False, False),
+        ("problems", _event("success", needed=False), True, [], False, False, False),
+        ("problems", _event("success"), True, [], False, False, False),
+        ("problems", _event("failed"), True, [], True, False, False),
+        ("all", _event("success"), True, [], True, False, False),
+        ("all", _event("stopped"), True, [], True, False, False),
+        ("failed", _event("stopped"), True, [], False, False, False),
+        ("problems", _event("stopped"), True, [], False, False, False),
+        ("all", _event("success", dry_run=True), False, [], False, False, False),
+        ("all", _event("success", dry_run=True), True, [], True, False, False),
+        ("all", _event("failed", template="proxmox"), True, ["docker"], False, False, False),
+        ("all", _event("failed", template="docker"), True, ["docker"], True, False, False),
         # switch "open updates": reports every run with updates > 0, independent of "when"
-        ("failed", _event("success", updates=3), True, [], True, True),
-        ("failed", _event("success", updates=3), True, [], False, False),
-        ("failed", _event("success", updates=0), True, [], False, True),
-        ("failed", _event("success", needed=True), True, [], False, True),  # reboot only: no update count
-        ("failed", _event("success"), True, [], False, True),  # no HA_RESULT at all
-        ("failed", _event("stopped", updates=3), True, [], False, True),
-        ("failed", _event("success", updates=3, dry_run=True), False, [], False, True),
-        ("failed", _event("success", updates=3, template="proxmox"), True, ["docker"], False, True),
+        ("failed", _event("success", updates=3), True, [], True, True, False),
+        ("failed", _event("success", updates=3), True, [], False, False, False),
+        ("failed", _event("success", updates=0), True, [], False, True, False),
+        ("failed", _event("success", needed=True), True, [], False, True, False),  # reboot only: no update count
+        ("failed", _event("success"), True, [], False, True, False),  # no HA_RESULT at all
+        ("failed", _event("stopped", updates=3), True, [], False, True, False),
+        ("failed", _event("success", updates=3, dry_run=True), False, [], False, True, False),
+        ("failed", _event("success", updates=3, template="proxmox"), True, ["docker"], False, True, False),
+        # switch "also runs without HA_RESULT": a short message instead of silence
+        ("failed", _event("success"), True, [], True, False, True),
+        ("problems", _event("success"), True, [], True, False, True),
+        ("failed", _event("success", needed=False), True, [], False, False, True),  # has a HA_RESULT: nothing to do
+        ("failed", _event("stopped"), True, [], False, False, True),
+        ("failed", _event("success", dry_run=True), False, [], False, False, True),
+        ("failed", _event("success", template="proxmox"), True, ["docker"], False, False, True),
+        ("failed", _event("success"), True, [], False, False, False),
     ],
 )
-async def test_condition(hass: HomeAssistant, when, event, include_dry_runs, only, expected, notify_updates) -> None:
+async def test_condition(
+    hass: HomeAssistant, when, event, include_dry_runs, only, expected, notify_updates, notify_without_result
+) -> None:
     condition = _load()["conditions"][0]["value_template"]
     variables = {
         "when": when,
         "include_dry_runs": include_dry_runs,
         "only_templates": only,
         "notify_updates": notify_updates,
+        "notify_without_result": notify_without_result,
         "trigger": event,
     }
     assert Template(condition, hass).async_render(variables) is expected
 
-
-HOSTS = {
-    "pve": {"updates": 28, "installed": 0, "reboot_required": True},
-    "docker": {"updates": 0, "installed": 5, "reboot_required": False},
-    "adguard": {"updates": 1, "reboot_required": False},
-    "pi": {"updates": None, "reboot_required": None},
-}
-
-
-async def _render(hass: HomeAssistant, event: dict, show_hosts: bool = True) -> str:
-    message = _load()["actions"][0]["data"]["message"]
-    return Template(message, hass).async_render({"show_hosts": show_hosts, "trigger": event})
-
-
-async def test_message_lists_the_count_per_host(hass: HomeAssistant) -> None:
-    event = _event("success", needed=True, updates=29, hosts=HOSTS)
-    event["event"]["data"]["text"] = "Task OK"
-    assert (await _render(hass, event)).split("\n") == [
-        "Task OK",
-        "• adguard: 1 Update",
-        "• docker: aktuell · 5 installiert",
-        "• pi: keine Angaben",
-        "• pve: 28 Updates · Neustart nötig",
-    ]
-
-
-async def test_message_without_hosts_or_with_the_switch_off_is_the_plain_text(hass: HomeAssistant) -> None:
-    event = _event("success", needed=True, updates=29, hosts=HOSTS)
-    event["event"]["data"]["text"] = "Task OK"
-    assert await _render(hass, event, show_hosts=False) == "Task OK"
-    for plain in (_event("success"), _event("success", needed=False), _event("success", hosts={})):
-        plain["event"]["data"]["text"] = "Task OK"
-        assert await _render(hass, plain) == "Task OK"

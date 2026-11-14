@@ -476,7 +476,7 @@ Gleicher Aufbau in den Ereignissen, in der Aktions-Antwort und in den Attributen
                                 // {"needed": true, "updates": 3, "reboot_required": false, "hosts": {…}, "packages": [...]}
   "url": "https://semaphore.example.de/project/1/templates/1?t=42",
   "title": "❌ docker-system aktualisieren: fehlgeschlagen",
-  "text": "Gestartet: 24.10.2026 14:00:00 (von Andreas)\nDauer: 3 s\nErgebnis: fehlgeschlagen – dockerhost: ok=0 geändert=0 failed=1\nFehler: Error when processing /home/x/docker-system: pull access denied\nTask: Neue Images ziehen, Container mit neuem Image neu erstellen\nHost: dockerhost",
+  "text": "Gestartet: 24.10.2026 14:00:00 (von Andreas)\nDauer: 3 s\nErgebnis: fehlgeschlagen\n• dockerhost: 1 fehlgeschlagen\nFehler: Error when processing /home/x/docker-system: pull access denied\nTask: Neue Images ziehen, Container mit neuem Image neu erstellen\nHost: dockerhost",
   "short": "❌ fehlgeschlagen · 3 s · 24.10. 14:00 · Error when processing …"
 }
 ```
@@ -503,7 +503,7 @@ Ohne YAML: Das Blueprint **„Semaphore UI – Benachrichtigung bei Taskende“*
 * **Benachrichtigen:** eine oder mehrere `notify`-Entitäten (z. B. dein Handy).
 * **Wann:** *nur bei Fehlern*, *bei Fehlern und bei Handlungsbedarf* (auch erfolgreiche Läufe mit `HA_RESULT` `needed: true`) oder *bei jedem Ergebnis*.
 * **Auch bei offenen Updates benachrichtigen** (Standard: aus): meldet jeden Lauf, nach dem noch Updates offen sind, unabhängig von „Wann“. Mit „Nur bei Fehlern“ kombiniert kommt also kein Hinweis nur wegen eines nötigen Neustarts.
-* **Anzahl je Host anzeigen** (Standard: an): hängt eine Zeile pro Host an, z. B. `• pve: 28 Updates · Neustart nötig` oder `• docker: aktuell · 5 installiert`.
+* **Auch Läufe ohne HA_RESULT melden** (Standard: an): Läufe von Playbooks ohne `HA_RESULT` (z. B. Build/Deploy) melden sich mit einer kurzen Nachricht (Ergebnis, Dauer, eine Zeile pro Host) statt gar nicht.
 * **Testläufe einbeziehen** (Standard: ja), **nur bestimmte Templates** (Namen wie in Semaphore) und **zusätzliche Aktionen** (der Bericht steht in `trigger.event.data`).
 
 **Blueprint aktuell halten:** Am Gerät des Projekts gibt es die Entität **Blueprint-Update** (zeigt die installierte und die neueste Version, Knopf *Installieren*) und den Knopf **Blueprint herunterladen** (lädt die Datei aus dem neuesten Release, auch wenn sie schon aktuell ist). Die Datei landet in `/config/blueprints/automation/19Andy89/semaphore_task_result.yaml`, also dort, wo auch der Import-Dialog sie ablegt; bestehende Automationen nutzen sie weiter und werden neu geladen. Eine vorhandene, abweichende Datei bleibt als `semaphore_task_result.yaml.bak` erhalten. Die installierte Version steht als Kommentar in der ersten Zeile; eine von Hand importierte Datei gilt als aktuell, wenn ihr Inhalt dem Release entspricht, sonst als „unknown“. Auf einer **Dev-Version** der Integration (`…-dev.N`) zählt auch das neueste Vorab-Release, du bekommst dann also auch die Dev-Blueprints; mit einer stabilen Version nur stabile. Geprüft wird alle 6 Stunden (abschaltbar mit „Auf neue Semaphore-Version prüfen“ in den Optionen; der Knopf lädt dann trotzdem auf Wunsch).

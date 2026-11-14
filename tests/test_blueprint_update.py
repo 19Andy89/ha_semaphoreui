@@ -128,6 +128,7 @@ async def test_a_new_release_shows_an_update(hass: HomeAssistant, fake, make_ent
     button = entity(hass, "button", entry, "blueprint_download")
     await hass.services.async_call("button", SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True)
     server.blueprint_release = {"tag_name": "v9.1.0", "html_url": "https://example.test/ha_release2"}
+    server.blueprint_text += "# new in 9.1.0\n"  # the blueprint itself changed
     await entry.runtime_data.blueprint_coordinator.async_refresh()
     await hass.async_block_till_done()
     state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
@@ -207,3 +208,18 @@ async def test_the_dev_check_recognises_dev_versions(hass: HomeAssistant) -> Non
     for version, expected in (("0.22.0-dev.2", True), ("0.22.0", False)):
         with patch.object(blueprint, "async_get_integration", AsyncMock(return_value=SimpleNamespace(version=version))):
             assert await blueprint.async_is_dev_version(hass) is expected
+
+
+async def test_a_new_tag_with_the_same_blueprint_is_no_update(hass: HomeAssistant, fake, make_entry, tmp_path: Path) -> None:
+    """Every dev build gets a new tag; as long as the file is the same there is nothing to update."""
+    server, _ = fake
+    entry = await start(hass, tmp_path, make_entry)
+    await hass.services.async_call(
+        "button", SERVICE_PRESS, {ATTR_ENTITY_ID: entity(hass, "button", entry, "blueprint_download")}, blocking=True
+    )
+    server.blueprint_release = {"tag_name": "v9.0.1", "html_url": "https://example.test/ha_release3"}
+    await entry.runtime_data.blueprint_coordinator.async_refresh()
+    await hass.async_block_till_done()
+    state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
+    assert state.state == STATE_OFF
+    assert state.attributes["installed_version"] == state.attributes["latest_version"] == "v9.0.1"
