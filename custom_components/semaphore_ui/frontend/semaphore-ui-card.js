@@ -2127,7 +2127,7 @@ for (const card of [
 ]) {
   if (!window.customCards.some((c) => c.type === card.type)) {
     // preview: the picker shows the card with the first matching device (see getStubConfig)
-    window.customCards.push({ ...card, preview: true, documentationURL: "https://semaphoreui.com/docs" });
+    window.customCards.push({ ...card, preview: true, documentationURL: "https://github.com/19Andy89/ha_semaphoreui" });
   }
 }
 console.info(`%c SEMAPHORE-UI-CARD %c ${SEMAPHORE_CARD_VERSION} `, "color:#fff;background:#039be5;font-weight:700", "color:#039be5;background:#fff;font-weight:700");
