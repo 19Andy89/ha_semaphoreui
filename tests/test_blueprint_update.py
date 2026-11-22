@@ -44,13 +44,24 @@ def github_requests(server: FakeSemaphore) -> list[tuple[str, str, str | None]]:
 # --------------------------------------------------------------------------- #
 # pure helpers
 # --------------------------------------------------------------------------- #
-def test_stamp_roundtrip() -> None:
+def test_a_legacy_stamp_is_recognised_and_removed() -> None:
     text = "blueprint:\n  domain: automation\n"
-    stamped = blueprint.stamp("v1.2.3", text)
-    assert stamped.startswith("# ha_semaphoreui blueprint v1.2.3\n")
+    stamped = f"# ha_semaphoreui blueprint v1.2.3\n{text}"
     assert blueprint.unstamp(stamped) == text
-    assert blueprint.stamp("v2.0.0", stamped) == blueprint.stamp("v2.0.0", text)  # no double stamp
+    assert blueprint.unstamp(text) == text
 
+
+def test_the_installed_version_comes_from_the_memory_not_from_the_file(tmp_path: Path) -> None:
+    path = tmp_path / "bp.yaml"
+    assert blueprint.installed_version(path, None, None) == blueprint.NOT_INSTALLED
+    path.write_text("blueprint:\n  domain: automation\n", encoding="utf-8")
+    assert blueprint.installed_version(path, None, None) == blueprint.UNKNOWN
+    remembered = {"tag": "v1.0.0", "sha256": blueprint.sha256(path.read_text(encoding="utf-8"))}
+    assert blueprint.installed_version(path, None, None, remembered) == "v1.0.0"
+    path.write_text("blueprint:\n  domain: automation\n# edited by hand\n", encoding="utf-8")
+    assert blueprint.installed_version(path, None, None, remembered) == blueprint.UNKNOWN  # changed since
+    path.write_text("# ha_semaphoreui blueprint v0.9.0\nblueprint:\n  domain: automation\n", encoding="utf-8")
+    assert blueprint.installed_version(path, None, None) == "v0.9.0"  # legacy stamp
 
 @pytest.mark.parametrize(
     ("text", "ok"),
@@ -89,14 +100,14 @@ async def test_the_button_downloads_the_blueprint(hass: HomeAssistant, fake, mak
     )
     await hass.async_block_till_done()
     written = (tmp_path / TARGET).read_text(encoding="utf-8")
-    assert written.startswith("# ha_semaphoreui blueprint v9.0.0\n")
-    assert blueprint.unstamp(written) == server.blueprint_text
+    assert written == server.blueprint_text  # byte for byte: tools that compare it with the source_url see no difference
     assert not (tmp_path / (str(TARGET) + ".bak")).exists()  # nothing to back up
     state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
     assert state.state == STATE_OFF and state.attributes["installed_version"] == "v9.0.0"
 
 
 async def test_an_old_different_file_is_kept_as_bak(hass: HomeAssistant, fake, make_entry, tmp_path: Path) -> None:
+    server, _ = fake
     target = tmp_path / TARGET
     target.parent.mkdir(parents=True)
     target.write_text("blueprint:\n  name: my own version\n  domain: automation\n", encoding="utf-8")
@@ -106,7 +117,7 @@ async def test_an_old_different_file_is_kept_as_bak(hass: HomeAssistant, fake, m
     await hass.services.async_call(
         "update", SERVICE_INSTALL, {ATTR_ENTITY_ID: entity(hass, "update", entry, "blueprint_update")}, blocking=True
     )
-    assert target.read_text(encoding="utf-8").startswith("# ha_semaphoreui blueprint v9.0.0\n")
+    assert target.read_text(encoding="utf-8") == server.blueprint_text
     assert "my own version" in Path(str(target) + ".bak").read_text(encoding="utf-8")
 
 
@@ -196,7 +207,7 @@ async def test_a_dev_version_also_offers_the_dev_blueprint(
     await hass.services.async_call(
         "button", SERVICE_PRESS, {ATTR_ENTITY_ID: entity(hass, "button", entry, "blueprint_download")}, blocking=True
     )
-    assert (tmp_path / TARGET).read_text(encoding="utf-8").startswith("# ha_semaphoreui blueprint v9.1.0-dev.3\n")
+    assert (tmp_path / TARGET).read_text(encoding="utf-8") == server.blueprint_text
     state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
     assert state.state == STATE_OFF and state.attributes["installed_version"] == "v9.1.0-dev.3"
 
@@ -223,3 +234,39 @@ async def test_a_new_tag_with_the_same_blueprint_is_no_update(hass: HomeAssistan
     state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
     assert state.state == STATE_OFF
     assert state.attributes["installed_version"] == state.attributes["latest_version"] == "v9.0.1"
+
+
+async def test_a_file_from_an_early_dev_version_is_cleaned_without_a_backup(
+    hass: HomeAssistant, fake, make_entry, tmp_path: Path
+) -> None:
+    """dev.1-dev.7 wrote a stamp line: same content -> current; the next install removes the line, no .bak."""
+    server, _ = fake
+    target = tmp_path / TARGET
+    target.parent.mkdir(parents=True)
+    target.write_text("# ha_semaphoreui blueprint v8.0.0\n" + server.blueprint_text, encoding="utf-8")
+    entry = await start(hass, tmp_path, make_entry)
+    state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
+    assert state.state == STATE_OFF and state.attributes["installed_version"] == "v9.0.0"
+    await hass.services.async_call(
+        "button", SERVICE_PRESS, {ATTR_ENTITY_ID: entity(hass, "button", entry, "blueprint_download")}, blocking=True
+    )
+    assert target.read_text(encoding="utf-8") == server.blueprint_text
+    assert not Path(str(target) + ".bak").exists()
+
+
+async def test_the_installed_version_survives_between_two_checks_with_changed_releases(
+    hass: HomeAssistant, fake, make_entry, tmp_path: Path
+) -> None:
+    """The file is byte-identical to the release, yet the integration knows which release it installed."""
+    server, _ = fake
+    entry = await start(hass, tmp_path, make_entry)
+    await hass.services.async_call(
+        "button", SERVICE_PRESS, {ATTR_ENTITY_ID: entity(hass, "button", entry, "blueprint_download")}, blocking=True
+    )
+    server.blueprint_release = {"tag_name": "v9.2.0", "html_url": "https://example.test/ha_release4"}
+    server.blueprint_text += "# new in 9.2.0\n"
+    await entry.runtime_data.blueprint_coordinator.async_refresh()
+    await hass.async_block_till_done()
+    state = hass.states.get(entity(hass, "update", entry, "blueprint_update"))
+    assert state.state == STATE_ON
+    assert (state.attributes["installed_version"], state.attributes["latest_version"]) == ("v9.0.0", "v9.2.0")

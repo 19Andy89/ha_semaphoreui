@@ -1,4 +1,4 @@
-# examples/update-linux.yml – Linux-Gäste aktualisieren und das Ergebnis an Home Assistant melden (HA_RESULT)
+# playbooks/update-linux.yml – Linux-Gäste aktualisieren und das Ergebnis an Home Assistant melden (HA_RESULT)
 ---
 - name: Linux-Gäste aktualisieren
   hosts: linux_guests

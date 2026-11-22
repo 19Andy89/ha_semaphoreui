@@ -5,10 +5,12 @@ integration downloads ``semaphore_task_result.yaml`` from the GitHub release on 
 entity + button of the project device) and puts it where the import dialog would put it
 (``/config/blueprints/automation/19Andy89/``); automations that use it keep working.
 
-* The file is stamped with its release (first line), so the installed version can be shown.
+* The file is written exactly as it is in the release (byte for byte), so that tools which compare
+  it with the ``source_url`` (Spook's blueprint updates, Home Assistant's own check) see no difference.
+  Which release was installed is remembered separately (``.storage``), together with a hash of the file.
   A file counts as the latest version whenever its content equals the one in the latest release
-  (the stamp may name an older tag, e.g. between two dev builds). A file imported by hand carries
-  no stamp: if its content differs it counts as "unknown".
+  (e.g. between two dev builds that did not touch the blueprint). A file that is neither the latest
+  nor the one we installed counts as "unknown".
 * An existing different file is saved as ``<name>.yaml.bak`` first.
 * Stable version installed: only the latest stable release counts. Dev pre-release installed
   (``x.y.z-dev.N``): the newest release including pre-releases counts, so its blueprint is offered too.
@@ -23,6 +25,7 @@ from datetime import timedelta
 import logging
 import os
 from pathlib import Path
+import hashlib
 import re
 
 import aiohttp
@@ -30,6 +33,7 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.loader import async_get_integration
 
@@ -49,6 +53,9 @@ from .coordinator import SemaphoreConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
+STORAGE_VERSION = 1
+STORAGE_KEY = f"{DOMAIN}_blueprint"
+# Versions 0.22.0-dev.1 to dev.7 wrote this line at the top of the file; it is removed on the next install
 STAMP_RE = re.compile(r"\A# ha_semaphoreui blueprint (?P<tag>v?[0-9A-Za-z.\-+]+)\r?\n")
 MAX_BYTES = 200_000
 NOT_INSTALLED = "not installed"
@@ -74,14 +81,14 @@ def blueprint_path(hass: HomeAssistant) -> Path:
     return Path(hass.config.path("blueprints", "automation", BLUEPRINT_SUBDIR, BLUEPRINT_FILE))
 
 
-def stamp(tag: str, text: str) -> str:
-    """The downloaded text with the release as first line."""
-    return f"# ha_semaphoreui blueprint {tag}\n{unstamp(text)}"
-
-
 def unstamp(text: str) -> str:
-    """The text without our stamp line."""
+    """The text without the stamp line that early dev versions of this integration added."""
     return STAMP_RE.sub("", text, count=1)
+
+
+def sha256(text: str) -> str:
+    """Hash of a file's text (what we remember about the file we wrote)."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def looks_like_the_blueprint(text: str) -> bool:
@@ -93,7 +100,12 @@ def looks_like_the_blueprint(text: str) -> bool:
     )
 
 
-def installed_version(path: Path, latest_text: str | None, latest_tag: str | None) -> str:
+def installed_version(
+    path: Path,
+    latest_text: str | None,
+    latest_tag: str | None,
+    remembered: dict[str, str] | None = None,
+) -> str:
     """Version of the installed file (blocking: reads the file)."""
     try:
         text = path.read_text(encoding="utf-8")
@@ -102,11 +114,11 @@ def installed_version(path: Path, latest_text: str | None, latest_tag: str | Non
     except (OSError, UnicodeDecodeError):
         return UNKNOWN
     if latest_text is not None and latest_tag and unstamp(text) == unstamp(latest_text):
-        # Same content as the latest release (also if stamped with an older tag: every dev build
-        # gets a new tag, but the blueprint rarely changes) -> no update
-        return latest_tag
+        return latest_tag  # same content as the latest release: nothing to update
+    if remembered and remembered.get("sha256") == sha256(text) and remembered.get("tag"):
+        return remembered["tag"]  # the file we wrote, untouched
     if match := STAMP_RE.match(text):
-        return match["tag"]
+        return match["tag"]  # written by an early dev version
     return UNKNOWN
 
 
@@ -116,7 +128,7 @@ def write_blueprint(path: Path, content: str) -> bool:
     backup = False
     if path.exists():
         try:
-            if path.read_text(encoding="utf-8") != content:
+            if unstamp(path.read_text(encoding="utf-8")) != content:
                 backup = True
                 path.with_name(path.name + ".bak").write_bytes(path.read_bytes())
         except OSError as err:
@@ -190,6 +202,7 @@ class SemaphoreBlueprintCoordinator(DataUpdateCoordinator[BlueprintData]):
             update_interval=timedelta(seconds=BLUEPRINT_SCAN_INTERVAL),
         )
         self.check_updates: bool = entry.options.get(CONF_CHECK_UPDATES, True)
+        self._store: Store[dict[str, str]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
 
     async def _async_update_data(self) -> BlueprintData:
         latest = None
@@ -201,7 +214,8 @@ class SemaphoreBlueprintCoordinator(DataUpdateCoordinator[BlueprintData]):
             )
         path = blueprint_path(self.hass)
         tag, url, text = latest if latest else (None, None, None)
-        installed = await self.hass.async_add_executor_job(installed_version, path, text, tag)
+        remembered = await self._store.async_load()
+        installed = await self.hass.async_add_executor_job(installed_version, path, text, tag, remembered)
         return BlueprintData(installed, tag, url, str(path))
 
     async def async_install(self) -> str:
@@ -217,7 +231,9 @@ class SemaphoreBlueprintCoordinator(DataUpdateCoordinator[BlueprintData]):
         if not looks_like_the_blueprint(text):
             raise BlueprintError("The downloaded file is not the expected blueprint; nothing was written")
         path = blueprint_path(self.hass)
-        backup = await self.hass.async_add_executor_job(write_blueprint, path, stamp(tag, text))
+        content = unstamp(text)
+        backup = await self.hass.async_add_executor_job(write_blueprint, path, content)
+        await self._store.async_save({"tag": tag, "sha256": sha256(content)})
         _LOGGER.info(
             "Blueprint %s %s written to %s%s",
             BLUEPRINT_FILE,
