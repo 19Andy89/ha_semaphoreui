@@ -157,6 +157,9 @@ ICONS = {
     "never_run": "➖",
 }
 
+ACTION_ICON = "🟠"  # push title: action needed
+OK_ICON = "🟢"  # push title: nothing to do
+
 # Keys of the report dict (used to exclude them from the recorder).
 REPORT_KEYS = (
     "project",
@@ -819,32 +822,31 @@ def build_report(
     note = ((task or {}).get("message") or "").strip() or None
     parameters = _parameters(task)
     icon = ICONS[result]
-    title = f"{icon} {template_name}"
-    if dry_run:
-        title += f" ({t['dry_run']})"
-    title += f": {t[result]}"
-
     recap = (analysis or {}).get("recap", [])
     ha_result = (analysis or {}).get("ha_result")
 
-    # --- multi line text for push messages ---
+    # push title: colour = what the reader has to do (orange: action needed, green: nothing to do,
+    # red: run failed). "successful" is not worth a word - only a failed/stopped run says why.
+    needs_action = bool(
+        ha_result
+        and (
+            ha_result.get("needed")
+            or ha_result.get("reboot_required")
+            or (isinstance(ha_result.get("updates"), (int, float)) and ha_result["updates"] > 0)
+            or ha_result.get("notes")
+        )
+    )
+    title_icon = icon
+    if result == "success":
+        title_icon = ACTION_ICON if needs_action else OK_ICON
+    title = f"{title_icon} {template_name}"
+    if dry_run:
+        title += f" ({t['dry_run']})"
+    if result != "success":
+        title += f": {t[result]}"
+
+    # --- multi line text for push messages: what to do first, details afterwards ---
     lines: list[str] = []
-    if started:
-        line = f"{t['started']}: {local(started, 'dt_long')}"
-        if started_by:
-            line += f" ({t['by']} {started_by})"
-        lines.append(line)
-    if duration_text:
-        lines.append(f"{t['duration']}: {duration_text}")
-    if finished:
-        lines.append(f"{t['result']}: {t[result]}")
-        lines.extend(host_lines(recap, ha_result, dry_run=dry_run, lang=lang))
-    if ha_result:
-        # one host: its line already says it all; several hosts (or none named): add the total
-        if len((ha_result.get("hosts") or {})) != 1:
-            lines.append(ha_result_text(ha_result, lang))
-        for item in (ha_result.get("notes") or [])[:3]:
-            lines.append(f"{t['hint']} ({item['host']}): {item['text']}")
     if error:
         lines.append(f"{t['error']}: {error['reason']}")
         if error.get("failed_task"):
@@ -853,6 +855,19 @@ def build_report(
             lines.append(f"{t['host']}: {error['host']}")
     elif result == "failed" and analysis and analysis["tail"]:
         lines.append(f"{t['error']}: {analysis['tail'][-1]}")
+    if finished:
+        lines.extend(host_lines(recap, ha_result, dry_run=dry_run, lang=lang))
+    if ha_result:
+        # one host: its line already says it all; several hosts (or none named): add the total
+        if len((ha_result.get("hosts") or {})) != 1:
+            lines.append(ha_result_text(ha_result, lang))
+        for item in (ha_result.get("notes") or [])[:3]:
+            lines.append(f"{t['hint']} ({item['host']}): {item['text']}")
+    if started:
+        line = f"{t['started']}: {local(started, 'dt_long')}"
+        if started_by:
+            line += f" ({t['by']} {started_by})"
+        lines.append(line)
     if parameters:
         shown = ", ".join(f"{k}={v}" for k, v in parameters.items())
         lines.append(f"{t['parameters']}: {truncate(shown, MAX_LINE)}")

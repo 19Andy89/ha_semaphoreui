@@ -206,7 +206,7 @@ async def test_start_button_and_finish_event(hass: HomeAssistant, fake, make_ent
     assert data["task_id"] == task_id and data["result"] == "success"
     assert data["duration_seconds"] == 42 and data["duration"] == "42 s"
     assert data["recap"][0]["ok"] == 3
-    assert data["title"].startswith("✅ docker-system aktualisieren")
+    assert data["title"].startswith("🟢 docker-system aktualisieren")
     assert hass.states.get(eid(hass, "sensor", 1, "status")).state == "success"
     assert hass.states.get(eid(hass, "binary_sensor", 1, "running")).state == "off"
 

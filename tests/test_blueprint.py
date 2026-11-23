@@ -129,7 +129,34 @@ async def test_condition(
         "notify_updates": notify_updates,
         "notify_without_result": notify_without_result,
         "notify_installed": notify_installed,
+        "dry_run_only_if_action": False,
         "trigger": event,
     }
     assert Template(condition, hass).async_render(variables) is expected
 
+
+
+@pytest.mark.parametrize(
+    ("event", "expected"),
+    [
+        (_event("success", dry_run=True, needed=True, updates=3), True),  # dry run with open updates
+        (_event("success", dry_run=True, needed=True), True),  # reboot only
+        (_event("success", dry_run=True, needed=False, updates=0), False),  # nothing to do: quiet
+        (_event("success", dry_run=True), False),  # no HA_RESULT: no action known
+        (_event("failed", dry_run=True), True),  # a failure always reports
+        (_event("success", needed=False, updates=0), True),  # real runs are not affected
+    ],
+)
+async def test_condition_dry_run_only_if_action(hass: HomeAssistant, event, expected) -> None:
+    condition = _load()["conditions"][0]["value_template"]
+    variables = {
+        "when": "all",
+        "include_dry_runs": True,
+        "only_templates": [],
+        "notify_updates": False,
+        "notify_without_result": True,
+        "notify_installed": True,
+        "dry_run_only_if_action": True,
+        "trigger": event,
+    }
+    assert Template(condition, hass).async_render(variables) is expected

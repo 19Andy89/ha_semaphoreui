@@ -99,11 +99,11 @@ def test_report_success_de() -> None:
     assert rep["result"] == "success" and rep["success"] is True
     assert rep["duration_seconds"] == 72 and rep["duration"] == "1 Min 12 s"
     assert rep["started_local"] == "24.10.2026 14:03:01"  # UTC+2
-    assert rep["title"] == "✅ docker-system aktualisieren: erfolgreich"
+    assert rep["title"] == "🟢 docker-system aktualisieren"  # no "erfolgreich", nothing to do = green
     assert rep["url"] == "https://semaphore.example/project/1/templates/1?t=7"
     assert "Gestartet: 24.10.2026 14:03:01 (von Andreas)" in rep["text"]
-    assert "Dauer: 1 Min 12 s" in rep["text"]
-    assert "Ergebnis: erfolgreich\n• dockerhost: 1 geändert" in rep["text"]  # without HA_RESULT: the recap, no zero values
+    assert "Dauer" not in rep["text"]  # duration is not worth a push line
+    assert rep["text"].startswith("• dockerhost: 1 geändert\nGestartet:")  # without HA_RESULT: the recap, no zero values
     assert "failed=0" not in rep["text"] and "ok=" not in rep["text"]
     assert rep["error"] is None
     assert rep["short"].startswith("✅ erfolgreich · 1 Min 12 s · 24.10. 14:03")
@@ -217,3 +217,21 @@ def test_host_lines_without_ha_result_use_the_recap_only() -> None:
 def test_host_only_known_from_ha_result_is_listed_and_action_is_named() -> None:
     ha = {"hosts": {"zeta": {"updates": 0, "needed": True}, "alpha": {"updates": 5}}}
     assert host_lines([], ha, dry_run=True, lang="de") == ["• alpha: 5 offene Updates", "• zeta: Handlungsbedarf"]
+
+
+def _ha_report(ha: dict, result: str = "success") -> dict:
+    out = rows(OK_OUT + "\n" + 'HA_RESULT: ' + __import__("json").dumps(ha))
+    task = {"id": 8, "status": result, "created": "2026-10-24T12:03:00Z", "start": "2026-10-24T12:03:01Z", "end": "2026-10-24T12:04:13Z"}
+    return build_report(project_id=1, project_name="P", template=TEMPLATE, task=task, output=out, lang="de", tz=BERLIN)
+
+
+def test_title_orange_when_action_needed_and_action_first() -> None:
+    rep = _ha_report({"needed": True, "updates": 3, "reboot_required": False, "hosts": {"dockerhost": {"updates": 3}}})
+    assert rep["title"] == "🟠 docker-system aktualisieren"
+    assert rep["text"].splitlines()[0].startswith("• dockerhost")
+    assert "Dauer" not in rep["text"]
+
+
+def test_title_green_when_nothing_to_do() -> None:
+    rep = _ha_report({"needed": False, "updates": 0, "reboot_required": False, "hosts": {}})
+    assert rep["title"].startswith("🟢 ")

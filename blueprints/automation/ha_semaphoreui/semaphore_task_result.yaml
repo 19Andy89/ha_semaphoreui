@@ -66,6 +66,15 @@ blueprint:
       default: true
       selector:
         boolean: {}
+    dry_run_only_if_action:
+      name: Testläufe nur bei Handlungsbedarf melden
+      description: >-
+        Ein Testlauf (Dry-Run) meldet sich nur, wenn danach etwas zu tun ist (`needed`, offene `updates` oder
+        `reboot_required` im `HA_RESULT`) – oder wenn er fehlschlägt. Testläufe ohne Handlungsbedarf und ohne
+        `HA_RESULT` bleiben still. Echte Läufe sind davon nicht betroffen. Gilt nur, wenn „Testläufe einbeziehen“ an ist.
+      default: false
+      selector:
+        boolean: {}
     only_templates:
       name: Nur diese Templates (optional)
       description: Namen der Semaphore-Templates, genau wie in Semaphore geschrieben. Leer = alle Templates.
@@ -91,6 +100,7 @@ variables:
   notify_installed: !input notify_installed
   notify_without_result: !input notify_without_result
   include_dry_runs: !input include_dry_runs
+  dry_run_only_if_action: !input dry_run_only_if_action
   only_templates: !input only_templates
 
 triggers:
@@ -105,11 +115,13 @@ conditions:
       {% set action = (d.ha_result is mapping) and (d.ha_result.get('needed', false) | bool(false)) %}
       {% set pending = (d.ha_result is mapping) and ((d.ha_result.get('updates', 0) | int(0)) > 0) %}
       {% set installed = (d.ha_result is mapping) and ((d.ha_result.get('installed', 0) | int(0)) > 0) %}
+      {% set reboot = (d.ha_result is mapping) and (d.ha_result.get('reboot_required', false) | bool(false)) %}
       {% set no_report = d.ha_result is not mapping %}
       {% set by_result = (d.result != 'stopped' or when == 'all') and
          (when == 'all' or failed or (when == 'problems' and action) or (notify_updates and pending) or (notify_installed and installed)
           or (notify_without_result and no_report)) %}
-      {% set by_dry_run = include_dry_runs or not d.dry_run %}
+      {% set by_dry_run = (include_dry_runs or not d.dry_run) and
+         not (dry_run_only_if_action and d.dry_run and not failed and not (action or pending or reboot)) %}
       {% set by_template = (only_templates | length == 0) or (d.template in only_templates) %}
       {{ by_result and by_dry_run and by_template }}
 
